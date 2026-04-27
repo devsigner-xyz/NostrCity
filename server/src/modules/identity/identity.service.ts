@@ -1,3 +1,6 @@
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
+
 import { SimplePool } from 'nostr-tools';
 
 import { shouldUseFallbackRelays } from '../../relay/relay-fallback';
@@ -22,6 +25,8 @@ type NostrEventLike = {
 type Nip05JsonResponse = {
   names?: Record<string, string>;
 };
+
+type ResolveHostname = (hostname: string) => Promise<ReadonlyArray<string>>;
 
 type MetadataContent = {
   name?: unknown;
@@ -62,6 +67,7 @@ const METADATA_KIND = 0;
 const DEFAULT_NIP05_TIMEOUT_MS = 3_500;
 const NIP05_SUCCESS_TTL_MS = 15 * 60_000;
 const NIP05_ERROR_TTL_MS = 3 * 60_000;
+const NIP05_MAX_RESPONSE_BYTES = 128 * 1024;
 const PROFILE_CACHE_TTL_MS = 5 * 60_000;
 const PROFILE_NAME_MAX_LENGTH = 128;
 const PROFILE_DISPLAY_NAME_MAX_LENGTH = 128;
@@ -70,11 +76,185 @@ const PROFILE_NIP05_MAX_LENGTH = 320;
 const PROFILE_IMAGE_URL_MAX_LENGTH = 2_048;
 const PROFILE_LUD16_MAX_LENGTH = 320;
 
+const BLOCKED_NIP05_HOSTNAMES = new Set([
+  'localhost',
+  'localhost.localdomain',
+  'metadata.google.internal',
+]);
+
 const normalizePubkey = (value: string): string => value.trim().toLowerCase();
 
 const normalizeNip05 = (value: string): string => value.trim().toLowerCase();
 
+const normalizeNip05Hostname = (domain: string): string => domain.trim().toLowerCase().replace(/\.$/, '');
+
 const isPubkey = (value: string): boolean => LOWER_HEX_64_PATTERN.test(value);
+
+const parseIpv4Address = (hostname: string): number[] | null => {
+  const parts = hostname.split('.');
+  if (parts.length !== 4 || parts.some((part) => !/^\d+$/.test(part))) {
+    return null;
+  }
+
+  const octets = parts.map((part) => Number(part));
+  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+    return null;
+  }
+
+  return octets;
+};
+
+const isIpv4Literal = (hostname: string): boolean => parseIpv4Address(hostname) !== null;
+
+const isBlockedIpv4Address = (octets: number[]): boolean => {
+  const [first = 0, second = 0, third = 0] = octets;
+  return first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 0) ||
+    (first === 192 && second === 168) ||
+    (first === 198 && (second === 18 || second === 19)) ||
+    (first === 198 && second === 51 && third === 100) ||
+    (first === 203 && second === 0 && third === 113) ||
+    first >= 224;
+};
+
+const getIpv6Hextets = (address: string): [number, number] => {
+  const [first = '', second = ''] = address.split(':');
+  return [Number.parseInt(first || '0', 16), Number.parseInt(second || '0', 16)];
+};
+
+const isBlockedIpv6Address = (address: string): boolean => {
+  const normalized = address.trim().toLowerCase();
+  const mappedIpv4 = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
+  if (mappedIpv4) {
+    const octets = parseIpv4Address(mappedIpv4);
+    return !octets || isBlockedIpv4Address(octets);
+  }
+
+  if (normalized === '::' || normalized === '::1') {
+    return true;
+  }
+
+  const [first, second] = getIpv6Hextets(normalized);
+  return first === 0 ||
+    (first & 0xfe00) === 0xfc00 ||
+    (first & 0xffc0) === 0xfe80 ||
+    (first & 0xff00) === 0xff00 ||
+    first === 0x2002 ||
+    (first === 0x2001 && second === 0x0db8);
+};
+
+const isUnsafeNip05Hostname = (domain: string): boolean => {
+  const hostname = normalizeNip05Hostname(domain);
+  return BLOCKED_NIP05_HOSTNAMES.has(hostname) ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.localhost.localdomain') ||
+    isIpv4Literal(hostname);
+};
+
+const isUnsafeResolvedAddress = (address: string): boolean => {
+  const normalized = address.trim().toLowerCase();
+  const ipVersion = isIP(normalized);
+  if (ipVersion === 4) {
+    const octets = parseIpv4Address(normalized);
+    return !octets || isBlockedIpv4Address(octets);
+  }
+
+  if (ipVersion === 6) {
+    return isBlockedIpv6Address(normalized);
+  }
+
+  return true;
+};
+
+const resolveNip05Hostname: ResolveHostname = async (hostname) => {
+  const addresses = await lookup(hostname, { all: true, verbatim: true });
+  return addresses.map((address) => address.address);
+};
+
+const assertJsonContentType = (response: Response): void => {
+  const mediaType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+  if (mediaType !== 'application/json' && !mediaType.endsWith('+json')) {
+    throw new Error('NIP-05 response content-type must be JSON');
+  }
+};
+
+const createAbortError = (): DOMException => new DOMException('The operation was aborted.', 'AbortError');
+
+const withAbortSignal = async <T>(operation: Promise<T>, signal: AbortSignal): Promise<T> => {
+  if (signal.aborted) {
+    throw createAbortError();
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = () => {
+      signal.removeEventListener('abort', onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(createAbortError());
+    };
+
+    signal.addEventListener('abort', onAbort, { once: true });
+    operation.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error: unknown) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+};
+
+const readLimitedJson = async (response: Response, signal: AbortSignal): Promise<unknown> => {
+  assertJsonContentType(response);
+
+  const contentLength = response.headers.get('content-length');
+  if (contentLength && Number(contentLength) > NIP05_MAX_RESPONSE_BYTES) {
+    throw new Error('NIP-05 response is too large');
+  }
+
+  if (!response.body) {
+    return JSON.parse('');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytesRead = 0;
+  let text = '';
+
+  try {
+    while (true) {
+      const { done, value } = await withAbortSignal(reader.read(), signal);
+      if (done) {
+        break;
+      }
+
+      bytesRead += value.byteLength;
+      if (bytesRead > NIP05_MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error('NIP-05 response is too large');
+      }
+
+      text += decoder.decode(value, { stream: true });
+    }
+  } catch (error) {
+    if (signal.aborted) {
+      await reader.cancel().catch(() => undefined);
+    }
+    throw error;
+  }
+
+  text += decoder.decode();
+  return JSON.parse(text);
+};
 
 const resolveTimeoutMs = (timeoutMs?: number): number => {
   if (!Number.isFinite(timeoutMs)) {
@@ -189,6 +369,7 @@ export interface IdentityServiceOptions {
   bootstrapRelays?: string[];
   fetchImpl?: typeof fetch;
   nowMs?: () => number;
+  resolveHostname?: ResolveHostname;
   nip05SuccessTtlMs?: number;
   nip05ErrorTtlMs?: number;
   profileCacheTtlMs?: number;
@@ -217,7 +398,7 @@ class GatewayIdentityService implements IdentityService {
 
   constructor(
     private readonly options: Required<
-      Pick<IdentityServiceOptions, 'fetchImpl' | 'nowMs' | 'nip05SuccessTtlMs' | 'nip05ErrorTtlMs' | 'profileCacheTtlMs' | 'defaultNip05TimeoutMs'>
+      Pick<IdentityServiceOptions, 'fetchImpl' | 'nowMs' | 'resolveHostname' | 'nip05SuccessTtlMs' | 'nip05ErrorTtlMs' | 'profileCacheTtlMs' | 'defaultNip05TimeoutMs'>
       > & {
         pool: SimplePool;
         bootstrapRelays: string[];
@@ -313,6 +494,17 @@ class GatewayIdentityService implements IdentityService {
       };
     }
 
+    if (isUnsafeNip05Hostname(parsed.domain)) {
+      return {
+        pubkey,
+        nip05: parsed.normalized,
+        status: 'unverified',
+        identifier: parsed.normalized,
+        displayIdentifier: parsed.display,
+        checkedAt: this.options.nowMs(),
+      };
+    }
+
     const cacheKey = `${pubkey}::${parsed.normalized}`;
     const cachedSuccess = this.getNip05CacheEntry(this.nip05SuccessCache, cacheKey);
     if (cachedSuccess) {
@@ -337,14 +529,34 @@ class GatewayIdentityService implements IdentityService {
       }, timeoutMs);
 
       try {
+        const hostname = normalizeNip05Hostname(parsed.domain);
+        const addresses = await withAbortSignal(this.options.resolveHostname(hostname), controller.signal);
+        if (addresses.length === 0) {
+          throw new Error('NIP-05 hostname did not resolve');
+        }
+
+        if (addresses.some(isUnsafeResolvedAddress)) {
+          return {
+            pubkey,
+            nip05: parsed.normalized,
+            status: 'unverified',
+            identifier: parsed.normalized,
+            displayIdentifier: parsed.display,
+            checkedAt: this.options.nowMs(),
+          };
+        }
+
         const url = `https://${parsed.domain}/.well-known/nostr.json?name=${encodeURIComponent(parsed.name)}`;
-        const response = await this.options.fetchImpl(url, { signal: controller.signal });
+        const response = await this.options.fetchImpl(url, {
+          signal: controller.signal,
+          redirect: 'error',
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
 
-        const parsedBody = parseNip05JsonResponse(await response.json());
+        const parsedBody = parseNip05JsonResponse(await readLimitedJson(response, controller.signal));
         const names = parsedBody.names;
         if (!names || typeof names !== 'object') {
           const result: Nip05BatchResultDto = {
@@ -509,6 +721,7 @@ export const createIdentityService = (options: IdentityServiceOptions = {}): Ide
     bootstrapRelays: options.bootstrapRelays ?? DEFAULT_BOOTSTRAP_RELAYS,
     fetchImpl: options.fetchImpl ?? fetch,
     nowMs: options.nowMs ?? Date.now,
+    resolveHostname: options.resolveHostname ?? resolveNip05Hostname,
     nip05SuccessTtlMs: options.nip05SuccessTtlMs ?? NIP05_SUCCESS_TTL_MS,
     nip05ErrorTtlMs: options.nip05ErrorTtlMs ?? NIP05_ERROR_TTL_MS,
     profileCacheTtlMs: options.profileCacheTtlMs ?? PROFILE_CACHE_TTL_MS,
