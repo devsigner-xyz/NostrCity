@@ -26,6 +26,7 @@ import { rateLimitPlugin } from './plugins/rate-limit';
 import { requestContextPlugin } from './plugins/request-context';
 import { securityHeadersPlugin } from './plugins/security-headers';
 import { staticAssetsPlugin } from './plugins/static-assets';
+import { validateProductionSecurityConfig } from './production-config';
 import { healthRoute } from './routes/health.route';
 import { createAppServices } from './services/app-services';
 
@@ -64,6 +65,8 @@ const resolveTrustProxy = (): FastifyServerOptions['trustProxy'] => {
 };
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
+  validateProductionSecurityConfig();
+
   const app = Fastify({ logger: false, trustProxy: resolveTrustProxy() });
   const defaultServices = createAppServices();
 

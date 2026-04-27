@@ -1,5 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
 
+import { isProductionRuntime } from '../production-config';
+
+type EnvLike = Partial<Record<string, string | undefined>>;
+
 const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -7,13 +11,17 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://127.0.0.1:4173',
 ];
 
-const resolveAllowedOrigins = (): Set<string> => {
-  const configuredOrigins = process.env.BFF_CORS_ORIGINS?.split(',')
+export const resolveAllowedOrigins = (env: EnvLike = process.env): Set<string> => {
+  const configuredOrigins = env.BFF_CORS_ORIGINS?.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
 
   if (configuredOrigins && configuredOrigins.length > 0) {
     return new Set(configuredOrigins);
+  }
+
+  if (isProductionRuntime(env)) {
+    throw new Error('BFF_CORS_ORIGINS must be set in production');
   }
 
   return new Set(DEFAULT_ALLOWED_ORIGINS);
