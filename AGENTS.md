@@ -4,7 +4,7 @@ Agent-focused guidance for working in this repository. Keep this file current wh
 
 ## Project Overview
 
-MapGenerator procedurally generates American-style city maps and exports map images and 3D city model assets. The current product also includes a Nostr-native social overlay, a Fastify Backend-for-Frontend (BFF), a VitePress documentation site, and a landing page.
+Nostr City procedurally generates American-style city maps and exports map images and 3D city model assets. The current product also includes a Nostr-native social overlay, a Fastify Backend-for-Frontend (BFF), a VitePress documentation site, and a landing page.
 
 Core stack: TypeScript, React 19, Vite, Tailwind CSS v4, shadcn/ui, Radix UI, Fastify, Nostr tooling, VitePress, Vitest, Playwright, pnpm, and Make.
 

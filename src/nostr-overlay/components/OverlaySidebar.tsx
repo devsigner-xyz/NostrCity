@@ -54,7 +54,7 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 
-export const OVERLAY_SIDEBAR_EXPANDED_WIDTH = 380;
+export const OVERLAY_SIDEBAR_EXPANDED_WIDTH = 300;
 export const OVERLAY_SIDEBAR_COLLAPSED_WIDTH = 56;
 type SettingsMenuView = SettingsRouteView | 'ui';
 

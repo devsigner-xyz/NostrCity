@@ -247,7 +247,7 @@ export const enMessages = {
     'settings.about.feature.cityStats': 'Real-time city stats',
     'settings.advanced.title': 'Advanced settings',
     'settings.advanced.description': 'Advanced map configuration and simulation parameters.',
-    'settings.advanced.body': 'Advanced MapGenerator configuration.',
+    'settings.advanced.body': 'Advanced Nostr City map configuration.',
     'settings.zaps.title': 'Zaps',
     'settings.zaps.description': 'Define quick amounts for sending zaps.',
     'settings.zaps.amounts': 'Zap amounts',

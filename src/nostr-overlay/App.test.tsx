@@ -7209,7 +7209,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        expect((bridge.setViewportInsetLeft as any).mock.calls.some((call: unknown[]) => call[0] === 380)).toBe(true);
+        expect((bridge.setViewportInsetLeft as any).mock.calls.some((call: unknown[]) => call[0] === 300)).toBe(true);
 
         const hidePanelButton = rendered.container.querySelector('button[aria-label="Ocultar panel"]') as HTMLButtonElement;
         expect(hidePanelButton).toBeDefined();
@@ -7241,7 +7241,7 @@ describe('Nostr overlay App', () => {
         });
 
         expect(rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]')).not.toBeNull();
-        expect((bridge.setViewportInsetLeft as any).mock.calls[(bridge.setViewportInsetLeft as any).mock.calls.length - 1][0]).toBe(380);
+        expect((bridge.setViewportInsetLeft as any).mock.calls[(bridge.setViewportInsetLeft as any).mock.calls.length - 1][0]).toBe(300);
     });
 
     test('renders shadcn sidebar structure with rail', async () => {

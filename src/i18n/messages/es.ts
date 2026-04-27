@@ -245,7 +245,7 @@ export const esMessages = {
     'settings.about.feature.cityStats': 'Estadisticas de ciudad en tiempo real',
     'settings.advanced.title': 'Ajustes avanzados',
     'settings.advanced.description': 'Configuracion avanzada del mapa y parametros de simulacion.',
-    'settings.advanced.body': 'Configuracion avanzada del MapGenerator.',
+    'settings.advanced.body': 'Configuracion avanzada del mapa de Nostr City.',
     'settings.zaps.title': 'Zaps',
     'settings.zaps.description': 'Define cantidades rapidas para enviar zaps.',
     'settings.zaps.amounts': 'Cantidad de zaps',

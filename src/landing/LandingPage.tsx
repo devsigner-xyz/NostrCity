@@ -16,6 +16,8 @@ const MAP_PRESET_BY_THEME: Record<SiteTheme, 'Nostr City Light' | 'Nostr City Da
   dark: 'Nostr City Dark',
 };
 
+const GITHUB_REPOSITORY_URL = 'https://github.com/devsigner-xyz/NostrCity';
+
 const HERO_MARKERS = [
   {
     label: '01',
@@ -148,7 +150,7 @@ export default function LandingPage() {
 
         <nav className="topbar-links" aria-label={t('landing.nav.mainLinks')}>
           <a href={docsUrl}>{t('landing.nav.documentation')}</a>
-          <a href="https://github.com/ProbableTrain/MapGenerator" target="_blank" rel="noreferrer">
+          <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer">
             {t('landing.nav.github')}
           </a>
           <a href="#features">
@@ -299,7 +301,7 @@ export default function LandingPage() {
 
           <div className="footer-cta">
             <a className="app-link" href={appUrl}>{t('landing.footer.openApp')}</a>
-            <a href="https://github.com/ProbableTrain/MapGenerator" target="_blank" rel="noreferrer">
+            <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer">
               {t('landing.footer.viewRepo')}
             </a>
             <a href={docsUrl}>{t('landing.footer.readDocs')}</a>
