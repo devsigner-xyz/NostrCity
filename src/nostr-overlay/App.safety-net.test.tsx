@@ -724,7 +724,7 @@ describe('Nostr overlay App focused safety-net harness', () => {
         });
         expect(failedActivityRow).not.toBeUndefined();
         const failedBadge = failedActivityRow?.querySelector('[data-slot="badge"]');
-        expect(failedBadge?.textContent).toBe('failed');
+        expect(failedBadge?.textContent).toBe('Fallido');
     });
 
     test('keeps the user on wallet when an auto-resumed WebLN payment fails', async () => {
@@ -801,7 +801,7 @@ describe('Nostr overlay App focused safety-net harness', () => {
         expect(sendPayment).toHaveBeenCalledWith('lnbc1invoice');
         expect(activity?.status).toBe('failed');
         expect(failedActivityRow).not.toBeUndefined();
-        expect(failedBadge?.textContent).toBe('failed');
+        expect(failedBadge?.textContent).toBe('Fallido');
 
         await act(async () => {
             await Promise.resolve();

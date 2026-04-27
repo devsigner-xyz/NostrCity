@@ -1,6 +1,6 @@
 import { buildApp } from './app';
 
-const DEFAULT_HOST = '127.0.0.1';
+const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 3000;
 
 export const resolvePort = (rawPort: string | undefined): number => {

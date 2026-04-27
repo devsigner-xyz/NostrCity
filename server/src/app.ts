@@ -25,6 +25,7 @@ import { ownerAuthPlugin } from './plugins/owner-auth';
 import { rateLimitPlugin } from './plugins/rate-limit';
 import { requestContextPlugin } from './plugins/request-context';
 import { securityHeadersPlugin } from './plugins/security-headers';
+import { staticAssetsPlugin } from './plugins/static-assets';
 import { healthRoute } from './routes/health.route';
 import { createAppServices } from './services/app-services';
 
@@ -37,6 +38,7 @@ export interface BuildAppOptions {
   usersService?: UsersService;
   dmService?: DmService;
   publishService?: PublishService;
+  staticAssetsPath?: string;
 }
 
 const resolveTrustProxy = (): FastifyServerOptions['trustProxy'] => {
@@ -105,6 +107,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     prefix: '/v1',
     service: options.publishService ?? defaultServices.publishService,
   });
+  app.register(staticAssetsPlugin, { rootPath: options.staticAssetsPath });
 
   return app;
 };

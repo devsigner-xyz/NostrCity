@@ -6,7 +6,7 @@ import { resolveHost, resolvePort } from './main';
 
 describe('server main config helpers', () => {
   it('uses defaults when host/port are missing', () => {
-    expect(resolveHost(undefined)).toBe('127.0.0.1');
+    expect(resolveHost(undefined)).toBe('0.0.0.0');
     expect(resolvePort(undefined)).toBe(3000);
   });
 

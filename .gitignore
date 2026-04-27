@@ -8,5 +8,6 @@ npm-debug.log*
 .playwright-mcp/
 .worktrees/
 /dist
+/server/dist
 .superpowers/
 docs/.vitepress/cache/
