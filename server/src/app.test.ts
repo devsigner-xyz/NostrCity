@@ -29,6 +29,11 @@ describe('buildApp', () => {
     expect(response.json()).toEqual({
       status: 'ok',
     });
+    expect(response.headers['content-security-policy']).toContain(
+      "default-src 'self'",
+    );
+    expect(response.headers['cross-origin-opener-policy']).toBe('same-origin');
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
   });
 
   it('returns not found for POST /v1/health', async () => {

@@ -90,7 +90,9 @@ describe('request context plugin', () => {
 
     expect(response.headers['x-content-type-options']).toBe('nosniff');
     expect(response.headers['x-frame-options']).toBe('DENY');
-    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    expect(response.headers['referrer-policy']).toBe(
+      'strict-origin-when-cross-origin',
+    );
     expect(response.headers['permissions-policy']).toContain('geolocation=()');
   });
 });
