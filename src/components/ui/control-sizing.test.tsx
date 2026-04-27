@@ -3,6 +3,12 @@ import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, test } from "vitest"
 
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -71,5 +77,21 @@ describe("base control sizing", () => {
     const trigger = rendered.container.querySelector('[data-slot="select-trigger"]')
 
     expect(trigger?.className).toContain("data-[size=default]:h-10")
+  })
+
+  test("renders dialog overlays with backdrop blur", async () => {
+    const rendered = await renderElement(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Dialogo</DialogTitle>
+          <DialogDescription>Descripcion del dialogo</DialogDescription>
+        </DialogContent>
+      </Dialog>
+    )
+    mounted.push(rendered)
+
+    const overlay = document.body.querySelector('[data-slot="dialog-overlay"]')
+
+    expect(overlay?.className).toContain("backdrop-blur")
   })
 })
