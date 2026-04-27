@@ -70,6 +70,7 @@ describe('buildApp static assets', () => {
 
       try {
         const landing = await staticApp.inject({ method: 'GET', url: '/' });
+        const landingIndex = await staticApp.inject({ method: 'GET', url: '/index.html' });
         const appShell = await staticApp.inject({ method: 'GET', url: '/app/' });
         const appFallback = await staticApp.inject({ method: 'GET', url: '/app/profile/alice' });
         const docs = await staticApp.inject({ method: 'GET', url: '/docs/' });
@@ -80,6 +81,8 @@ describe('buildApp static assets', () => {
 
         expect(landing.statusCode).toBe(200);
         expect(landing.body).toContain('Landing');
+        expect(landingIndex.statusCode).toBe(200);
+        expect(landingIndex.body).toContain('Landing');
         expect(appShell.statusCode).toBe(200);
         expect(appShell.body).toContain('App');
         expect(appFallback.statusCode).toBe(200);
@@ -94,6 +97,32 @@ describe('buildApp static assets', () => {
         expect(asset.body).toBe('asset');
         expect(health.statusCode).toBe(200);
         expect(health.json()).toEqual({ status: 'ok' });
+      } finally {
+        await staticApp.close();
+      }
+    } finally {
+      await rm(assetsRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('serves the app shell at root when the landing document is missing', async () => {
+    const assetsRoot = await mkdtemp(join(tmpdir(), 'nostr-city-dist-'));
+
+    try {
+      await mkdir(join(assetsRoot, 'app'), { recursive: true });
+      await writeFile(join(assetsRoot, 'app', 'index.html'), '<h1>App</h1>');
+
+      const staticApp = buildApp({ staticAssetsPath: assetsRoot });
+      await staticApp.ready();
+
+      try {
+        const landing = await staticApp.inject({ method: 'GET', url: '/' });
+        const landingIndex = await staticApp.inject({ method: 'GET', url: '/index.html' });
+
+        expect(landing.statusCode).toBe(200);
+        expect(landing.body).toContain('App');
+        expect(landingIndex.statusCode).toBe(200);
+        expect(landingIndex.body).toContain('App');
       } finally {
         await staticApp.close();
       }

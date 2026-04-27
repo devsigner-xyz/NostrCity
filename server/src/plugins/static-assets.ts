@@ -26,6 +26,8 @@ const pathExists = async (path: string): Promise<boolean> => {
   }
 };
 
+const landingCandidates = ['index.html', join('app', 'index.html')];
+
 export const staticAssetsPlugin: FastifyPluginAsync<StaticAssetsOptions> = async (
   app,
   options,
@@ -39,6 +41,26 @@ export const staticAssetsPlugin: FastifyPluginAsync<StaticAssetsOptions> = async
   await app.register(fastifyStatic, {
     root: rootPath,
     prefix: '/',
+  });
+
+  app.get('/', async (_request, reply) => {
+    for (const candidate of landingCandidates) {
+      if (await fileExists(join(rootPath, candidate))) {
+        return reply.sendFile(candidate);
+      }
+    }
+
+    reply.callNotFound();
+  });
+
+  app.get('/index.html', async (_request, reply) => {
+    for (const candidate of landingCandidates) {
+      if (await fileExists(join(rootPath, candidate))) {
+        return reply.sendFile(candidate);
+      }
+    }
+
+    reply.callNotFound();
   });
 
   app.get('/docs/*', async (request, reply) => {
