@@ -12,6 +12,7 @@ interface RenderSelectorInput {
     disabled?: boolean;
     initialMethod?: 'npub' | 'nip07' | 'nip46';
     loadingText?: string;
+    restrictToNpubOnly?: boolean;
 }
 
 async function renderSelector(input: RenderSelectorInput = {}): Promise<RenderResult> {
@@ -25,6 +26,7 @@ async function renderSelector(input: RenderSelectorInput = {}): Promise<RenderRe
         onStartSession,
         ...(input.loadingText === undefined ? {} : { loadingText: input.loadingText }),
         ...(input.initialMethod === undefined ? {} : { initialMethod: input.initialMethod }),
+        ...(input.restrictToNpubOnly === undefined ? {} : { restrictToNpubOnly: input.restrictToNpubOnly }),
     };
 
     await act(async () => {
@@ -109,12 +111,13 @@ describe('LoginMethodSelector', () => {
         expect(rendered.container.querySelector('[data-testid="login-method-submit-npub"]')).not.toBeNull();
     });
 
-    test('does not show nsec in login method options', async () => {
-        const rendered = await renderSelector();
+    test('temporarily exposes only npub in the disabled login method select', async () => {
+        const rendered = await renderSelector({ restrictToNpubOnly: true });
         mounted.push(rendered);
 
         const methodSelectTrigger = rendered.container.querySelector('[data-testid="login-method-trigger"]') as HTMLButtonElement;
         expect(methodSelectTrigger).toBeDefined();
+        expect(methodSelectTrigger.disabled).toBe(true);
 
         await act(async () => {
             methodSelectTrigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
@@ -123,8 +126,10 @@ describe('LoginMethodSelector', () => {
 
         const options = Array.from(document.body.querySelectorAll('[data-slot="select-item"]'));
         expect(options.some((option) => (option.textContent || '').trim() === 'nsec')).toBe(false);
-        expect(options.some((option) => (option.textContent || '').trim() === 'Extension (NIP-07)')).toBe(true);
-        expect(options.some((option) => (option.textContent || '').trim() === 'Bunker (NIP-46)')).toBe(true);
+        expect(options.some((option) => (option.textContent || '').trim() === 'Extension (NIP-07)')).toBe(false);
+        expect(options.some((option) => (option.textContent || '').trim() === 'Bunker (NIP-46)')).toBe(false);
+        expect(rendered.container.textContent || '').not.toContain('Extension (NIP-07)');
+        expect(rendered.container.textContent || '').not.toContain('Bunker (NIP-46)');
     });
 
     test('submits npub login through startSession handler', async () => {
@@ -192,23 +197,20 @@ describe('LoginMethodSelector', () => {
         expect(submitButton.textContent || '').not.toContain('Cargando...');
     });
 
-    test('shows specific progress copy on nip07 submit when loading text is provided', async () => {
-        const rendered = await renderSelector({ disabled: true, initialMethod: 'nip07', loadingText: 'Conectando a relays...' });
+    test('falls back to npub when an unavailable nip07 initial method is provided', async () => {
+        const rendered = await renderSelector({ disabled: true, initialMethod: 'nip07', loadingText: 'Conectando a relays...', restrictToNpubOnly: true });
         mounted.push(rendered);
 
-        const submitButton = rendered.container.querySelector('[data-testid="login-method-submit-nip07"]') as HTMLButtonElement | null;
-        expect(submitButton).toBeDefined();
-        expect(submitButton?.textContent || '').not.toContain('Cargando...');
+        expect(rendered.container.querySelector('[data-testid="login-method-submit-nip07"]')).toBeNull();
+        expect(rendered.container.querySelector('[data-testid="login-method-submit-npub"]')).not.toBeNull();
     });
 
-    test('shows specific progress copy on nip46 submit when loading text is provided', async () => {
-        const rendered = await renderSelector({ disabled: true, initialMethod: 'nip46', loadingText: 'Conectando a relays...' });
+    test('falls back to npub when an unavailable nip46 initial method is provided', async () => {
+        const rendered = await renderSelector({ disabled: true, initialMethod: 'nip46', loadingText: 'Conectando a relays...', restrictToNpubOnly: true });
         mounted.push(rendered);
 
-        const submitButton = rendered.container.querySelector('[data-testid="login-method-submit-nip46"]') as HTMLButtonElement;
-        expect(submitButton).toBeDefined();
-        expect(submitButton.textContent || '').toContain('Conectando a relays...');
-        expect(submitButton.textContent || '').not.toContain('Conectar bunker');
+        expect(rendered.container.querySelector('[data-testid="login-method-submit-nip46"]')).toBeNull();
+        expect(rendered.container.querySelector('[data-testid="login-method-submit-npub"]')).not.toBeNull();
     });
 
     test('exposes a stable npub submit test id', async () => {
@@ -222,7 +224,7 @@ describe('LoginMethodSelector', () => {
         expect(submitButton?.classList.contains('w-full')).toBe(true);
     });
 
-    test('exposes a stable nip07 submit test id', async () => {
+    test('exposes a stable nip07 submit test id in development mode', async () => {
         const rendered = await renderSelector({ initialMethod: 'nip07' });
         mounted.push(rendered);
 
@@ -233,7 +235,7 @@ describe('LoginMethodSelector', () => {
         expect(primaryButton?.classList.contains('w-full')).toBe(true);
     });
 
-    test('exposes a stable nip46 submit test id', async () => {
+    test('exposes a stable nip46 submit test id in development mode', async () => {
         const rendered = await renderSelector({ initialMethod: 'nip46' });
         mounted.push(rendered);
 
@@ -245,7 +247,7 @@ describe('LoginMethodSelector', () => {
         expect(rendered.container.querySelector('[data-testid="login-method-form-nip46"]')).not.toBeNull();
     });
 
-    test('submits bunker uri through nip46 method', async () => {
+    test('submits bunker uri through nip46 method in development mode', async () => {
         const rendered = await renderSelector({ initialMethod: 'nip46' });
         mounted.push(rendered);
 

@@ -34,6 +34,22 @@ export function SettingsAboutPage() {
                             <li>{t('settings.about.feature.cityStats')}</li>
                         </ul>
                     </div>
+
+                    <div className="nostr-about-section">
+                        <h4>{t('settings.about.attribution')}</h4>
+                        <p>
+                            {t('settings.about.mapGeneratorAttribution')}{' '}
+                            <a
+                                href="https://github.com/ProbableTrain/MapGenerator"
+                                target="_blank"
+                                rel="noreferrer"
+                                data-testid="mapgenerator-attribution-link"
+                                className="text-primary underline-offset-4 hover:underline"
+                            >
+                                ProbableTrain/MapGenerator
+                            </a>
+                        </p>
+                    </div>
                 </div>
             </div>
         </>

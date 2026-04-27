@@ -6,6 +6,7 @@ import { CreateAccountDialog, type CreateLocalAccountInput } from './CreateAccou
 import { LoginMethodSelector } from './LoginMethodSelector';
 import { AuthFlowFooter } from './AuthFlowFooter';
 import { useI18n } from '@/i18n/useI18n';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -66,15 +67,28 @@ export function LoginGateScreen({
                         </div>
 
                         {restoringSession ? (
-                            <Empty className="min-h-48 border-0 p-0" role="status" aria-live="polite">
-                                <EmptyHeader>
-                                    <EmptyMedia variant="icon">
-                                        <Spinner />
-                                    </EmptyMedia>
-                                    <EmptyTitle>{t('auth.login.restoringSession')}</EmptyTitle>
-                                    <EmptyDescription>{restorationSubtitle}</EmptyDescription>
-                                </EmptyHeader>
-                            </Empty>
+                            <>
+                                <Empty className="min-h-48 border-0 p-0" role="status" aria-live="polite">
+                                    <EmptyHeader>
+                                        <EmptyMedia variant="icon">
+                                            <Spinner />
+                                        </EmptyMedia>
+                                        <EmptyTitle>{t('auth.login.restoringSession')}</EmptyTitle>
+                                        <EmptyDescription>{restorationSubtitle}</EmptyDescription>
+                                    </EmptyHeader>
+                                </Empty>
+                                <Badge variant="outline" asChild className="mx-auto h-auto gap-1.5 py-1 pl-1 pr-2">
+                                    <a
+                                        href="https://github.com/devsigner-xyz"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        data-testid="devsigner-attribution-link"
+                                    >
+                                        <img src="/devsigner-xyz.png" alt="" className="size-5 rounded-full object-cover" />
+                                        {t('auth.login.devsignerByline')}
+                                    </a>
+                                </Badge>
+                            </>
                         ) : showUnlockLocalAccount ? (
                             <form
                                 data-testid="unlock-local-account-form"

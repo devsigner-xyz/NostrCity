@@ -1022,7 +1022,7 @@ describe('useWalletZapController', () => {
         expect(latest?.walletSettings.activeConnection).toBeNull();
     });
 
-    test('connectNwcWallet storage redacts uri and secret in localStorage and keeps sensitive values only in sessionStorage', async () => {
+    test('connectNwcWallet storage redacts uri and secret without writing sessionStorage secrets', async () => {
         const ownerPubkey = 'owner-a';
         const { nwcUri, clientSecret, createClient } = createNwcFixture();
         let latest: WalletZapController | undefined;
@@ -1043,14 +1043,19 @@ describe('useWalletZapController', () => {
         });
 
         const localPayload = JSON.parse(localStorage.getItem(buildScopedStorageKey(WALLET_SETTINGS_STORAGE_KEY, ownerPubkey)) ?? '{}') as WalletSettingsState;
-        const sessionPayload = JSON.parse(sessionStorage.getItem(buildScopedStorageKey(WALLET_SESSION_CONNECTION_STORAGE_KEY, ownerPubkey)) ?? '{}') as { uri?: string; secret?: string };
+        expect(latest?.walletSettings.activeConnection).toMatchObject({
+            method: 'nwc',
+            uri: nwcUri,
+            secret: clientSecret,
+            restoreState: 'connected',
+        });
         expect(localPayload.activeConnection).toMatchObject({
             method: 'nwc',
             uri: '',
             secret: '',
             restoreState: 'reconnect-required',
         });
-        expect(sessionPayload).toEqual({ uri: nwcUri, secret: clientSecret });
+        expect(sessionStorage.getItem(buildScopedStorageKey(WALLET_SESSION_CONNECTION_STORAGE_KEY, ownerPubkey))).toBeNull();
     });
 
     test('disconnectWallet clears the active wallet and NWC input', async () => {
@@ -1071,7 +1076,7 @@ describe('useWalletZapController', () => {
         await act(async () => {
             await latest?.connectNwcWallet();
         });
-        expect(sessionStorage.getItem(buildScopedStorageKey(WALLET_SESSION_CONNECTION_STORAGE_KEY, ownerPubkey))).not.toBeNull();
+        expect(sessionStorage.getItem(buildScopedStorageKey(WALLET_SESSION_CONNECTION_STORAGE_KEY, ownerPubkey))).toBeNull();
 
         act(() => {
             latest?.disconnectWallet();

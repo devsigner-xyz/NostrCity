@@ -21,6 +21,7 @@ interface LoginMethodSelectorProps {
     loadingText?: string;
     onStartSession: (method: LoginMethod, input: ProviderResolveInput) => Promise<void> | void;
     initialMethod?: SelectorMethod;
+    restrictToNpubOnly?: boolean;
 }
 
 type SelectorMethod = 'npub' | 'nip07' | 'nip46';
@@ -30,9 +31,10 @@ export function LoginMethodSelector({
     loadingText,
     onStartSession,
     initialMethod = 'npub',
+    restrictToNpubOnly = import.meta.env.PROD,
 }: LoginMethodSelectorProps) {
     const { t } = useI18n();
-    const [method, setMethod] = useState<SelectorMethod>(initialMethod);
+    const [method, setMethod] = useState<SelectorMethod>(restrictToNpubOnly ? 'npub' : initialMethod);
     const [npub, setNpub] = useState('');
     const [bunkerUri, setBunkerUri] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +71,7 @@ export function LoginMethodSelector({
         nip07: t('auth.selector.nip07'),
         nip46: t('auth.selector.nip46'),
     };
+    const selectorMethods: SelectorMethod[] = restrictToNpubOnly ? ['npub'] : ['npub', 'nip07', 'nip46'];
 
     const handleNip46Submit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -86,15 +89,15 @@ export function LoginMethodSelector({
         <section className="grid gap-3" data-testid="login-method-selector" aria-label={t('auth.selector.aria')}>
             <div className="grid gap-2">
                 <Label htmlFor="nostr-login-method-trigger">{t('auth.selector.accessMethod')}</Label>
-                <Select value={method} onValueChange={(value) => setMethod(value as SelectorMethod)} disabled={isBusy}>
+                <Select value={method} onValueChange={(value) => setMethod(value as SelectorMethod)} disabled={isBusy || restrictToNpubOnly}>
                     <SelectTrigger id="nostr-login-method-trigger" className="w-full" data-testid="login-method-trigger" aria-label={t('auth.selector.loginMethodAria')}>
                         <SelectValue>{selectorMethodLabels[method]}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                         <SelectGroup>
-                            <SelectItem value="npub">{selectorMethodLabels.npub}</SelectItem>
-                            <SelectItem value="nip07">{selectorMethodLabels.nip07}</SelectItem>
-                            <SelectItem value="nip46">{selectorMethodLabels.nip46}</SelectItem>
+                            {selectorMethods.map((selectorMethod) => (
+                                <SelectItem key={selectorMethod} value={selectorMethod}>{selectorMethodLabels[selectorMethod]}</SelectItem>
+                            ))}
                         </SelectGroup>
                     </SelectContent>
                 </Select>
@@ -171,6 +174,7 @@ export function LoginMethodSelector({
                     </Button>
                 </form>
             ) : null}
+
         </section>
     );
 }

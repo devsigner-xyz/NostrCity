@@ -384,6 +384,22 @@ describe('LoginGateScreen', () => {
         expect(rendered.container.querySelector('[data-slot="empty-icon"] [aria-label="Loading"]')).not.toBeNull();
     });
 
+    test('shows devsigner attribution link while restoring a session', async () => {
+        const rendered = await renderScreen({ restoringSession: true });
+        mounted.push(rendered);
+
+        const link = rendered.container.querySelector('[data-testid="devsigner-attribution-link"]') as HTMLAnchorElement | null;
+        const avatar = link?.querySelector('img') as HTMLImageElement | null;
+
+        expect(link).not.toBeNull();
+        expect(link?.textContent || '').toContain('by devsigner-xyz');
+        expect(link?.getAttribute('href')).toBe('https://github.com/devsigner-xyz');
+        expect(link?.getAttribute('target')).toBe('_blank');
+        expect(link?.getAttribute('rel')).toBe('noreferrer');
+        expect(avatar?.getAttribute('src')).toBe('/devsigner-xyz.png');
+        expect(avatar?.getAttribute('alt')).toBe('');
+    });
+
     test('shows dynamic restoration subtitle from map loader text', async () => {
         const rendered = await renderScreen({ restoringSession: true, mapLoaderText: 'Construyendo mapa...' });
         mounted.push(rendered);
