@@ -6,6 +6,8 @@ import type {
     SocialFeedPage,
     SocialFeedService,
     SocialThreadPage,
+    ViewerReaction,
+    ViewerReactionByEventId,
 } from '../../nostr/social-feed-service';
 import {
     buildQuoteContent,
@@ -40,7 +42,9 @@ import {
 import {
     useFollowingFeedEngagementQuery,
     useFollowingFeedInfiniteQuery,
+    normalizeEngagementEventIds,
     useThreadInfiniteQuery,
+    useViewerReactionsQuery,
 } from '../query/following-feed.query';
 import type { FollowingFeedQueryInput } from '../query/types';
 import {
@@ -69,9 +73,15 @@ interface UseFollowingFeedControllerOptions {
 
 interface ToggleReactionMutationVariables {
     input: ToggleReactionInput;
-    previous: boolean;
+    previous: ViewerReaction | undefined;
     next: boolean;
     reactionEventId: string | undefined;
+}
+
+interface ToggleReactionMutationContext {
+    eventId: string;
+    optimisticDelta: number;
+    previous: ViewerReaction | undefined;
 }
 
 interface ToggleRepostMutationVariables {
@@ -215,9 +225,8 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
     const [pendingLatestFeedPage, setPendingLatestFeedPage] = useState<SocialFeedPage | null>(null);
     const [pendingNewCount, setPendingNewCount] = useState(0);
     const [isRefreshingFeed, setIsRefreshingFeed] = useState(false);
-    const [reactionByEventId, setReactionByEventId] = useState<Record<string, boolean>>({});
+    const [viewerReactionByEventId, setViewerReactionByEventId] = useState<ViewerReactionByEventId>({});
     const [repostByEventId, setRepostByEventId] = useState<Record<string, boolean>>({});
-    const [reactionEventIdByTarget, setReactionEventIdByTarget] = useState<Record<string, string>>({});
     const [repostEventIdByTarget, setRepostEventIdByTarget] = useState<Record<string, string>>({});
     const [engagementDeltaByEventId, setEngagementDeltaByEventId] = useState<SocialEngagementByEventId>({});
     const refreshInFlightRef = useRef(false);
@@ -321,12 +330,56 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
         items,
         activeThread,
     }), [activeThread, items]);
+    const viewerReactionEventIds = useMemo(
+        () => normalizeEngagementEventIds(engagementEventIds),
+        [engagementEventIds]
+    );
 
     const engagementQuery = useFollowingFeedEngagementQuery({
         eventIds: engagementEventIds,
         service: options.service,
         enabled: isOpen,
     });
+
+    const viewerReactionQuery = useViewerReactionsQuery({
+        ...(options.ownerPubkey ? { ownerPubkey: options.ownerPubkey } : {}),
+        eventIds: viewerReactionEventIds,
+        service: options.service,
+        enabled: isOpen,
+    });
+
+    useEffect(() => {
+        setViewerReactionByEventId({});
+    }, [options.ownerPubkey]);
+
+    useEffect(() => {
+        if (!viewerReactionQuery.data) {
+            return;
+        }
+
+        const scopedEventIds = new Set(viewerReactionEventIds);
+        setViewerReactionByEventId((current) => {
+            const next: ViewerReactionByEventId = {};
+            for (const [eventId, reaction] of Object.entries(current)) {
+                if (!scopedEventIds.has(eventId)) {
+                    next[eventId] = reaction;
+                }
+            }
+
+            return {
+                ...next,
+                ...viewerReactionQuery.data,
+            };
+        });
+    }, [viewerReactionEventIds, viewerReactionQuery.data]);
+
+    const reactionByEventId = useMemo(() => {
+        const activeByEventId: Record<string, boolean> = {};
+        for (const eventId of Object.keys(viewerReactionByEventId)) {
+            activeByEventId[eventId] = true;
+        }
+        return activeByEventId;
+    }, [viewerReactionByEventId]);
 
     const baseEngagementByEventId = useMemo(() => {
         const fallback = createEmptyEngagementByEventIds(engagementEventIds);
@@ -627,46 +680,64 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
                 kind: 5,
                 content: '',
                 created_at: now(),
-                tags: [['e', variables.reactionEventId]],
+                tags: [['e', variables.reactionEventId], ['k', '7']],
             });
 
             return {};
         },
-        onMutate: async (variables) => {
+        onMutate: async (variables): Promise<ToggleReactionMutationContext> => {
             const eventId = variables.input.eventId;
             const optimisticDelta = variables.next ? 1 : -1;
             setPublishError(null);
-            setReactionByEventId((current) => ({ ...current, [eventId]: variables.next }));
+            setViewerReactionByEventId((current) => {
+                const next = { ...current };
+                if (variables.next) {
+                    next[eventId] = {
+                        eventId,
+                        reactionEventId: `temp-reaction:${eventId}:${Date.now()}`,
+                        emoji: variables.input.emoji && variables.input.emoji.length > 0 ? variables.input.emoji : '❤️',
+                        createdAt: now(),
+                    };
+                    return next;
+                }
+
+                delete next[eventId];
+                return next;
+            });
             applyEngagementDelta(eventId, 'reactions', optimisticDelta);
-            return { eventId, optimisticDelta };
+            return { eventId, optimisticDelta, previous: variables.previous };
         },
         onSuccess: (result, variables) => {
             const eventId = variables.input.eventId;
             if (variables.next && result.publishedReactionEventId) {
-                setReactionEventIdByTarget((current) => ({
+                setViewerReactionByEventId((current) => ({
                     ...current,
-                    [eventId]: result.publishedReactionEventId,
+                    [eventId]: {
+                        eventId,
+                        reactionEventId: result.publishedReactionEventId,
+                        emoji: variables.input.emoji && variables.input.emoji.length > 0 ? variables.input.emoji : '❤️',
+                        createdAt: now(),
+                    },
                 }));
-                return;
-            }
-
-            if (!variables.next) {
-                setReactionEventIdByTarget((current) => {
-                    const next = { ...current };
-                    delete next[eventId];
-                    return next;
-                });
             }
         },
         onError: (error, variables, context) => {
-            setReactionByEventId((current) => ({ ...current, [variables.input.eventId]: variables.previous }));
+            setViewerReactionByEventId((current) => {
+                const next = { ...current };
+                if (context?.previous) {
+                    next[variables.input.eventId] = context.previous;
+                } else {
+                    delete next[variables.input.eventId];
+                }
+                return next;
+            });
             if (context) {
                 applyEngagementDelta(context.eventId, 'reactions', -context.optimisticDelta);
             }
             setPublishError(error instanceof Error ? error.message : 'No se pudo actualizar la reaccion');
         },
         onSettled: () => {
-            void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.followingFeed() });
+            void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.social() });
         },
     });
 
@@ -998,7 +1069,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
             return false;
         }
 
-        const previous = Boolean(reactionByEventId[input.eventId]);
+        const previous = viewerReactionByEventId[input.eventId];
         const next = !previous;
 
         try {
@@ -1006,7 +1077,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
                 input,
                 previous,
                 next,
-                reactionEventId: reactionEventIdByTarget[input.eventId],
+                reactionEventId: previous?.reactionEventId,
             });
             return true;
         } catch {
@@ -1016,9 +1087,8 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
         options.canWrite,
         options.ownerPubkey,
         options.writeGateway,
-        reactionByEventId,
-        reactionEventIdByTarget,
         toggleReactionMutation,
+        viewerReactionByEventId,
     ]);
 
     const toggleRepost = useCallback(async (input: ToggleRepostInput): Promise<boolean> => {
@@ -1066,6 +1136,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
         isPublishingQuote: publishQuoteMutation.isPending,
         isPublishingReply: publishReplyMutation.isPending,
         reactionByEventId,
+        viewerReactionByEventId,
         repostByEventId,
         pendingReactionByEventId,
         pendingRepostByEventId,

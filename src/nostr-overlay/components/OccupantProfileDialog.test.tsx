@@ -666,6 +666,8 @@ describe('OccupantProfileDialog', () => {
         const followingAliceButton = rerendered.container.querySelector('button[aria-label="Dejar de seguir a Alice"]') as HTMLButtonElement;
         expect(followingAliceButton).toBeDefined();
         expect(followingAliceButton.disabled).toBe(false);
+        expect(followingAliceButton.getAttribute('data-variant')).toBe('outline');
+        expect(followingAliceButton.getAttribute('data-size')).toBe('xs');
 
         await act(async () => {
             followingAliceButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -675,6 +677,44 @@ describe('OccupantProfileDialog', () => {
         expect(onFollowProfile).toHaveBeenLastCalledWith('a'.repeat(64));
         expect(followingAliceButton.disabled).toBe(true);
         expect((followingAliceButton.textContent || '').trim()).toBe('Siguiendo');
+    });
+
+    test('shows icon-only send message action in header when direct messages are available', async () => {
+        const onSendMessage = vi.fn();
+        const rendered = await renderElement(
+            <OccupantProfileDialog
+                {...buildProps({
+                    ownerPubkey: 'f'.repeat(64),
+                    onSendMessage,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const messageAliceButton = document.body.querySelector('button[aria-label="Enviar mensaje a Alice"]') as HTMLButtonElement;
+        expect(messageAliceButton).not.toBeNull();
+        expect((messageAliceButton.textContent || '').trim()).toBe('');
+        expect(messageAliceButton.getAttribute('data-variant')).toBe('outline');
+        expect(messageAliceButton.getAttribute('data-size')).toBe('icon-xs');
+
+        await act(async () => {
+            messageAliceButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onSendMessage).toHaveBeenCalledTimes(1);
+        expect(onSendMessage).toHaveBeenCalledWith('a'.repeat(64));
+
+        const ownProfile = await renderElement(
+            <OccupantProfileDialog
+                {...buildProps({
+                    ownerPubkey: 'a'.repeat(64),
+                    onSendMessage,
+                })}
+            />
+        );
+        mounted.push(ownProfile);
+
+        expect(ownProfile.container.querySelector('button[aria-label="Enviar mensaje a Alice"]')).toBeNull();
     });
 
     test('shows action menu in network tabs and executes copy, message, and details actions', async () => {

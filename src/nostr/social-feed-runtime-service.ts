@@ -14,6 +14,7 @@ import {
     toSocialFeedItem,
     toSocialThreadItem,
     type LoadEngagementInput,
+    type LoadViewerReactionsInput,
     type LoadFollowingFeedInput,
     type LoadThreadInput,
     type SocialEngagementByEventId,
@@ -22,6 +23,7 @@ import {
     type SocialFeedService,
     type SocialThreadItem,
     type SocialThreadPage,
+    type ViewerReactionByEventId,
 } from './social-feed-service';
 import type { NostrEvent, NostrFilter } from './types';
 
@@ -33,6 +35,7 @@ const ENGAGEMENT_KINDS = [1, 6, 7, 16, 9735] as const;
 const DEFAULT_FEED_LIMIT = 30;
 const DEFAULT_THREAD_LIMIT = 40;
 const DEFAULT_ENGAGEMENT_LIMIT = 120;
+const DEFAULT_VIEWER_REACTIONS_LIMIT = 120;
 const DEFAULT_BACKFILL_TIMEOUT_MS = 7_000;
 const QUERY_LIMIT_MULTIPLIER = 3;
 const MIN_QUERY_LIMIT = 24;
@@ -164,6 +167,36 @@ function createEmptyEngagementMetrics(): SocialEngagementMetrics {
 
 function normalizeTargetEventIds(eventIds: string[]): string[] {
     return [...new Set(eventIds.filter((eventId) => typeof eventId === 'string' && eventId.length > 0))];
+}
+
+function normalizeReactionEmoji(content: string): string {
+    const normalized = content.trim();
+    return normalized.length === 0 || normalized === '+' ? '❤️' : normalized;
+}
+
+function collectDeletedEventIds(events: NostrEvent[], ownerPubkey: string): Set<string> {
+    const deletedEventIds = new Set<string>();
+
+    for (const event of events) {
+        if (event.kind !== 5 || event.pubkey !== ownerPubkey) {
+            continue;
+        }
+
+        const kindTags = event.tags
+            .filter((tag) => Array.isArray(tag) && tag[0] === 'k')
+            .map((tag) => tag[1]);
+        if (kindTags.length > 0 && !kindTags.includes('7')) {
+            continue;
+        }
+
+        for (const tag of event.tags) {
+            if (Array.isArray(tag) && tag[0] === 'e' && typeof tag[1] === 'string') {
+                deletedEventIds.add(tag[1]);
+            }
+        }
+    }
+
+    return deletedEventIds;
 }
 
 function normalizeHashtag(hashtag: string): string {
@@ -794,6 +827,71 @@ export function createRuntimeSocialFeedService(
                 }
 
                 return engagementByEventId;
+            });
+        },
+
+        async loadViewerReactions(input: LoadViewerReactionsInput): Promise<ViewerReactionByEventId> {
+            const ownerPubkey = typeof input.ownerPubkey === 'string' ? input.ownerPubkey.trim() : '';
+            const targetEventIds = normalizeTargetEventIds(input.eventIds);
+            const targetSet = new Set(targetEventIds);
+
+            if (!ownerPubkey || targetEventIds.length === 0) {
+                return {};
+            }
+
+            return withRelayFallback(async (transport) => {
+                const limit = clampLimit(input.limit, Math.max(DEFAULT_VIEWER_REACTIONS_LIMIT, targetEventIds.length));
+                const eventIdChunks = chunkEventIds(targetEventIds);
+                const filters: NostrFilter[] = eventIdChunks.map((chunk) => ({
+                    authors: [ownerPubkey],
+                    kinds: [7],
+                    '#e': chunk,
+                    limit,
+                }));
+
+                const events = await fetchBackfillWithTimeout(transport, filters, backfillTimeoutMs);
+                const latestReactionByEventId = new Map<string, NostrEvent>();
+                const reactionByEventId: ViewerReactionByEventId = {};
+
+                for (const event of sortAndDedupe(events as NostrEvent[])) {
+                    if (event.kind !== 7 || event.pubkey !== ownerPubkey) {
+                        continue;
+                    }
+
+                    const targetEventId = extractTargetEventId(event);
+                    if (!targetEventId || !targetSet.has(targetEventId) || latestReactionByEventId.has(targetEventId)) {
+                        continue;
+                    }
+
+                    latestReactionByEventId.set(targetEventId, event);
+                }
+
+                const reactionEventIds = [...latestReactionByEventId.values()].map((event) => event.id);
+                const deleteFilters: NostrFilter[] = chunkEventIds(reactionEventIds).map((chunk) => ({
+                    authors: [ownerPubkey],
+                    kinds: [5],
+                    '#e': chunk,
+                    limit,
+                }));
+                const deleteEvents = deleteFilters.length > 0
+                    ? await fetchBackfillWithTimeout(transport, deleteFilters, backfillTimeoutMs)
+                    : [];
+                const deletedReactionEventIds = collectDeletedEventIds(sortAndDedupe(deleteEvents as NostrEvent[]), ownerPubkey);
+
+                for (const [targetEventId, event] of latestReactionByEventId.entries()) {
+                    if (deletedReactionEventIds.has(event.id)) {
+                        continue;
+                    }
+
+                    reactionByEventId[targetEventId] = {
+                        eventId: targetEventId,
+                        reactionEventId: event.id,
+                        emoji: normalizeReactionEmoji(event.content),
+                        createdAt: event.created_at,
+                    };
+                }
+
+                return reactionByEventId;
             });
         },
     };

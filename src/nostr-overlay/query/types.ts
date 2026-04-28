@@ -26,6 +26,11 @@ export interface EngagementQueryInput {
     eventIds: string[];
 }
 
+export interface ViewerReactionsQueryInput {
+    ownerPubkey: string;
+    eventIds: string[];
+}
+
 export interface NotificationsQueryInput {
     ownerPubkey: string;
     limit?: number;

@@ -606,6 +606,69 @@ describe('social-feed-runtime-service', () => {
         expect(filters.some((filter) => Array.isArray(filter['#q']))).toBe(true);
     });
 
+    test('loads latest viewer reactions by target event id', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const transport = createTransportMock([
+            noteEvent({ id: 'older-reaction', pubkey: ownerPubkey, kind: 7, createdAt: 800, tags: [['e', 'note-1']], content: '😂' }),
+            noteEvent({ id: 'latest-reaction', pubkey: ownerPubkey, kind: 7, createdAt: 900, tags: [['e', 'note-1']], content: '🔥' }),
+            noteEvent({ id: 'like-reaction', pubkey: ownerPubkey, kind: 7, createdAt: 890, tags: [['e', 'note-2']], content: '+' }),
+            noteEvent({ id: 'other-viewer-reaction', pubkey: FOLLOW_A, kind: 7, createdAt: 910, tags: [['e', 'note-1']], content: '👏' }),
+            noteEvent({ id: 'outside-targets', pubkey: ownerPubkey, kind: 7, createdAt: 920, tags: [['e', 'note-3']], content: '🤯' }),
+        ]);
+
+        const service = createRuntimeSocialFeedService({
+            createTransport: () => transport as any,
+            resolveRelays: () => ['wss://relay.one'],
+        });
+
+        const reactions = await service.loadViewerReactions({
+            ownerPubkey,
+            eventIds: ['note-1', 'note-2'],
+        });
+
+        expect(reactions).toEqual({
+            'note-1': {
+                eventId: 'note-1',
+                reactionEventId: 'latest-reaction',
+                emoji: '🔥',
+                createdAt: 900,
+            },
+            'note-2': {
+                eventId: 'note-2',
+                reactionEventId: 'like-reaction',
+                emoji: '❤️',
+                createdAt: 890,
+            },
+        });
+        const filters = (transport.fetchBackfill as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Array<Record<string, unknown>>;
+        expect(filters[0]).toMatchObject({
+            authors: [ownerPubkey],
+            kinds: [7],
+            '#e': ['note-1', 'note-2'],
+        });
+    });
+
+    test('suppresses viewer reactions deleted by the owner', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const transport = createTransportMock([
+            noteEvent({ id: 'latest-reaction', pubkey: ownerPubkey, kind: 7, createdAt: 900, tags: [['e', 'note-1']], content: '🔥' }),
+            noteEvent({ id: 'older-reaction', pubkey: ownerPubkey, kind: 7, createdAt: 800, tags: [['e', 'note-1']], content: '😂' }),
+            noteEvent({ id: 'delete-reaction', pubkey: ownerPubkey, kind: 5, createdAt: 910, tags: [['e', 'latest-reaction'], ['k', '7']] }),
+        ]);
+
+        const service = createRuntimeSocialFeedService({
+            createTransport: () => transport as any,
+            resolveRelays: () => ['wss://relay.one'],
+        });
+
+        const reactions = await service.loadViewerReactions({
+            ownerPubkey,
+            eventIds: ['note-1'],
+        });
+
+        expect(reactions).toEqual({});
+    });
+
     test('dedupes engagement events and ignores unsupported note kinds', async () => {
         const invalid = {
             id: 'invalid',

@@ -17,6 +17,9 @@ import {
   threadQuerySchema,
   type ThreadParams,
   type ThreadQuery,
+  viewerReactionsBodySchema,
+  viewerReactionsResponseSchema,
+  type ViewerReactionsBody,
 } from './social.schemas';
 import { createSocialService, type SocialService } from './social.service';
 
@@ -118,6 +121,23 @@ export const socialRoutes: FastifyPluginAsync<SocialRoutesOptions> = async (
     },
     async (request) => {
       return service.getEngagement(request.body);
+    },
+  );
+
+  app.post<{
+    Body: ViewerReactionsBody;
+  }>(
+    '/social/viewer-reactions',
+    {
+      schema: {
+        body: viewerReactionsBodySchema,
+        response: {
+          200: viewerReactionsResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      return service.getViewerReactions(request.body);
     },
   );
 };

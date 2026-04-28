@@ -11,6 +11,7 @@ import type {
     NotificationsQueryInput,
     RelayMetadataQueryInput,
     ThreadQueryInput,
+    ViewerReactionsQueryInput,
 } from './types';
 
 const ROOT_SCOPE = 'nostr-overlay' as const;
@@ -79,6 +80,15 @@ export const nostrOverlayQueryKeys = {
         SOCIAL_SCOPE,
         'engagement',
         {
+            eventIds: normalizeValues(input.eventIds),
+        },
+    ] as const,
+    viewerReactions: (input: ViewerReactionsQueryInput) => [
+        ROOT_SCOPE,
+        SOCIAL_SCOPE,
+        'viewer-reactions',
+        {
+            ownerPubkey: input.ownerPubkey,
             eventIds: normalizeValues(input.eventIds),
         },
     ] as const,

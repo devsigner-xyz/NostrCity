@@ -44,6 +44,19 @@ describe('social routes', () => {
         ]),
       ),
     }),
+    getViewerReactions: async (query) => ({
+      byEventId: Object.fromEntries(
+        query.eventIds.map((eventId) => [
+          eventId,
+          {
+            eventId,
+            reactionEventId: '7'.repeat(64),
+            emoji: '🔥',
+            createdAt: 123,
+          },
+        ]),
+      ),
+    }),
   };
   const app = buildApp({ socialService });
 
@@ -159,6 +172,29 @@ describe('social routes', () => {
           reactions: 0,
           zaps: 0,
           zapSats: 0,
+        },
+      },
+    });
+  });
+
+  it('returns viewer reactions envelope for valid body', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/social/viewer-reactions',
+      payload: {
+        ownerPubkey: VALID_PUBKEY,
+        eventIds: [VALID_EVENT_ID],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      byEventId: {
+        [VALID_EVENT_ID]: {
+          eventId: VALID_EVENT_ID,
+          reactionEventId: '7'.repeat(64),
+          emoji: '🔥',
+          createdAt: 123,
         },
       },
     });

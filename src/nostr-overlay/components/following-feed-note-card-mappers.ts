@@ -1,4 +1,4 @@
-import type { SocialEngagementMetrics, SocialFeedItem, SocialThreadItem } from '../../nostr/social-feed-service';
+import type { SocialEngagementMetrics, SocialFeedItem, SocialThreadItem, ViewerReactionByEventId } from '../../nostr/social-feed-service';
 import type { NostrPostPreview } from '../../nostr/posts';
 import type { NoteActionState } from './note-card-model';
 
@@ -17,12 +17,17 @@ interface BuildActionStateBaseInput {
     onConfigureZapAmounts?: () => void;
     engagementByEventId: Record<string, SocialEngagementMetrics>;
     reactionByEventId: Record<string, boolean>;
+    viewerReactionByEventId?: ViewerReactionByEventId;
     repostByEventId: Record<string, boolean>;
     pendingReactionByEventId: Record<string, boolean>;
     pendingRepostByEventId: Record<string, boolean>;
     onToggleReaction: (input: { eventId: string; targetPubkey?: string; emoji?: string }) => Promise<boolean>;
     onToggleRepost: (input: { eventId: string; targetPubkey?: string; repostContent?: string }) => Promise<boolean>;
     onQuote: () => void;
+}
+
+function viewerReactionForEvent(viewerReactionByEventId: ViewerReactionByEventId | undefined, eventId: string) {
+    return viewerReactionByEventId?.[eventId];
 }
 
 interface BuildFeedActionStateInput extends BuildActionStateBaseInput {
@@ -77,6 +82,7 @@ export function buildFeedActionState({
     canWrite,
     engagementByEventId,
     reactionByEventId,
+    viewerReactionByEventId,
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -89,10 +95,11 @@ export function buildFeedActionState({
     onQuote,
 }: BuildFeedActionStateInput): NoteActionState {
     const metrics = metricsForEvent(engagementByEventId, item.id);
+    const viewerReaction = viewerReactionForEvent(viewerReactionByEventId, item.id);
 
     return {
         canWrite,
-        isReactionActive: Boolean(reactionByEventId[item.id]),
+        isReactionActive: Boolean(viewerReaction || reactionByEventId[item.id]),
         isRepostActive: Boolean(repostByEventId[item.id]),
         isReactionPending: Boolean(pendingReactionByEventId[item.id]),
         isRepostPending: Boolean(pendingRepostByEventId[item.id]),
@@ -101,6 +108,7 @@ export function buildFeedActionState({
         reposts: metrics.reposts,
         zapSats: metrics.zapSats,
         zapAmounts,
+        ...(viewerReaction ? { reactionEmoji: viewerReaction.emoji } : {}),
         onReply: () => {
             void onOpenThread(item.targetEventId || item.id);
         },
@@ -110,6 +118,11 @@ export function buildFeedActionState({
         onToggleReaction: () => onToggleReaction({
             eventId: item.id,
             targetPubkey: item.pubkey,
+        }),
+        onSelectReactionEmoji: (emoji) => onToggleReaction({
+            eventId: item.id,
+            targetPubkey: item.pubkey,
+            emoji,
         }),
         onRepost: () => onToggleRepost({
             eventId: item.id,
@@ -138,6 +151,7 @@ export function buildPreviewActionState({
     canWrite,
     engagementByEventId,
     reactionByEventId,
+    viewerReactionByEventId,
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -150,10 +164,11 @@ export function buildPreviewActionState({
     onQuote,
 }: BuildPreviewActionStateInput): NoteActionState {
     const metrics = metricsForEvent(engagementByEventId, item.id);
+    const viewerReaction = viewerReactionForEvent(viewerReactionByEventId, item.id);
 
     return {
         canWrite,
-        isReactionActive: Boolean(reactionByEventId[item.id]),
+        isReactionActive: Boolean(viewerReaction || reactionByEventId[item.id]),
         isRepostActive: Boolean(repostByEventId[item.id]),
         isReactionPending: Boolean(pendingReactionByEventId[item.id]),
         isRepostPending: Boolean(pendingRepostByEventId[item.id]),
@@ -162,6 +177,7 @@ export function buildPreviewActionState({
         reposts: metrics.reposts,
         zapSats: metrics.zapSats,
         zapAmounts,
+        ...(viewerReaction ? { reactionEmoji: viewerReaction.emoji } : {}),
         onReply: () => {
             void onOpenThread(item.id);
         },
@@ -171,6 +187,11 @@ export function buildPreviewActionState({
         onToggleReaction: () => onToggleReaction({
             eventId: item.id,
             targetPubkey: item.pubkey,
+        }),
+        onSelectReactionEmoji: (emoji) => onToggleReaction({
+            eventId: item.id,
+            targetPubkey: item.pubkey,
+            emoji,
         }),
         onRepost: () => onToggleRepost({
             eventId: item.id,
@@ -199,6 +220,7 @@ export function buildRootActionState({
     canWrite,
     engagementByEventId,
     reactionByEventId,
+    viewerReactionByEventId,
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -212,10 +234,11 @@ export function buildRootActionState({
     onQuote,
 }: BuildThreadActionStateInput): NoteActionState {
     const metrics = metricsForEvent(engagementByEventId, item.id);
+    const viewerReaction = viewerReactionForEvent(viewerReactionByEventId, item.id);
 
     return {
         canWrite,
-        isReactionActive: Boolean(reactionByEventId[item.id]),
+        isReactionActive: Boolean(viewerReaction || reactionByEventId[item.id]),
         isRepostActive: Boolean(repostByEventId[item.id]),
         isReactionPending: Boolean(pendingReactionByEventId[item.id]),
         isRepostPending: Boolean(pendingRepostByEventId[item.id]),
@@ -224,11 +247,17 @@ export function buildRootActionState({
         reposts: metrics.reposts,
         zapSats: metrics.zapSats,
         zapAmounts,
+        ...(viewerReaction ? { reactionEmoji: viewerReaction.emoji } : {}),
         onReply,
         ...(onViewDetail ? { onViewDetail } : {}),
         onToggleReaction: () => onToggleReaction({
             eventId: item.id,
             targetPubkey: item.pubkey,
+        }),
+        onSelectReactionEmoji: (emoji) => onToggleReaction({
+            eventId: item.id,
+            targetPubkey: item.pubkey,
+            emoji,
         }),
         onRepost: () => onToggleRepost({
             eventId: item.id,

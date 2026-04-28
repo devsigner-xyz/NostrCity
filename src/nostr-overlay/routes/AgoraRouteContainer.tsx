@@ -23,6 +23,7 @@ export interface AgoraRouteContainerProps {
         isPublishingReply: FollowingFeedSurfaceProps['isPublishingReply'];
         publishError: FollowingFeedSurfaceProps['publishError'];
         reactionByEventId: FollowingFeedSurfaceProps['reactionByEventId'];
+        viewerReactionByEventId?: FollowingFeedSurfaceProps['viewerReactionByEventId'];
         repostByEventId: FollowingFeedSurfaceProps['repostByEventId'];
         pendingReactionByEventId: FollowingFeedSurfaceProps['pendingReactionByEventId'];
         pendingRepostByEventId: FollowingFeedSurfaceProps['pendingRepostByEventId'];
@@ -112,6 +113,7 @@ export function AgoraRouteContainer({
             isPublishingReply={followingFeed.isPublishingReply}
             publishError={followingFeed.publishError}
             reactionByEventId={followingFeed.reactionByEventId}
+            {...(followingFeed.viewerReactionByEventId ? { viewerReactionByEventId: followingFeed.viewerReactionByEventId } : {})}
             repostByEventId={followingFeed.repostByEventId}
             pendingReactionByEventId={followingFeed.pendingReactionByEventId}
             pendingRepostByEventId={followingFeed.pendingRepostByEventId}

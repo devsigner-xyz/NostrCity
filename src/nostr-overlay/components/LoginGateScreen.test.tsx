@@ -386,7 +386,7 @@ describe('LoginGateScreen', () => {
         expect(rendered.container.querySelector('[data-slot="empty-icon"] [aria-label="Loading"]')).not.toBeNull();
     });
 
-    test('shows devsigner attribution link while restoring a session', async () => {
+    test('shows strhodler attribution link while restoring a session', async () => {
         const rendered = await renderScreen({ restoringSession: true });
         mounted.push(rendered);
 
@@ -394,11 +394,11 @@ describe('LoginGateScreen', () => {
         const avatar = link?.querySelector('img') as HTMLImageElement | null;
 
         expect(link).not.toBeNull();
-        expect(link?.textContent || '').toContain('by devsigner-xyz');
-        expect(link?.getAttribute('href')).toBe('https://github.com/devsigner-xyz');
+        expect(link?.textContent || '').toContain('Made with ❤️ by strhodler');
+        expect(link?.getAttribute('href')).toBe('https://github.com/strhodler');
         expect(link?.getAttribute('target')).toBe('_blank');
         expect(link?.getAttribute('rel')).toBe('noreferrer');
-        expect(avatar?.getAttribute('src')).toBe('/devsigner-xyz.png');
+        expect(avatar?.getAttribute('src')).toBe('/strhodler.jpg');
         expect(avatar?.getAttribute('alt')).toBe('');
     });
 

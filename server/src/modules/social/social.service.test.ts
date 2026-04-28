@@ -429,4 +429,158 @@ describe('social service pagination', () => {
       zapSats: 21,
     });
   });
+
+  it('loads latest viewer emoji reactions by target event id', async () => {
+    const eventA = 'd'.repeat(64);
+    const eventB = 'e'.repeat(64);
+    const eventC = 'f'.repeat(64);
+    const reactionAOld = '4'.repeat(64);
+    const reactionANew = '5'.repeat(64);
+    const reactionB = '6'.repeat(64);
+    const reactionC = '8'.repeat(64);
+
+    const pool = {
+      querySync: vi.fn(async (_relays: string[], filter: Record<string, unknown>) => {
+        if (!Array.isArray(filter.kinds) || filter.kinds[0] !== 7) {
+          return [];
+        }
+
+        return [
+          {
+            id: reactionAOld,
+            pubkey: OWNER,
+            kind: 7,
+            created_at: 10,
+            tags: [['e', eventA]],
+            content: '👏',
+          },
+          {
+            id: reactionANew,
+            pubkey: OWNER,
+            kind: 7,
+            created_at: 20,
+            tags: [['e', eventA]],
+            content: '🔥',
+          },
+          {
+            id: reactionB,
+            pubkey: OWNER,
+            kind: 7,
+            created_at: 15,
+            tags: [['e', eventB]],
+            content: '+',
+          },
+          {
+            id: reactionC,
+            pubkey: OWNER,
+            kind: 7,
+            created_at: 12,
+            tags: [['e', eventA, '', 'root'], ['e', eventC]],
+            content: '🤯',
+          },
+          {
+            id: '7'.repeat(64),
+            pubkey: FOLLOW,
+            kind: 7,
+            created_at: 30,
+            tags: [['e', eventA]],
+            content: '😢',
+          },
+        ];
+      }),
+    } as unknown as SimplePool;
+
+    const service = createSocialService({
+      pool,
+      bootstrapRelays: ['wss://relay.damus.io'],
+    });
+
+    const result = await service.getViewerReactions({
+      ownerPubkey: OWNER,
+      eventIds: [eventA, eventB, eventC],
+    });
+
+    expect(result.byEventId).toEqual({
+      [eventA]: {
+        eventId: eventA,
+        reactionEventId: reactionANew,
+        emoji: '🔥',
+        createdAt: 20,
+      },
+      [eventB]: {
+        eventId: eventB,
+        reactionEventId: reactionB,
+        emoji: '❤️',
+        createdAt: 15,
+      },
+      [eventC]: {
+        eventId: eventC,
+        reactionEventId: reactionC,
+        emoji: '🤯',
+        createdAt: 12,
+      },
+    });
+  });
+
+  it('suppresses latest viewer reactions deleted by the owner', async () => {
+    const eventId = 'd'.repeat(64);
+    const reactionOld = '4'.repeat(64);
+    const reactionNew = '5'.repeat(64);
+
+    const pool = {
+      querySync: vi.fn(async (_relays: string[], filter: Record<string, unknown>) => {
+        if (!Array.isArray(filter.kinds)) {
+          return [];
+        }
+
+        if (filter.kinds[0] === 7) {
+          return [
+            {
+              id: reactionOld,
+              pubkey: OWNER,
+              kind: 7,
+              created_at: 10,
+              tags: [['e', eventId]],
+              content: '😂',
+            },
+            {
+              id: reactionNew,
+              pubkey: OWNER,
+              kind: 7,
+              created_at: 20,
+              tags: [['e', eventId]],
+              content: '🔥',
+            },
+          ];
+        }
+
+        if (filter.kinds[0] === 5) {
+          return [
+            {
+              id: '6'.repeat(64),
+              pubkey: OWNER,
+              kind: 5,
+              created_at: 30,
+              tags: [['e', reactionNew], ['k', '7']],
+              content: '',
+            },
+          ];
+        }
+
+        return [];
+      }),
+    } as unknown as SimplePool;
+
+    const service = createSocialService({
+      pool,
+      bootstrapRelays: ['wss://relay.damus.io'],
+    });
+
+    const result = await service.getViewerReactions({
+      ownerPubkey: OWNER,
+      eventIds: [eventId],
+    });
+
+    expect(result.byEventId).toEqual({});
+  });
 });

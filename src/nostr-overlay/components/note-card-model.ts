@@ -11,9 +11,11 @@ export interface NoteActionState {
     reposts: number;
     zapSats: number;
     zapAmounts?: number[] | undefined;
+    reactionEmoji?: string | undefined;
     onReply: () => void;
     onViewDetail?: (() => void) | undefined;
     onToggleReaction: () => Promise<boolean>;
+    onSelectReactionEmoji?: ((emoji: string) => Promise<boolean>) | undefined;
     onRepost: () => Promise<boolean>;
     onQuote: () => void;
     onZap?: ((amount: number) => Promise<void> | void) | undefined;

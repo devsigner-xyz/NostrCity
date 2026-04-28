@@ -79,12 +79,12 @@ export function LoginGateScreen({
                                 </Empty>
                                 <Badge variant="outline" asChild className="mx-auto h-auto gap-1.5 py-1 pl-1 pr-2">
                                     <a
-                                        href="https://github.com/devsigner-xyz"
+                                        href="https://github.com/strhodler"
                                         target="_blank"
                                         rel="noreferrer"
                                         data-testid="devsigner-attribution-link"
                                     >
-                                        <img src="/devsigner-xyz.png" alt="" className="size-5 rounded-full object-cover" />
+                                        <img src="/strhodler.jpg" alt="" className="size-5 rounded-full object-cover" />
                                         {t('auth.login.devsignerByline')}
                                     </a>
                                 </Badge>

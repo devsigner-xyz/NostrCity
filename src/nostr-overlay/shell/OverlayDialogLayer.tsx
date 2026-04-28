@@ -2,7 +2,7 @@ import type { ProviderResolveInput } from '../../nostr/auth/providers/types';
 import type { AuthSessionState, LoginMethod } from '../../nostr/auth/session';
 import type { Nip05ValidationResult } from '../../nostr/nip05';
 import type { RelayType } from '../../nostr/relay-settings';
-import type { SocialEngagementByEventId } from '../../nostr/social-feed-service';
+import type { SocialEngagementByEventId, ViewerReactionByEventId } from '../../nostr/social-feed-service';
 import type { NostrEvent, NostrProfile } from '../../nostr/types';
 import type { UiSettingsState } from '../../nostr/ui-settings';
 import type { EasterEggId } from '../../ts/ui/easter_eggs';
@@ -57,6 +57,7 @@ interface OverlayDialogLayerProps {
     canWrite: boolean;
     canAccessDirectMessages: boolean;
     reactionByEventId: Record<string, boolean>;
+    viewerReactionByEventId?: ViewerReactionByEventId;
     repostByEventId: Record<string, boolean>;
     pendingReactionByEventId: Record<string, boolean>;
     pendingRepostByEventId: Record<string, boolean>;
@@ -127,6 +128,7 @@ export function OverlayDialogLayer({
     canWrite,
     canAccessDirectMessages,
     reactionByEventId,
+    viewerReactionByEventId,
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -198,6 +200,7 @@ export function OverlayDialogLayer({
                 canWrite={canWrite}
                 canAccessDirectMessages={canAccessDirectMessages}
                 reactionByEventId={reactionByEventId}
+                {...(viewerReactionByEventId ? { viewerReactionByEventId } : {})}
                 repostByEventId={repostByEventId}
                 pendingReactionByEventId={pendingReactionByEventId}
                 pendingRepostByEventId={pendingRepostByEventId}

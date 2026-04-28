@@ -11,29 +11,31 @@ describe('map visual dark theme styles', () => {
     });
 
     test('defines dark styles for map zoom controls', () => {
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-zoom-group\s*\{[^}]*background:\s*rgba\(6,\s*41,\s*31,/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-regenerate-button\s*\{[^}]*background:\s*rgba\(6,\s*41,\s*31,/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-zoom-level\s*\{[^}]*color:\s*#FFD900/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-zoom-group\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--background\)\s+92%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-regenerate-button\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--background\)\s+92%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-zoom-level\s*\{[^}]*color:\s*var\(--muted-foreground\)/s);
+        expect(styles).not.toMatch(/\.dark\s+\.nostr-map-(?:zoom-group|regenerate-button|display-toggle-group|theme-toggle-group)\s*\{[^}]*rgba\(6,\s*41,\s*31,/s);
+        expect(styles).not.toMatch(/\.dark\s+\.nostr-map-zoom-level\s*\{[^}]*#FFD900/s);
     });
 
-    test('keeps light map control surfaces translucent like dark mode', () => {
-        expect(styles).toMatch(/\.nostr-map-zoom-group\s*\{[^}]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\)/s);
-        expect(styles).toMatch(/\.nostr-map-regenerate-button\s*\{[^}]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\)/s);
-        expect(styles).toMatch(/\.nostr-map-display-toggle-group\s*\{[^}]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\)/s);
-        expect(styles).toMatch(/\.nostr-map-theme-toggle-group\s*\{[^}]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\)/s);
+    test('keeps map control surfaces on neutral system tokens', () => {
+        expect(styles).toMatch(/\.nostr-map-zoom-group\s*\{[^}]*border:\s*1px\s+solid\s+var\(--border\)/s);
+        expect(styles).toMatch(/\.nostr-map-regenerate-button\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--background\)\s+92%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.nostr-map-display-toggle-group\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--background\)\s+92%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.nostr-map-theme-toggle-group\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--background\)\s+92%,\s*transparent\)/s);
     });
 
-    test('uses surface-only map control wrappers without borders', () => {
-        expect(styles).toMatch(/\.nostr-map-zoom-group\s*\{[^}]*border:\s*0;/s);
-        expect(styles).toMatch(/\.nostr-map-display-toggle-group\s*\{[^}]*border:\s*0;/s);
-        expect(styles).toMatch(/\.nostr-map-theme-toggle-group\s*\{[^}]*border:\s*0;/s);
-        expect(styles).toMatch(/\.nostr-map-regenerate-button\s*\{[^}]*border:\s*0;/s);
+    test('uses standard bordered map control wrappers', () => {
+        expect(styles).toMatch(/\.nostr-map-zoom-group\s*\{[^}]*border:\s*1px\s+solid\s+var\(--border\)/s);
+        expect(styles).toMatch(/\.nostr-map-display-toggle-group\s*\{[^}]*border:\s*1px\s+solid\s+var\(--border\)/s);
+        expect(styles).toMatch(/\.nostr-map-theme-toggle-group\s*\{[^}]*border:\s*1px\s+solid\s+var\(--border\)/s);
+        expect(styles).toMatch(/\.nostr-map-regenerate-button\s*\{[^}]*border:\s*1px\s+solid\s+var\(--border\)/s);
     });
 
     test('aligns display toggles with map action control surfaces', () => {
         expect(styles).toMatch(/\.nostr-map-display-toggle-group\s*\{[^}]*min-height:\s*38px;/s);
         expect(styles).toMatch(/\.nostr-map-regenerate-button\s*\{[^}]*width:\s*38px;[^}]*height:\s*38px;/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-display-toggle-group\s*\{[^}]*background:\s*rgba\(6,\s*41,\s*31,/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-display-toggle-group\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--background\)\s+92%,\s*transparent\)/s);
     });
 
     test('separates zoom controls and keeps zoom buttons circular', () => {
@@ -43,8 +45,9 @@ describe('map visual dark theme styles', () => {
     });
 
     test('distinguishes active display toggles from inactive toggles', () => {
-        expect(styles).toMatch(/\.nostr-map-display-toggle-button\[data-state="on"\]\s*\{[^}]*border:\s*0;/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-display-toggle-button\[data-state="on"\]\s*\{[^}]*background:\s*rgba\(255,\s*217,\s*0,/s);
+        expect(styles).toMatch(/\.nostr-map-display-toggle-button\[data-state="on"\]\s*\{[^}]*background:\s*var\(--muted\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-display-toggle-button\[data-state="on"\]\s*\{[^}]*background:\s*var\(--muted\)/s);
+        expect(styles).not.toMatch(/\.dark\s+\.nostr-map-display-toggle-button\[data-state="on"\]\s*\{[^}]*rgba\(255,\s*217,\s*0,/s);
     });
 
     test('defines dark styles for map occupant and icon markers', () => {

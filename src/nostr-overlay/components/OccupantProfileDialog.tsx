@@ -11,7 +11,7 @@ import { Nip05Identifier } from './Nip05Identifier';
 import { fromPostPreview } from './note-card-adapters';
 import type { NoteCardModel } from './note-card-model';
 import { withoutNoteActions } from './note-card-model';
-import { EllipsisVerticalIcon, XIcon } from 'lucide-react';
+import { EllipsisVerticalIcon, MessageCircleIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -31,7 +31,7 @@ import { useI18n } from '@/i18n/useI18n';
 import { PersonContextMenuItems } from './PersonContextMenuItems';
 import { VerifiedUserAvatar } from './VerifiedUserAvatar';
 import { toast } from 'sonner';
-import type { SocialEngagementMetrics } from '../../nostr/social-feed-service';
+import type { SocialEngagementMetrics, ViewerReactionByEventId } from '../../nostr/social-feed-service';
 
 interface OccupantProfileDialogProps {
     ownerPubkey?: string;
@@ -66,6 +66,7 @@ interface OccupantProfileDialogProps {
     onSendMessage?: (pubkey: string) => void | Promise<void>;
     canWrite?: boolean;
     reactionByEventId?: Record<string, boolean>;
+    viewerReactionByEventId?: ViewerReactionByEventId;
     repostByEventId?: Record<string, boolean>;
     pendingReactionByEventId?: Record<string, boolean>;
     pendingRepostByEventId?: Record<string, boolean>;
@@ -208,6 +209,7 @@ export function OccupantProfileDialog({
     onSendMessage,
     canWrite = false,
     reactionByEventId = {},
+    viewerReactionByEventId = {},
     repostByEventId = {},
     pendingReactionByEventId = {},
     pendingRepostByEventId = {},
@@ -247,6 +249,7 @@ export function OccupantProfileDialog({
     const canAddRelaySuggestions = typeof onAddRelaySuggestion === 'function';
     const canAddAllRelaySuggestions = typeof onAddAllRelaySuggestions === 'function' && relaySuggestionRows.length > 1;
     const canFollowActiveProfile = typeof onFollowProfile === 'function' && ownerPubkey !== pubkey;
+    const canSendMessageToActiveProfile = typeof onSendMessage === 'function' && ownerPubkey !== pubkey;
     const activeProfileFollowState = buildFollowActionState(pubkey, displayName, ownerFollowSet, pendingFollowByPubkey, t);
 
     const npubValue = useMemo(() => {
@@ -674,18 +677,37 @@ export function OccupantProfileDialog({
                                 </div>
                             </div>
 
-                            {canFollowActiveProfile ? (
-                                <Button
-                                    type="button"
-                                    size="xs"
-                                    variant={activeProfileFollowState.isFollowed ? 'secondary' : 'outline'}
-                                    className="shrink-0"
-                                    disabled={activeProfileFollowState.isDisabled}
-                                    aria-label={activeProfileFollowState.ariaLabel}
-                                    onClick={() => followProfile(pubkey)}
-                                >
-                                    {activeProfileFollowState.label}
-                                </Button>
+                            {(canSendMessageToActiveProfile || canFollowActiveProfile) ? (
+                                <div className="flex shrink-0 items-center gap-2">
+                                    {canSendMessageToActiveProfile ? (
+                                        <Button
+                                            type="button"
+                                            size="icon-xs"
+                                            variant="outline"
+                                            aria-label={t('profile.sendMessageTo', { displayName })}
+                                            title={t('profile.sendMessageTo', { displayName })}
+                                            onClick={() => {
+                                                void onSendMessage?.(pubkey);
+                                            }}
+                                        >
+                                            <MessageCircleIcon data-icon="inline-start" />
+                                        </Button>
+                                    ) : null}
+
+                                    {canFollowActiveProfile ? (
+                                        <Button
+                                            type="button"
+                                            size="xs"
+                                            variant="outline"
+                                            className="shrink-0"
+                                            disabled={activeProfileFollowState.isDisabled}
+                                            aria-label={activeProfileFollowState.ariaLabel}
+                                            onClick={() => followProfile(pubkey)}
+                                        >
+                                            {activeProfileFollowState.label}
+                                        </Button>
+                                    ) : null}
+                                </div>
                             ) : null}
                         </div>
                     </div>
@@ -805,6 +827,7 @@ export function OccupantProfileDialog({
                                                         canWrite,
                                                         engagementByEventId,
                                                         reactionByEventId,
+                                                        viewerReactionByEventId,
                                                         repostByEventId,
                                                         pendingReactionByEventId,
                                                         pendingRepostByEventId,

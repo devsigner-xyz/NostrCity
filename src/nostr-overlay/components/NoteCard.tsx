@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item';
 import type { I18nContextValue } from '@/i18n/I18nProvider';
 import { useI18n } from '@/i18n/useI18n';
@@ -91,6 +92,8 @@ function truncateTo140(content: string, _t: I18nContextValue['t']): string {
 
 const MAX_NESTED_VISIBLE = 3;
 const MAX_REFERENCES_VISIBLE = 2;
+const DEFAULT_REACTION_EMOJI = '❤️';
+const REACTION_EMOJI_PRESET = [DEFAULT_REACTION_EMOJI, '😂', '🔥', '👏', '🤯', '😮', '😢', '👍'] as const;
 
 interface VisibleNestedEntries {
     visibleEntries: Array<{ key: string; note: NoteCardModel }>;
@@ -232,27 +235,66 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
     };
 
     const canOpenZapMenu = Boolean(actions.canWrite && actions.onZap && actions.zapAmounts && actions.zapAmounts.length > 0);
+    const reactionEmoji = actions.reactionEmoji || DEFAULT_REACTION_EMOJI;
+    const reactionButtonLabel = actions.isReactionActive
+        ? t('note.actions.removeReaction', { emoji: reactionEmoji, count: String(actions.reactions) })
+        : t('note.actions.react', { count: String(actions.reactions) });
+    const reactionButton = (
+        <Button
+            type="button"
+            variant={actions.isReactionActive ? 'default' : 'ghost'}
+            size="sm"
+            disabled={actions.isReactionPending || !actions.canWrite}
+            aria-label={reactionButtonLabel}
+            onClick={(event) => {
+                event.stopPropagation();
+                if (actions.isReactionActive || !actions.onSelectReactionEmoji) {
+                    void actions.onToggleReaction();
+                }
+            }}
+        >
+            {actions.isReactionActive ? (
+                <span data-icon="inline-start" aria-hidden="true">{reactionEmoji}</span>
+            ) : (
+                <HeartIcon data-icon="inline-start" aria-hidden="true" />
+            )}
+            <span>{actions.reactions}</span>
+        </Button>
+    );
 
     return (
         <ButtonGroup>
-            <Button type="button" variant="ghost" size="sm" aria-label={t('note.actions.reply', { count: String(actions.replies) })} onClick={actions.onReply}>
+            <Button type="button" variant="ghost" size="sm" aria-label={t('note.actions.reply', { count: String(actions.replies) })} onClick={(event) => {
+                event.stopPropagation();
+                actions.onReply();
+            }}>
                 <MessageCircleIcon data-icon="inline-start" aria-hidden="true" />
                 <span>{actions.replies}</span>
             </Button>
 
-            <Button
-                type="button"
-                variant={actions.isReactionActive ? 'default' : 'ghost'}
-                size="sm"
-                disabled={actions.isReactionPending || !actions.canWrite}
-                aria-label={t('note.actions.react', { count: String(actions.reactions) })}
-                onClick={() => {
-                    void actions.onToggleReaction();
-                }}
-            >
-                <HeartIcon data-icon="inline-start" aria-hidden="true" />
-                <span>{actions.reactions}</span>
-            </Button>
+            {!actions.isReactionActive && actions.onSelectReactionEmoji ? (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        {reactionButton}
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="min-w-40" align="start">
+                        <DropdownMenuGroup>
+                            <DropdownMenuLabel>{t('note.actions.chooseReaction')}</DropdownMenuLabel>
+                            {REACTION_EMOJI_PRESET.map((emoji) => (
+                                <DropdownMenuItem
+                                    key={`note-reaction-${emoji}`}
+                                    aria-label={t('note.actions.reactWithEmoji', { emoji })}
+                                    onSelect={() => {
+                                        void actions.onSelectReactionEmoji?.(emoji);
+                                    }}
+                                >
+                                    <span>{emoji}</span>
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            ) : reactionButton}
 
             <ContextMenu>
                 <ContextMenuTrigger asChild>

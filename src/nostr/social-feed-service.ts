@@ -71,6 +71,12 @@ export interface LoadEngagementInput {
     until?: number;
 }
 
+export interface LoadViewerReactionsInput {
+    ownerPubkey: string;
+    eventIds: string[];
+    limit?: number;
+}
+
 export interface SocialEngagementMetrics {
     replies: number;
     reposts: number;
@@ -81,6 +87,15 @@ export interface SocialEngagementMetrics {
 
 export type SocialEngagementByEventId = Record<string, SocialEngagementMetrics>;
 
+export interface ViewerReaction {
+    eventId: string;
+    reactionEventId: string;
+    emoji: string;
+    createdAt: number;
+}
+
+export type ViewerReactionByEventId = Record<string, ViewerReaction>;
+
 export interface SocialFeedService {
     loadFollowingFeed(input: LoadFollowingFeedInput): Promise<SocialFeedPage>;
     loadArticlesFeed(input: LoadArticlesFeedInput): Promise<SocialFeedPage>;
@@ -88,6 +103,7 @@ export interface SocialFeedService {
     loadHashtagFeed(input: LoadHashtagFeedInput): Promise<SocialFeedPage>;
     loadThread(input: LoadThreadInput): Promise<SocialThreadPage>;
     loadEngagement(input: LoadEngagementInput): Promise<SocialEngagementByEventId>;
+    loadViewerReactions(input: LoadViewerReactionsInput): Promise<ViewerReactionByEventId>;
 }
 
 function tagValue(tag: string[] | undefined): string | undefined {

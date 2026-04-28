@@ -110,6 +110,12 @@ describe('nostr overlay query standards', () => {
         );
 
         expect(
+            nostrOverlayQueryKeys.viewerReactions({ ownerPubkey: 'owner', eventIds: ['id-2', 'id-1', 'id-2'] })
+        ).toEqual(
+            ['nostr-overlay', 'social', 'viewer-reactions', { ownerPubkey: 'owner', eventIds: ['id-1', 'id-2'] }]
+        );
+
+        expect(
             nostrOverlayQueryKeys.userSearch({ term: '  alice  ' })
         ).toEqual(
             ['nostr-overlay', 'social', 'search', {

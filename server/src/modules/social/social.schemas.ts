@@ -29,6 +29,11 @@ export interface EngagementBody {
   until?: number;
 }
 
+export interface ViewerReactionsBody {
+  ownerPubkey: string;
+  eventIds: string[];
+}
+
 export interface SocialEventDto {
   id: string;
   pubkey: string;
@@ -66,6 +71,17 @@ export interface EngagementTotalsDto {
 
 export interface EngagementResponseDto {
   byEventId: Record<string, EngagementTotalsDto>;
+}
+
+export interface ViewerReactionDto {
+  eventId: string;
+  reactionEventId: string;
+  emoji: string;
+  createdAt: number;
+}
+
+export interface ViewerReactionsResponseDto {
+  byEventId: Record<string, ViewerReactionDto>;
 }
 
 const LOWER_HEX_64_PATTERN = '^[0-9a-f]{64}$';
@@ -313,6 +329,54 @@ export const engagementResponseSchema = {
       type: 'object',
       patternProperties: {
         [LOWER_HEX_64_PATTERN]: engagementTotalsSchema,
+      },
+      additionalProperties: false,
+    },
+  },
+} as const;
+
+export const viewerReactionsBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['ownerPubkey', 'eventIds'],
+  properties: {
+    ownerPubkey: {
+      type: 'string',
+      pattern: LOWER_HEX_64_PATTERN,
+    },
+    eventIds: {
+      type: 'array',
+      minItems: 1,
+      maxItems: MAX_ENGAGEMENT_EVENT_IDS,
+      items: {
+        type: 'string',
+        pattern: LOWER_HEX_64_PATTERN,
+      },
+    },
+  },
+} as const;
+
+const viewerReactionSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['eventId', 'reactionEventId', 'emoji', 'createdAt'],
+  properties: {
+    eventId: { type: 'string', pattern: LOWER_HEX_64_PATTERN },
+    reactionEventId: { type: 'string', pattern: LOWER_HEX_64_PATTERN },
+    emoji: { type: 'string', minLength: 1 },
+    createdAt: { type: 'integer', minimum: 0 },
+  },
+} as const;
+
+export const viewerReactionsResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['byEventId'],
+  properties: {
+    byEventId: {
+      type: 'object',
+      patternProperties: {
+        [LOWER_HEX_64_PATTERN]: viewerReactionSchema,
       },
       additionalProperties: false,
     },

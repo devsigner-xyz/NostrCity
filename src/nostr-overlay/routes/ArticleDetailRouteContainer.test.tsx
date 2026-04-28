@@ -48,6 +48,7 @@ function service(): SocialFeedService {
         loadHashtagFeed: vi.fn(),
         loadThread: vi.fn(),
         loadEngagement: vi.fn(),
+        loadViewerReactions: vi.fn(),
     };
 }
 

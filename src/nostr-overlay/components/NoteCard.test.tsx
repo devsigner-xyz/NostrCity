@@ -158,6 +158,66 @@ describe('NoteCard', () => {
         expect(container.querySelector('button[aria-label="Copiar identificador de nota note-1"]')).toBeNull();
     });
 
+    test('opens emoji selector before reacting and sends selected emoji', async () => {
+        const onToggleReaction = vi.fn(async () => true);
+        const onSelectReactionEmoji = vi.fn(async () => true);
+        const { container } = await renderNoteCard({
+            ...defaultNoteFixture,
+            actions: {
+                ...defaultNoteFixture.actions!,
+                onToggleReaction,
+                onSelectReactionEmoji,
+            } as any,
+        });
+
+        const reactionButton = container.querySelector('button[aria-label="Reaccionar (3)"]') as HTMLButtonElement;
+        expect(reactionButton).not.toBeNull();
+
+        await act(async () => {
+            reactionButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+            reactionButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const fireReaction = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+            item.getAttribute('aria-label') === 'Reaccionar con 🔥'
+        ) as HTMLElement;
+        expect(fireReaction).toBeDefined();
+
+        await act(async () => {
+            fireReaction.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onSelectReactionEmoji).toHaveBeenCalledWith('🔥');
+        expect(onToggleReaction).not.toHaveBeenCalled();
+    });
+
+    test('shows active reaction emoji and removes reaction directly on click', async () => {
+        const onToggleReaction = vi.fn(async () => true);
+        const { container } = await renderNoteCard({
+            ...defaultNoteFixture,
+            actions: {
+                ...defaultNoteFixture.actions!,
+                isReactionActive: true,
+                reactionEmoji: '👏',
+                onToggleReaction,
+                onSelectReactionEmoji: vi.fn(async () => true),
+            } as any,
+        });
+
+        const reactionButton = Array.from(container.querySelectorAll('button')).find((button) =>
+            button.getAttribute('aria-label') === 'Quitar reacción 👏 (3)'
+        ) as HTMLButtonElement | undefined;
+        expect(reactionButton).toBeDefined();
+        expect(reactionButton?.textContent || '').toContain('👏');
+
+        await act(async () => {
+            reactionButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onToggleReaction).toHaveBeenCalledTimes(1);
+        expect(document.body.querySelector('[data-slot="dropdown-menu-item"]')).toBeNull();
+    });
+
     test('renders long-form article notes with the article preview path', async () => {
         const { container } = await renderNoteCard({
             ...withoutNoteActions(defaultNoteFixture),

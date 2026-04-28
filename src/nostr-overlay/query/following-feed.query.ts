@@ -5,6 +5,7 @@ import type {
     SocialFeedPage,
     SocialFeedService,
     SocialThreadPage,
+    ViewerReactionByEventId,
 } from '../../nostr/social-feed-service';
 import { nostrOverlayQueryKeys } from './keys';
 import { createSocialQueryOptions } from './options';
@@ -45,6 +46,13 @@ interface UseThreadInfiniteQueryOptions {
 }
 
 interface UseFollowingFeedEngagementQueryOptions {
+    eventIds: string[];
+    service: SocialFeedService;
+    enabled: boolean;
+}
+
+interface UseViewerReactionsQueryOptions {
+    ownerPubkey?: string;
     eventIds: string[];
     service: SocialFeedService;
     enabled: boolean;
@@ -170,5 +178,16 @@ export function useFollowingFeedEngagementQuery(options: UseFollowingFeedEngagem
         queryKey: nostrOverlayQueryKeys.engagement({ eventIds }),
         queryFn: () => options.service.loadEngagement({ eventIds }),
         enabled: options.enabled && eventIds.length > 0,
+    }));
+}
+
+export function useViewerReactionsQuery(options: UseViewerReactionsQueryOptions) {
+    const ownerPubkey = options.ownerPubkey?.trim() ?? '';
+    const eventIds = normalizeEngagementEventIds(options.eventIds);
+
+    return useQuery<ViewerReactionByEventId, Error, ViewerReactionByEventId, ReturnType<typeof nostrOverlayQueryKeys.viewerReactions>>(createSocialQueryOptions({
+        queryKey: nostrOverlayQueryKeys.viewerReactions({ ownerPubkey: ownerPubkey || '__anonymous__', eventIds }),
+        queryFn: () => options.service.loadViewerReactions({ ownerPubkey, eventIds }),
+        enabled: options.enabled && Boolean(ownerPubkey) && eventIds.length > 0,
     }));
 }

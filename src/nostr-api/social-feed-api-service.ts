@@ -6,6 +6,7 @@ import {
     type SocialFeedPage,
     type SocialFeedService,
     type SocialThreadPage,
+    type ViewerReactionByEventId,
 } from '../nostr/social-feed-service';
 import type { NostrEvent } from '../nostr/types';
 import { createHttpClient, type HttpClient } from './http-client';
@@ -43,6 +44,17 @@ interface EngagementMetricsDto {
 
 interface EngagementResponseDto {
     byEventId: Record<string, EngagementMetricsDto>;
+}
+
+interface ViewerReactionDto {
+    eventId: string;
+    reactionEventId: string;
+    emoji: string;
+    createdAt: number;
+}
+
+interface ViewerReactionsResponseDto {
+    byEventId: Record<string, ViewerReactionDto>;
 }
 
 interface ArticleDetailResponseDto {
@@ -214,6 +226,21 @@ export function createSocialFeedApiService(options: CreateSocialFeedApiServiceOp
                 body: {
                     eventIds: input.eventIds,
                     until: input.until,
+                },
+            });
+
+            return response.byEventId;
+        },
+
+        async loadViewerReactions(input): Promise<ViewerReactionByEventId> {
+            if (!input.ownerPubkey || !input.eventIds || input.eventIds.length === 0) {
+                return {};
+            }
+
+            const response = await client.postJson<ViewerReactionsResponseDto>('/social/viewer-reactions', {
+                body: {
+                    ownerPubkey: input.ownerPubkey,
+                    eventIds: input.eventIds,
                 },
             });
 

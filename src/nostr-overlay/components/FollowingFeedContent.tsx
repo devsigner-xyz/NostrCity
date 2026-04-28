@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CopyIcon, ImageIcon } from 'lucide-react';
 import type { AgoraFeedLayout } from '../../nostr/ui-settings';
 import type { NostrEvent, NostrProfile } from '../../nostr/types';
-import type { SocialEngagementMetrics, SocialFeedItem } from '../../nostr/social-feed-service';
+import type { SocialEngagementMetrics, SocialFeedItem, ViewerReactionByEventId } from '../../nostr/social-feed-service';
 import type { SearchUsersResult } from '../query/user-search.query';
 import { createMentionDraft, type MentionDraft } from '../mention-serialization';
 import { MentionTextarea } from './MentionTextarea';
@@ -65,6 +65,7 @@ export interface FollowingFeedViewProps {
     isPublishingReply: boolean;
     publishError: string | null;
     reactionByEventId: Record<string, boolean>;
+    viewerReactionByEventId?: ViewerReactionByEventId;
     repostByEventId: Record<string, boolean>;
     pendingReactionByEventId: Record<string, boolean>;
     pendingRepostByEventId: Record<string, boolean>;
@@ -184,6 +185,7 @@ export function FollowingFeedContent({
     isPublishingReply,
     publishError,
     reactionByEventId,
+    viewerReactionByEventId = {},
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -309,6 +311,7 @@ export function FollowingFeedContent({
             canWrite,
             engagementByEventId,
             reactionByEventId,
+            viewerReactionByEventId,
             repostByEventId,
             pendingReactionByEventId,
             pendingRepostByEventId,
@@ -468,6 +471,7 @@ export function FollowingFeedContent({
                                             canWrite,
                                             engagementByEventId,
                                             reactionByEventId,
+                                            viewerReactionByEventId,
                                             repostByEventId,
                                             pendingReactionByEventId,
                                             pendingRepostByEventId,
@@ -494,6 +498,7 @@ export function FollowingFeedContent({
                                         canWrite,
                                         engagementByEventId,
                                         reactionByEventId,
+                                        viewerReactionByEventId,
                                         repostByEventId,
                                         pendingReactionByEventId,
                                         pendingRepostByEventId,
@@ -560,6 +565,7 @@ export function FollowingFeedContent({
                                             canWrite,
                                             engagementByEventId,
                                             reactionByEventId,
+                                            viewerReactionByEventId,
                                             repostByEventId,
                                             pendingReactionByEventId,
                                             pendingRepostByEventId,

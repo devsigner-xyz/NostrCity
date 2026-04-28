@@ -19,11 +19,14 @@ import type {
   ThreadResponseDto,
   ThreadParams,
   ThreadQuery,
+  ViewerReactionsBody,
+  ViewerReactionsResponseDto,
 } from './social.schemas';
 
 type ThreadRequest = ThreadQuery & ThreadParams;
 type EngagementRequest = EngagementBody;
 type ArticleRequest = ArticleParams;
+type ViewerReactionsRequest = ViewerReactionsBody;
 
 type NostrEventLike = {
   id: string;
@@ -53,6 +56,11 @@ const createEmptyEngagementTotals = () => ({
   zaps: 0,
   zapSats: 0,
 });
+
+const normalizeReactionEmoji = (content: string): string => {
+  const normalized = content.trim();
+  return normalized.length === 0 || normalized === '+' ? '❤️' : normalized;
+};
 
 const toEventDto = (event: NostrEventLike): SocialEventDto => {
   return {
@@ -140,6 +148,50 @@ const findTargetEventId = (
   return undefined;
 };
 
+const findLastTargetEventId = (
+  tags: string[][],
+  candidateEventIds: Set<string>,
+): string | undefined => {
+  for (let index = tags.length - 1; index >= 0; index -= 1) {
+    const tag = tags[index];
+    if (
+      Array.isArray(tag) &&
+      tag[0] === 'e' &&
+      typeof tag[1] === 'string' &&
+      candidateEventIds.has(tag[1])
+    ) {
+      return tag[1];
+    }
+  }
+
+  return undefined;
+};
+
+const collectDeletedEventIds = (events: NostrEventLike[], ownerPubkey: string): Set<string> => {
+  const deletedEventIds = new Set<string>();
+
+  for (const event of events) {
+    if (event.kind !== 5 || event.pubkey !== ownerPubkey) {
+      continue;
+    }
+
+    const kindTags = event.tags
+      .filter((tag) => Array.isArray(tag) && tag[0] === 'k')
+      .map((tag) => tag[1]);
+    if (kindTags.length > 0 && !kindTags.includes('7')) {
+      continue;
+    }
+
+    for (const tag of event.tags) {
+      if (Array.isArray(tag) && tag[0] === 'e' && typeof tag[1] === 'string') {
+        deletedEventIds.add(tag[1]);
+      }
+    }
+  }
+
+  return deletedEventIds;
+};
+
 const parseZapSats = (event: NostrEventLike): number => {
   const amountTag = event.tags.find(
     (tag) => Array.isArray(tag) && tag[0] === 'amount' && typeof tag[1] === 'string',
@@ -205,6 +257,7 @@ export interface SocialServiceOptions {
   articleGateway?: RelayGateway<ArticleRequest, ArticleResponseDto>;
   threadGateway?: RelayGateway<ThreadRequest, ThreadResponseDto>;
   engagementGateway?: RelayGateway<EngagementRequest, EngagementResponseDto>;
+  viewerReactionsGateway?: RelayGateway<ViewerReactionsRequest, ViewerReactionsResponseDto>;
   fetchFollowingFeed?: (
     query: FollowingFeedQuery,
     context: RelayGatewayQueryContext,
@@ -225,6 +278,10 @@ export interface SocialServiceOptions {
     query: EngagementRequest,
     context: RelayGatewayQueryContext,
   ) => Promise<EngagementResponseDto>;
+  fetchViewerReactions?: (
+    query: ViewerReactionsRequest,
+    context: RelayGatewayQueryContext,
+  ) => Promise<ViewerReactionsResponseDto>;
   defaultTimeoutMs?: number;
   bootstrapRelays?: string[];
   pool?: SimplePool;
@@ -236,6 +293,7 @@ export interface SocialService {
   getArticleById(query: ArticleRequest): Promise<ArticleResponseDto>;
   getThread(query: ThreadRequest): Promise<ThreadResponseDto>;
   getEngagement(query: EngagementRequest): Promise<EngagementResponseDto>;
+  getViewerReactions(query: ViewerReactionsRequest): Promise<ViewerReactionsResponseDto>;
 }
 
 class GatewaySocialService implements SocialService {
@@ -245,6 +303,7 @@ class GatewaySocialService implements SocialService {
     private readonly articleGateway: RelayGateway<ArticleRequest, ArticleResponseDto>,
     private readonly threadGateway: RelayGateway<ThreadRequest, ThreadResponseDto>,
     private readonly engagementGateway: RelayGateway<EngagementRequest, EngagementResponseDto>,
+    private readonly viewerReactionsGateway: RelayGateway<ViewerReactionsRequest, ViewerReactionsResponseDto>,
   ) {}
 
   async getFollowingFeed(query: FollowingFeedQuery): Promise<FollowingFeedResponseDto> {
@@ -286,6 +345,18 @@ class GatewaySocialService implements SocialService {
       },
     });
   }
+
+  async getViewerReactions(query: ViewerReactionsRequest): Promise<ViewerReactionsResponseDto> {
+    const eventIds = [...new Set(query.eventIds)].sort();
+
+    return this.viewerReactionsGateway.query({
+      key: `social:viewer-reactions:${query.ownerPubkey}:${eventIds.join(',')}`,
+      params: {
+        ...query,
+        eventIds,
+      },
+    });
+  }
 }
 
 const toDefaultEngagementResponse = (eventIds: string[]): EngagementResponseDto => {
@@ -315,6 +386,10 @@ const createPoolFetchers = (options: {
     query: EngagementRequest,
     context: RelayGatewayQueryContext,
   ) => Promise<EngagementResponseDto>;
+  fetchViewerReactions: (
+    query: ViewerReactionsRequest,
+    context: RelayGatewayQueryContext,
+  ) => Promise<ViewerReactionsResponseDto>;
   fetchArticlesFeed: (
     query: ArticlesFeedQuery,
     context: RelayGatewayQueryContext,
@@ -630,12 +705,81 @@ const createPoolFetchers = (options: {
     return queryWithFallback(relaySets, queryEngagementOnRelays);
   };
 
+  const fetchViewerReactions = async (
+    query: ViewerReactionsRequest,
+    _context: RelayGatewayQueryContext,
+  ): Promise<ViewerReactionsResponseDto> => {
+    const relaySets = resolveRelaySets({
+      scopedRelays: [],
+      userRelays: [],
+      bootstrapRelays: options.bootstrapRelays,
+    });
+
+    const queryViewerReactionsOnRelays = async (relays: string[]): Promise<ViewerReactionsResponseDto> => {
+      if (relays.length === 0) {
+        return { byEventId: {} };
+      }
+
+      const candidateIds = new Set(query.eventIds);
+      const events = await options.pool.querySync(relays, {
+        '#e': query.eventIds,
+        authors: [query.ownerPubkey],
+        kinds: [7],
+        limit: ENGAGEMENT_QUERY_LIMIT,
+      });
+      const latestReactionByEventId = new Map<string, NostrEventLike>();
+      const byEventId: ViewerReactionsResponseDto['byEventId'] = {};
+
+      for (const event of dedupeById(events).sort(byCreatedAtDesc)) {
+        if (event.kind !== 7 || event.pubkey !== query.ownerPubkey) {
+          continue;
+        }
+
+        const eventId = findLastTargetEventId(event.tags, candidateIds);
+        if (!eventId || latestReactionByEventId.has(eventId)) {
+          continue;
+        }
+
+        latestReactionByEventId.set(eventId, event);
+      }
+
+      const reactionEventIds = [...latestReactionByEventId.values()].map((event) => event.id);
+      const deleteEvents = reactionEventIds.length > 0
+        ? await options.pool.querySync(relays, {
+          '#e': reactionEventIds,
+          authors: [query.ownerPubkey],
+          kinds: [5],
+          limit: ENGAGEMENT_QUERY_LIMIT,
+        })
+        : [];
+      const deletedReactionEventIds = collectDeletedEventIds(dedupeById(deleteEvents), query.ownerPubkey);
+
+      for (const [eventId, event] of latestReactionByEventId.entries()) {
+        if (deletedReactionEventIds.has(event.id)) {
+          continue;
+        }
+
+        byEventId[eventId] = {
+          eventId,
+          reactionEventId: event.id,
+          emoji: normalizeReactionEmoji(event.content),
+          createdAt: event.created_at,
+        };
+      }
+
+      return { byEventId };
+    };
+
+    return queryWithFallback(relaySets, queryViewerReactionsOnRelays);
+  };
+
   return {
     fetchFollowingFeed,
     fetchArticlesFeed,
     fetchArticleById,
     fetchThread,
     fetchEngagement,
+    fetchViewerReactions,
   };
 };
 
@@ -702,5 +846,16 @@ export const createSocialService = (options: SocialServiceOptions = {}): SocialS
       },
     });
 
-  return new GatewaySocialService(feedGateway, articlesFeedGateway, articleGateway, threadGateway, engagementGateway);
+  const viewerReactionsGateway =
+    options.viewerReactionsGateway ??
+    createRelayGateway<ViewerReactionsRequest, ViewerReactionsResponseDto>({
+      queryFn: options.fetchViewerReactions || fetchers.fetchViewerReactions,
+      defaultTimeoutMs: options.defaultTimeoutMs,
+      cache: {
+        ttlMs: 5_000,
+        maxEntries: 300,
+      },
+    });
+
+  return new GatewaySocialService(feedGateway, articlesFeedGateway, articleGateway, threadGateway, engagementGateway, viewerReactionsGateway);
 };

@@ -187,10 +187,11 @@
 }
 
 .nostr-map-zoom-group {
-    border: 0;
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.88);
-    box-shadow: 0 12px 24px rgba(14, 32, 44, 0.2);
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    color: var(--foreground);
+    box-shadow: 0 12px 24px color-mix(in oklab, var(--foreground) 14%, transparent);
     gap: 0.25rem;
     min-height: 38px;
     padding: 0.22rem;
@@ -201,9 +202,18 @@
     height: 30px;
     border-left-width: 1px;
     border-radius: 999px;
+    color: var(--foreground);
     font-size: 1rem;
     font-weight: 700;
     line-height: 1;
+}
+
+.nostr-map-zoom-button:hover,
+.nostr-map-regenerate-button:hover,
+.nostr-map-display-toggle-button:hover,
+.nostr-map-theme-toggle-button:hover {
+    background: var(--muted);
+    color: var(--foreground);
 }
 
 .nostr-map-zoom-button-left {
@@ -220,7 +230,7 @@
     min-height: 30px;
     min-width: 58px;
     text-align: center;
-    color: #284959;
+    color: var(--muted-foreground);
     font-size: 0.78rem;
     font-weight: 700;
     border-radius: 999px;
@@ -231,9 +241,10 @@
     width: 38px;
     height: 38px;
     border-radius: 999px;
-    border: 0;
-    background: rgba(255, 255, 255, 0.88);
-    box-shadow: 0 12px 24px rgba(14, 32, 44, 0.2);
+    border: 1px solid var(--border);
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    color: var(--foreground);
+    box-shadow: 0 12px 24px color-mix(in oklab, var(--foreground) 14%, transparent);
 }
 
 .nostr-map-display-controls {
@@ -244,19 +255,21 @@
 }
 
 .nostr-map-display-toggle-group {
-    border: 0;
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.88);
-    box-shadow: 0 12px 24px rgba(14, 32, 44, 0.2);
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    color: var(--foreground);
+    box-shadow: 0 12px 24px color-mix(in oklab, var(--foreground) 14%, transparent);
     min-height: 38px;
     padding: 0.2rem;
 }
 
 .nostr-map-theme-toggle-group {
-    border: 0;
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.88);
-    box-shadow: 0 12px 24px rgba(14, 32, 44, 0.2);
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    color: var(--foreground);
+    box-shadow: 0 12px 24px color-mix(in oklab, var(--foreground) 14%, transparent);
     min-height: 38px;
     padding: 0.2rem;
 }
@@ -272,45 +285,40 @@
     min-width: 30px;
     height: 30px;
     border-color: transparent;
+    color: var(--foreground);
     padding: 0;
 }
 
-.nostr-map-display-toggle-button:hover,
-.nostr-map-theme-toggle-button:hover {
-    background: rgba(232, 242, 248, 0.92);
-    color: #173849;
-}
-
 .nostr-map-display-toggle-button[data-state="on"] {
-    border: 0;
-    background: rgba(43, 111, 143, 0.16);
-    color: #173849;
+    border-color: transparent;
+    background: var(--muted);
+    color: var(--foreground);
 }
 
 .nostr-map-theme-toggle-button[data-state="on"] {
-    border: 0;
-    background: rgba(43, 111, 143, 0.16);
-    color: #173849;
+    border-color: transparent;
+    background: var(--muted);
+    color: var(--foreground);
 }
 
 .dark .nostr-map-zoom-group {
-    background: rgba(6, 41, 31, 0.88);
-    box-shadow: 0 14px 28px rgba(6, 41, 31, 0.48), 0 0 18px rgba(255, 140, 26, 0.18);
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    box-shadow: 0 14px 28px color-mix(in oklab, black 42%, transparent);
 }
 
 .dark .nostr-map-regenerate-button {
-    background: rgba(6, 41, 31, 0.88);
-    box-shadow: 0 14px 28px rgba(6, 41, 31, 0.48), 0 0 18px rgba(255, 140, 26, 0.18);
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    box-shadow: 0 14px 28px color-mix(in oklab, black 42%, transparent);
 }
 
 .dark .nostr-map-display-toggle-group {
-    background: rgba(6, 41, 31, 0.88);
-    box-shadow: 0 14px 28px rgba(6, 41, 31, 0.48), 0 0 18px rgba(255, 140, 26, 0.18);
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    box-shadow: 0 14px 28px color-mix(in oklab, black 42%, transparent);
 }
 
 .dark .nostr-map-theme-toggle-group {
-    background: rgba(6, 41, 31, 0.88);
-    box-shadow: 0 14px 28px rgba(6, 41, 31, 0.48), 0 0 18px rgba(255, 140, 26, 0.18);
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    box-shadow: 0 14px 28px color-mix(in oklab, black 42%, transparent);
 }
 
 .dark .nostr-map-zoom-button,
@@ -330,26 +338,26 @@
 .dark .nostr-map-regenerate-button:hover,
 .dark .nostr-map-display-toggle-button:hover,
 .dark .nostr-map-theme-toggle-button:hover {
-    background: rgba(255, 109, 31, 0.52);
-    color: #FFD900;
+    background: var(--muted);
+    color: var(--foreground);
 }
 
 .dark .nostr-map-display-toggle-button[data-state="on"] {
-    border: 0;
-    background: rgba(255, 217, 0, 0.18);
-    color: #FFD900;
-    box-shadow: 0 0 12px rgba(255, 166, 0, 0.2);
+    border-color: transparent;
+    background: var(--muted);
+    color: var(--foreground);
+    box-shadow: none;
 }
 
 .dark .nostr-map-theme-toggle-button[data-state="on"] {
-    border: 0;
-    background: rgba(255, 217, 0, 0.18);
-    color: #FFD900;
-    box-shadow: 0 0 12px rgba(255, 166, 0, 0.2);
+    border-color: transparent;
+    background: var(--muted);
+    color: var(--foreground);
+    box-shadow: none;
 }
 
 .dark .nostr-map-zoom-level {
-    color: #FFD900;
+    color: var(--muted-foreground);
 }
 
 .nostr-toast {

@@ -913,7 +913,20 @@ describe('FollowingFeedSurface', () => {
         expect(replyRepostButton).toBeDefined();
 
         await act(async () => {
+            replyReactionButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
             replyReactionButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const fireReaction = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+            item.getAttribute('aria-label') === 'Reaccionar con 🔥'
+        ) as HTMLElement;
+
+        await act(async () => {
+            fireReaction.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+            fireReaction.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await act(async () => {
             replyRepostButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
             replyRepostButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -929,6 +942,7 @@ describe('FollowingFeedSurface', () => {
         expect(onToggleReaction).toHaveBeenCalledWith({
             eventId: 'reply-1',
             targetPubkey: 'c'.repeat(64),
+            emoji: '🔥',
         });
         expect(onToggleRepost).toHaveBeenCalledWith({
             eventId: 'reply-1',

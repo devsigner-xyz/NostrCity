@@ -1,6 +1,6 @@
 import type { Nip05ValidationResult } from '../../nostr/nip05';
 import type { RelaySettingsByType, RelayType } from '../../nostr/relay-settings';
-import type { SocialEngagementByEventId } from '../../nostr/social-feed-service';
+import type { SocialEngagementByEventId, ViewerReactionByEventId } from '../../nostr/social-feed-service';
 import type { NostrEvent, NostrProfile } from '../../nostr/types';
 import type { ZapIntentInput } from '../controllers/use-wallet-zap-controller';
 import { OccupantProfileDialog } from '../components/OccupantProfileDialog';
@@ -21,6 +21,7 @@ interface ActiveProfileDialogContainerProps {
     canWrite: boolean;
     canAccessDirectMessages: boolean;
     reactionByEventId: Record<string, boolean>;
+    viewerReactionByEventId?: ViewerReactionByEventId;
     repostByEventId: Record<string, boolean>;
     pendingReactionByEventId: Record<string, boolean>;
     pendingRepostByEventId: Record<string, boolean>;
@@ -60,6 +61,7 @@ export function ActiveProfileDialogContainer({
     canWrite,
     canAccessDirectMessages,
     reactionByEventId,
+    viewerReactionByEventId,
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -121,6 +123,7 @@ export function ActiveProfileDialogContainer({
             {...(canAccessDirectMessages ? { onSendMessage } : {})}
             canWrite={canWrite}
             reactionByEventId={reactionByEventId}
+            {...(viewerReactionByEventId ? { viewerReactionByEventId } : {})}
             repostByEventId={repostByEventId}
             pendingReactionByEventId={pendingReactionByEventId}
             pendingRepostByEventId={pendingRepostByEventId}

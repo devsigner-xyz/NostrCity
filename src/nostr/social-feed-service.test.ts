@@ -179,6 +179,7 @@ describe('social-feed-service contracts', () => {
             loadArticleById: SocialFeedService['loadArticleById'];
             loadThread: SocialFeedService['loadThread'];
             loadEngagement: SocialFeedService['loadEngagement'];
+            loadViewerReactions: SocialFeedService['loadViewerReactions'];
             loadHashtagFeed: SocialFeedService['loadHashtagFeed'];
         }>();
     });

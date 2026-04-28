@@ -244,6 +244,7 @@ function createSocialFeedServiceMock() {
         loadHashtagFeed: vi.fn(async () => ({ items: [], hasMore: false })),
         loadThread: vi.fn(async () => ({ root: null, replies: [], hasMore: false })),
         loadEngagement: vi.fn(async () => ({})),
+        loadViewerReactions: vi.fn(async () => ({})),
     };
 
     return {
@@ -2002,19 +2003,6 @@ describe('Nostr overlay App', () => {
 
         await waitFor(() => rendered.container.querySelector('.nostr-following-feed-surface') !== null);
         await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Reaccionar (3)"]')));
-        const reactionButton = rendered.container.querySelector('button[aria-label="Reaccionar (3)"]') as HTMLButtonElement;
-
-        await act(async () => {
-            reactionButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Reaccionar (4)"]')));
-        expect((rendered.container.querySelector('button[aria-label="Reaccionar (4)"]') as HTMLButtonElement).disabled).toBe(true);
-        await act(async () => {
-            reactionFailure.reject(new Error('reaction-failed'));
-        });
-        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Reaccionar (3)"]')));
-        await waitFor(() => (rendered.container.textContent || '').includes('reaction-failed'));
 
         const repostButton = rendered.container.querySelector('button[aria-label="Repostear (2)"]') as HTMLButtonElement;
         await act(async () => {
@@ -2038,8 +2026,126 @@ describe('Nostr overlay App', () => {
         await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Repostear (2)"]')));
         await waitFor(() => (rendered.container.textContent || '').includes('repost-failed'));
 
+        const reactionButton = rendered.container.querySelector('button[aria-label="Reaccionar (3)"]') as HTMLButtonElement;
+
+        await act(async () => {
+            reactionButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+            reactionButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).some((item) =>
+            item.getAttribute('aria-label') === 'Reaccionar con 🔥'
+        ));
+        const fireReactionItem = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+            item.getAttribute('aria-label') === 'Reaccionar con 🔥'
+        ) as HTMLElement;
+
+        await act(async () => {
+            fireReactionItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => publishEvent.mock.calls.some(([event]) => event.kind === 7 && (event as { content?: string }).content === '🔥'));
+
+        await act(async () => {
+            reactionFailure.reject(new Error('reaction-failed'));
+        });
+        await waitFor(() => (rendered.container.textContent || '').includes('reaction-failed'));
+
         expect(publishEvent).toHaveBeenCalledWith(expect.objectContaining({ kind: 7 }));
         expect(publishEvent).toHaveBeenCalledWith(expect.objectContaining({ kind: 6 }));
+    });
+
+    test('loads an existing emoji reaction and removes it with a deletion event', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const eventId = '2'.repeat(64);
+        const reactionEventId = '7'.repeat(64);
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [createFeedNote(eventId, 'a'.repeat(64), 100, 'already reacted')],
+            hasMore: false,
+        });
+        (socialFeed.service.loadEngagement as ReturnType<typeof vi.fn>).mockResolvedValue({
+            [eventId]: {
+                replies: 0,
+                reposts: 0,
+                reactions: 4,
+                zaps: 0,
+                zapSats: 0,
+            },
+        });
+        (socialFeed.service.loadViewerReactions as ReturnType<typeof vi.fn>).mockResolvedValue({
+            [eventId]: {
+                eventId,
+                reactionEventId,
+                emoji: '👏',
+                createdAt: 120,
+            },
+        });
+        const publishEvent = vi.fn(async (event: { kind: number; tags: string[][]; content: string; created_at: number }) => ({
+            id: 'd'.repeat(64),
+            pubkey: ownerPubkey,
+            ...event,
+        }));
+        vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
+            publishEvent,
+            publishTextNote: vi.fn(),
+            encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
+            decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
+        } as any);
+
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async () => null,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: ['a'.repeat(64)],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialFeedService: socialFeed.service,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        await act(async () => {
+            feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => Array.from(rendered.container.querySelectorAll('button')).some((button) =>
+            button.getAttribute('aria-label') === 'Quitar reacción 👏 (4)'
+        ));
+        const reactionButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            button.getAttribute('aria-label') === 'Quitar reacción 👏 (4)'
+        ) as HTMLButtonElement;
+
+        await act(async () => {
+            reactionButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => publishEvent.mock.calls.some(([event]) => event.kind === 5));
+        expect(publishEvent).toHaveBeenCalledWith(expect.objectContaining({
+            kind: 5,
+            tags: [['e', reactionEventId], ['k', '7']],
+        }));
     });
 
     test('inserts optimistic reply and reconciles to published reply', async () => {

@@ -944,6 +944,7 @@ export function App({ mapBridge, services }: AppProps) {
                             isPublishingReply: followingFeed.isPublishingReply,
                             publishError: followingFeed.publishError,
                             reactionByEventId: followingFeed.reactionByEventId,
+                            viewerReactionByEventId: followingFeed.viewerReactionByEventId,
                             repostByEventId: followingFeed.repostByEventId,
                             pendingReactionByEventId: followingFeed.pendingReactionByEventId,
                             pendingRepostByEventId: followingFeed.pendingRepostByEventId,
@@ -1107,6 +1108,7 @@ export function App({ mapBridge, services }: AppProps) {
                     canWrite={overlay.canWrite}
                     canAccessDirectMessages={canAccessDirectMessages}
                     reactionByEventId={followingFeed.reactionByEventId}
+                    viewerReactionByEventId={followingFeed.viewerReactionByEventId}
                     repostByEventId={followingFeed.repostByEventId}
                     pendingReactionByEventId={followingFeed.pendingReactionByEventId}
                     pendingRepostByEventId={followingFeed.pendingRepostByEventId}

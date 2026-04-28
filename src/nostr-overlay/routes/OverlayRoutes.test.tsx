@@ -146,6 +146,7 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
                 loadHashtagFeed: async () => ({ items: [], hasMore: false }),
                 loadThread: async () => ({ root: null, replies: [], hasMore: false }),
                 loadEngagement: async () => ({}),
+                loadViewerReactions: async () => ({}),
             },
             enabled: false,
             onBack: noop,
