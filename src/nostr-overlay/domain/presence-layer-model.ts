@@ -1,7 +1,6 @@
 import type { NostrProfile } from '../../nostr/types';
-import type { EasterEggBuildingSlot, MapBuildingSlot, SpecialBuildingSlot, WorldPoint } from '../map-bridge';
+import type { EasterEggBuildingSlot, MapBuildingSlot, WorldPoint } from '../map-bridge';
 import type { EasterEggId } from '../../ts/ui/easter_eggs';
-import type { SpecialBuildingId } from '../../ts/ui/special_buildings';
 
 export interface PresenceLayerEntry {
     key: string;
@@ -32,18 +31,6 @@ export interface DiscoveredEasterEggEntry {
 export interface BuildDiscoveredEasterEggEntriesInput {
     discoveredIds: EasterEggId[];
     easterEggBuildings: EasterEggBuildingSlot[];
-    buildingsByIndex: Record<number, MapBuildingSlot>;
-}
-
-export interface SpecialBuildingEntry {
-    key: string;
-    specialBuildingId: SpecialBuildingId;
-    index: number;
-    centroid: WorldPoint;
-}
-
-export interface BuildSpecialBuildingEntriesInput {
-    specialBuildings: SpecialBuildingSlot[];
     buildingsByIndex: Record<number, MapBuildingSlot>;
 }
 
@@ -140,22 +127,4 @@ export function buildDiscoveredEasterEggEntries(input: BuildDiscoveredEasterEggE
             };
         })
         .filter((entry): entry is DiscoveredEasterEggEntry => entry !== null);
-}
-
-export function buildSpecialBuildingEntries(input: BuildSpecialBuildingEntriesInput): SpecialBuildingEntry[] {
-    return input.specialBuildings
-        .map((entry) => {
-            const building = input.buildingsByIndex[entry.index];
-            if (!building) {
-                return null;
-            }
-
-            return {
-                key: `special-${entry.specialBuildingId}-${entry.index}`,
-                specialBuildingId: entry.specialBuildingId,
-                index: entry.index,
-                centroid: building.centroid,
-            };
-        })
-        .filter((entry): entry is SpecialBuildingEntry => entry !== null);
 }

@@ -24,7 +24,6 @@ function createMapBridgeStub(buildingsCount: number): { bridge: MapBridge; trigg
                 centroid: { x: index * 10, y: index * 10 },
             }))
         ),
-        listSpecialBuildings: vi.fn().mockReturnValue([]),
         applyOccupancy: vi.fn(),
         setVerifiedBuildingIndexes: vi.fn(),
         setViewportInsetLeft: vi.fn(),
@@ -51,7 +50,6 @@ function createMapBridgeStub(buildingsCount: number): { bridge: MapBridge; trigg
         }),
         onOccupiedBuildingClick: vi.fn().mockReturnValue(() => {}),
         onOccupiedBuildingContextMenu: vi.fn().mockReturnValue(() => {}),
-        onSpecialBuildingClick: vi.fn().mockReturnValue(() => {}),
         onViewChanged: vi.fn().mockReturnValue(() => {}),
     };
 

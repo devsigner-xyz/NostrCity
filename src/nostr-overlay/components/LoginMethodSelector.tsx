@@ -129,7 +129,6 @@ export function LoginMethodSelector({
 
             {method === 'nip07' ? (
                 <div className="grid gap-2">
-                    <p className="text-sm text-muted-foreground">{t('auth.selector.extensionDescription')}</p>
                     <Button
                         type="button"
                         className="mt-2 w-full"

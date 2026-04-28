@@ -916,7 +916,6 @@ export function App({ mapBridge, services }: AppProps) {
                         onOpenProfile={overlay.openActiveProfile}
                         onRequestZapPayment={requestZapPayment}
                         onConfigureZapAmounts={() => openSettingsPage('zaps')}
-                        onOpenAgora={() => navigate('/agora')}
                     />
 
                     <Toaster richColors position="bottom-center" closeButton={false} theme={resolvedOverlayTheme} />
@@ -1065,6 +1064,7 @@ export function App({ mapBridge, services }: AppProps) {
                         ownerPubkey: overlay.ownerPubkey,
                         followedPubkeys: overlay.follows,
                         verificationByPubkey,
+                        onCopyNpub: copyOwnerIdentifier,
                         canWrite: overlay.canWrite,
                         onFollowUser: followPerson,
                         canAccessDirectMessages,

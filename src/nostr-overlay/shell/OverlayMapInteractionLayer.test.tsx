@@ -1,7 +1,7 @@
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-import type { MapBridge, OccupiedBuildingContextPayload, SpecialBuildingClickPayload } from '../map-bridge';
+import type { MapBridge, OccupiedBuildingContextPayload } from '../map-bridge';
 import { OverlayMapInteractionLayer } from './OverlayMapInteractionLayer';
 
 interface RenderResult {
@@ -12,21 +12,18 @@ interface RenderResult {
 interface MapBridgeStub {
     bridge: MapBridge;
     triggerOccupiedBuildingContextMenu: (payload: OccupiedBuildingContextPayload) => void;
-    triggerSpecialBuildingClick: (payload: SpecialBuildingClickPayload) => void;
 }
 
 const FOLLOWED_PUBKEY = 'a'.repeat(64);
 
 function createMapBridgeStub(): MapBridgeStub {
     const occupiedContextMenuListeners: Array<(payload: OccupiedBuildingContextPayload) => void> = [];
-    const specialBuildingClickListeners: Array<(payload: SpecialBuildingClickPayload) => void> = [];
 
     const bridge: MapBridge = {
         ensureGenerated: vi.fn().mockResolvedValue(undefined),
         regenerateMap: vi.fn().mockResolvedValue(undefined),
         listBuildings: vi.fn().mockReturnValue([]),
         listEasterEggBuildings: vi.fn().mockReturnValue([]),
-        listSpecialBuildings: vi.fn().mockReturnValue([]),
         applyOccupancy: vi.fn(),
         setViewportInsetLeft: vi.fn(),
         setVerifiedBuildingIndexes: vi.fn(),
@@ -58,15 +55,6 @@ function createMapBridgeStub(): MapBridgeStub {
             };
         }),
         onEasterEggBuildingClick: vi.fn().mockReturnValue(() => {}),
-        onSpecialBuildingClick: vi.fn().mockImplementation((listener: (payload: SpecialBuildingClickPayload) => void) => {
-            specialBuildingClickListeners.push(listener);
-            return () => {
-                const index = specialBuildingClickListeners.indexOf(listener);
-                if (index >= 0) {
-                    specialBuildingClickListeners.splice(index, 1);
-                }
-            };
-        }),
         onViewChanged: vi.fn().mockReturnValue(() => {}),
     };
 
@@ -74,9 +62,6 @@ function createMapBridgeStub(): MapBridgeStub {
         bridge,
         triggerOccupiedBuildingContextMenu: (payload) => {
             occupiedContextMenuListeners.forEach((listener) => listener(payload));
-        },
-        triggerSpecialBuildingClick: (payload) => {
-            specialBuildingClickListeners.forEach((listener) => listener(payload));
         },
     };
 }
@@ -114,7 +99,6 @@ function createDefaultProps(overrides: Partial<ComponentProps<typeof OverlayMapI
         onOpenProfile: vi.fn(),
         onRequestZapPayment: vi.fn().mockResolvedValue(undefined),
         onConfigureZapAmounts: vi.fn(),
-        onOpenAgora: vi.fn(),
         ...overrides,
     };
 }
@@ -427,33 +411,4 @@ describe('OverlayMapInteractionLayer', () => {
         expect(document.body.textContent || '').not.toContain('Zap');
     });
 
-    test('opens Agora from reserved special building clicks outside the login gate', async () => {
-        const stub = createMapBridgeStub();
-        const onOpenAgora = vi.fn();
-        const rendered = await renderLayer(createDefaultProps({ mapBridge: stub.bridge, onOpenAgora }));
-        mounted.push(rendered);
-
-        await act(async () => {
-            stub.triggerSpecialBuildingClick({ buildingIndex: 4, specialBuildingId: 'agora' });
-        });
-
-        expect(onOpenAgora).toHaveBeenCalledTimes(1);
-    });
-
-    test('ignores reserved special building clicks while the login gate is visible', async () => {
-        const stub = createMapBridgeStub();
-        const onOpenAgora = vi.fn();
-        const rendered = await renderLayer(createDefaultProps({
-            mapBridge: stub.bridge,
-            showLoginGate: true,
-            onOpenAgora,
-        }));
-        mounted.push(rendered);
-
-        await act(async () => {
-            stub.triggerSpecialBuildingClick({ buildingIndex: 4, specialBuildingId: 'agora' });
-        });
-
-        expect(onOpenAgora).not.toHaveBeenCalled();
-    });
 });

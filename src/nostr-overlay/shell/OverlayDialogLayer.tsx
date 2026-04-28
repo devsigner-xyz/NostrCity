@@ -266,6 +266,7 @@ export function OverlayDialogLayer({
                 open={isUiSettingsDialogOpen}
                 uiSettings={uiSettings}
                 onPersistUiSettings={onPersistUiSettings}
+                mapBridge={mapBridge}
                 onOpenChange={(open) => {
                     if (open) {
                         onOpenUiSettingsDialog();

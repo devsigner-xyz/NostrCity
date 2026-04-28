@@ -69,19 +69,19 @@ describe('resolveBuildingRenderColours', () => {
     test('uses colour scheme overrides for occupied and hovered buildings', () => {
         const darkScheme: ColourScheme = {
             ...baseScheme,
-            occupiedBuildingColour: '#2ABAFB',
-            occupiedBuildingStroke: '#233CB5',
-            hoveredBuildingColour: '#DB5FF7',
-            hoveredBuildingStroke: '#FCFDFE',
+            occupiedBuildingColour: '#35D7FF',
+            occupiedBuildingStroke: '#8EEAFF',
+            hoveredBuildingColour: '#D33CFF',
+            hoveredBuildingStroke: '#F6F8FF',
         };
 
         expect(resolveBuildingRenderColours('occupied', darkScheme)).toEqual({
-            fill: '#2ABAFB',
-            stroke: '#233CB5',
+            fill: '#35D7FF',
+            stroke: '#8EEAFF',
         });
         expect(resolveBuildingRenderColours('hovered', darkScheme)).toEqual({
-            fill: '#DB5FF7',
-            stroke: '#FCFDFE',
+            fill: '#D33CFF',
+            stroke: '#F6F8FF',
         });
     });
 });
@@ -98,15 +98,15 @@ describe('resolveMapLabelColours', () => {
     test('uses colour scheme label overrides for dark presets', () => {
         const darkScheme: ColourScheme = {
             ...baseScheme,
-            streetLabelColour: '#010B2D',
-            waterLabelColour: '#BFEFFF',
-            parkLabelColour: '#F0D7FF',
+            streetLabelColour: '#030511',
+            waterLabelColour: '#8EEAFF',
+            parkLabelColour: '#FF8AF3',
         };
 
         expect(resolveMapLabelColours(darkScheme)).toEqual({
-            street: '#010B2D',
-            water: '#BFEFFF',
-            park: '#F0D7FF',
+            street: '#030511',
+            water: '#8EEAFF',
+            park: '#FF8AF3',
         });
     });
 });

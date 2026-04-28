@@ -26,7 +26,6 @@ import { runMapGeneration } from './ts/ui/map_generation_runner';
 import { calculateGeneratedMapCoverView } from './ts/ui/map_view_fit';
 import { createViewChangeScheduler } from './ts/ui/view_change_scheduler';
 import type { EasterEggId } from './ts/ui/easter_eggs';
-import type { SpecialBuildingId } from './ts/ui/special_buildings';
 
 interface OccupiedBuildingClickPayload {
     buildingIndex: number;
@@ -43,11 +42,6 @@ interface OccupiedBuildingContextMenuPayload {
 interface EasterEggBuildingClickPayload {
     buildingIndex: number;
     easterEggId: EasterEggId;
-}
-
-interface SpecialBuildingClickPayload {
-    buildingIndex: number;
-    specialBuildingId: SpecialBuildingId;
 }
 
 class Main {
@@ -98,7 +92,6 @@ class Main {
     private occupiedBuildingClickListeners: Array<(payload: OccupiedBuildingClickPayload) => void> = [];
     private occupiedBuildingContextMenuListeners: Array<(payload: OccupiedBuildingContextMenuPayload) => void> = [];
     private easterEggBuildingClickListeners: Array<(payload: EasterEggBuildingClickPayload) => void> = [];
-    private specialBuildingClickListeners: Array<(payload: SpecialBuildingClickPayload) => void> = [];
     private viewChangedListeners: Array<() => void> = [];
     private viewChangeScheduler = createViewChangeScheduler(() => this.notifyViewChanged());
     private viewportInsetLeft = 0;
@@ -269,10 +262,6 @@ class Main {
         return this.mainGui.getEasterEggBuildings();
     }
 
-    getSpecialBuildings(): Array<{ index: number; specialBuildingId: SpecialBuildingId }> {
-        return this.mainGui.getSpecialBuildings();
-    }
-
     setOccupancyByBuildingIndex(byBuildingIndex: Record<number, string>): void {
         this.mainGui.setOccupancyByBuildingIndex(byBuildingIndex);
     }
@@ -418,16 +407,6 @@ class Main {
             const index = this.easterEggBuildingClickListeners.indexOf(listener);
             if (index >= 0) {
                 this.easterEggBuildingClickListeners.splice(index, 1);
-            }
-        };
-    }
-
-    subscribeSpecialBuildingClick(listener: (payload: SpecialBuildingClickPayload) => void): () => void {
-        this.specialBuildingClickListeners.push(listener);
-        return (): void => {
-            const index = this.specialBuildingClickListeners.indexOf(listener);
-            if (index >= 0) {
-                this.specialBuildingClickListeners.splice(index, 1);
             }
         };
     }
@@ -736,15 +715,6 @@ class Main {
                 return;
             }
 
-            const specialBuildingHit = this.mainGui.getSpecialBuildingAtWorldPoint(worldPoint);
-            if (specialBuildingHit) {
-                this.notifySpecialBuildingClick({
-                    buildingIndex: specialBuildingHit.index,
-                    specialBuildingId: specialBuildingHit.specialBuildingId,
-                });
-                return;
-            }
-
             const easterEggHit = this.mainGui.getEasterEggBuildingAtWorldPoint(worldPoint);
             if (!easterEggHit) {
                 return;
@@ -861,12 +831,6 @@ class Main {
 
     private notifyEasterEggBuildingClick(payload: EasterEggBuildingClickPayload): void {
         for (const listener of this.easterEggBuildingClickListeners) {
-            listener(payload);
-        }
-    }
-
-    private notifySpecialBuildingClick(payload: SpecialBuildingClickPayload): void {
-        for (const listener of this.specialBuildingClickListeners) {
             listener(payload);
         }
     }

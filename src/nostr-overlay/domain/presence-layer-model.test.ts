@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { buildDiscoveredEasterEggEntries, buildPresenceLayerEntries, buildSpecialBuildingEntries, isPointWithinViewport } from './presence-layer-model';
+import { buildDiscoveredEasterEggEntries, buildPresenceLayerEntries, isPointWithinViewport } from './presence-layer-model';
 
 const ALICE = 'a'.repeat(64);
 const BOB = 'b'.repeat(64);
@@ -90,29 +90,6 @@ describe('buildDiscoveredEasterEggEntries', () => {
                 easterEggId: 'bitcoin_whitepaper',
                 index: 1,
                 centroid: { x: 120, y: 80 },
-            },
-        ]);
-    });
-});
-
-describe('buildSpecialBuildingEntries', () => {
-    test('returns assigned special buildings with valid building slots only', () => {
-        const entries = buildSpecialBuildingEntries({
-            specialBuildings: [
-                { index: 4, specialBuildingId: 'agora' },
-                { index: 9, specialBuildingId: 'agora' },
-            ],
-            buildingsByIndex: {
-                4: { index: 4, centroid: { x: 210, y: 130 } },
-            },
-        });
-
-        expect(entries).toEqual([
-            {
-                key: 'special-agora-4',
-                specialBuildingId: 'agora',
-                index: 4,
-                centroid: { x: 210, y: 130 },
             },
         ]);
     });

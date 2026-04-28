@@ -119,6 +119,18 @@ describe('ArticlesSurface', () => {
         expect(buttons.find((button) => button.textContent === 'Cargar mas')).toBeUndefined();
     });
 
+    test('constrains the article list width for readable article previews', async () => {
+        const rendered = await renderElement(surface({
+            items: [articleItem('article-1')],
+        }));
+        mounted.push(rendered);
+
+        const articleList = rendered.container.querySelector('[data-testid="articles-list"]');
+        expect(articleList).not.toBeNull();
+        expect(articleList?.className).toContain('max-w-[600px]');
+        expect(articleList?.className).toContain('w-full');
+    });
+
     test('loads more articles when scrolling near the bottom', async () => {
         const onLoadMore = vi.fn();
         const rendered = await renderElement(surface({

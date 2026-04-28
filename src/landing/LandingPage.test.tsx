@@ -80,7 +80,9 @@ describe('LandingPage theme selector', () => {
     const darkButton = rendered.container.querySelector('button[aria-pressed="true"]');
 
     expect(shell?.getAttribute('data-theme')).toBe('dark');
-    expect(logo?.getAttribute('src')).toBe('/logo-v2-dark.png');
+    expect(logo?.getAttribute('src')).toBe('/icon-dark-32x32.png');
+    expect(logo?.getAttribute('width')).toBe('32');
+    expect(logo?.getAttribute('height')).toBe('32');
     expect(darkButton?.textContent).toContain('Oscuro');
   });
 
@@ -105,30 +107,32 @@ describe('LandingPage theme selector', () => {
 
     expect(stored).toEqual({ language: 'es', theme: 'light' });
     expect(rendered.container.querySelector('.landing-shell')?.getAttribute('data-theme')).toBe('light');
-    expect(logo?.getAttribute('src')).toBe('/logo-v2-light.png');
+    expect(logo?.getAttribute('src')).toBe('/icon-light-32x32.png');
   });
 
-  test('labels the map preview with the active Nostr City preset', async () => {
+  test('renders the editorial hero without the previous visual map preview', async () => {
     mockSystemTheme(false);
 
     const rendered = await renderLanding();
     mounted.push(rendered);
 
-    const preview = rendered.container.querySelector('[data-testid="landing-map-preview"]');
-    expect(preview?.getAttribute('aria-label')).toBe('Vista previa del preset Nostr City Light');
-    expect(rendered.container.querySelector('[data-active-preset="Nostr City Light"]')?.textContent).toContain('Nostr City Light');
+    expect(rendered.container.querySelector('[data-testid="landing-map-preview"]')).toBeNull();
+    expect(rendered.container.querySelector('.hero-visual')).toBeNull();
+    expect(rendered.container.querySelector('h1')?.textContent).toContain('Explora Nostr como ciudad open source');
+  });
 
-    const darkButton = Array.from(rendered.container.querySelectorAll('.theme-toggle button')).find((button) =>
-      (button.textContent || '').includes('Oscuro'),
-    ) as HTMLButtonElement | undefined;
-    expect(darkButton).toBeDefined();
+  test('presents features as a two-column editorial list', async () => {
+    mockSystemTheme(false);
 
-    await act(async () => {
-      darkButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
+    const rendered = await renderLanding();
+    mounted.push(rendered);
 
-    expect(preview?.getAttribute('aria-label')).toBe('Vista previa del preset Nostr City Dark');
-    expect(rendered.container.querySelector('[data-active-preset="Nostr City Dark"]')?.textContent).toContain('Nostr City Dark');
+    const featureList = rendered.container.querySelector('[data-testid="landing-feature-list"]');
+    const featureItems = rendered.container.querySelectorAll('[data-testid="landing-feature-list"] article');
+
+    expect(featureList?.classList.contains('feature-list')).toBe(true);
+    expect(featureItems).toHaveLength(6);
+    expect(featureItems[0]?.textContent).toContain('Mapa generativo');
   });
 
   test('uses native in-page links for section navigation', async () => {

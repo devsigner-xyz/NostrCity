@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('landing muestra manifiesto y CTA principal', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1, name: /Nostr City/i })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: /Explora Nostr como ciudad open source/i })).toBeVisible();
   const primaryCta = page.getByRole('link', { name: 'Entrar a la aplicacion' }).first();
   await expect(primaryCta).toBeVisible();
   await expect(primaryCta).toHaveAttribute('href', '/app/');
@@ -13,8 +13,9 @@ test('landing muestra manifiesto y CTA principal', async ({ page }) => {
 test('landing incluye seccion para usuarios nostr y filosofia no comercial', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: /Para quienes ya usan Nostr/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Features para explorar Nostr/i })).toBeVisible();
   await expect(page.getByText(/sin animo de lucro/i).first()).toBeVisible();
+  await expect(page.getByText(/Mapa generativo/i).first()).toBeVisible();
 });
 
 test('landing renders english copy when ui language is en', async ({ page }) => {
@@ -26,5 +27,5 @@ test('landing renders english copy when ui language is en', async ({ page }) => 
 
   await expect(page.getByRole('link', { name: 'Documentation' }).first()).toHaveAttribute('href', '/docs/');
   await expect(page.getByRole('link', { name: 'Open the app' }).first()).toHaveAttribute('href', '/app/');
-  await expect(page.getByRole('heading', { name: /A new way to visualize Nostr/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Explore Nostr as an open-source city/i })).toBeVisible();
 });

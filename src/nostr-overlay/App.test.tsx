@@ -56,7 +56,6 @@ interface MapBridgeStub {
     triggerOccupiedBuildingClick: (payload: { buildingIndex: number; pubkey: string }) => void;
     triggerOccupiedBuildingContextMenu: (payload: { buildingIndex: number; pubkey: string; clientX: number; clientY: number }) => void;
     triggerEasterEggBuildingClick: (payload: { buildingIndex: number; easterEggId: 'bitcoin_whitepaper' | 'crypto_anarchist_manifesto' | 'cyberspace_independence' }) => void;
-    triggerSpecialBuildingClick: (payload: { buildingIndex: number; specialBuildingId: 'agora' }) => void;
 }
 
 interface Deferred<T> {
@@ -140,9 +139,6 @@ function createMapBridgeStub(buildingsCount = 0): MapBridgeStub {
     const easterEggBuildingClickListeners: Array<
         (payload: { buildingIndex: number; easterEggId: 'bitcoin_whitepaper' | 'crypto_anarchist_manifesto' | 'cyberspace_independence' }) => void
     > = [];
-    const specialBuildingClickListeners: Array<
-        (payload: { buildingIndex: number; specialBuildingId: 'agora' }) => void
-    > = [];
     const bridge = {
         ensureGenerated: vi.fn().mockResolvedValue(undefined),
         regenerateMap: vi.fn().mockResolvedValue(undefined),
@@ -171,7 +167,6 @@ function createMapBridgeStub(buildingsCount = 0): MapBridgeStub {
         mountSettingsPanel: vi.fn(),
         focusBuilding: vi.fn(),
         listEasterEggBuildings: vi.fn().mockReturnValue([]),
-        listSpecialBuildings: vi.fn().mockReturnValue([]),
         getParkCount: vi.fn().mockReturnValue(0),
         getZoom: vi.fn().mockReturnValue(1),
         worldToScreen: vi.fn().mockImplementation((point: { x: number; y: number }) => point),
@@ -204,15 +199,6 @@ function createMapBridgeStub(buildingsCount = 0): MapBridgeStub {
                 }
             };
         }),
-        onSpecialBuildingClick: vi.fn().mockImplementation((listener: (payload: { buildingIndex: number; specialBuildingId: 'agora' }) => void) => {
-            specialBuildingClickListeners.push(listener);
-            return () => {
-                const index = specialBuildingClickListeners.indexOf(listener);
-                if (index >= 0) {
-                    specialBuildingClickListeners.splice(index, 1);
-                }
-            };
-        }),
         onViewChanged: vi.fn().mockReturnValue(() => {}),
     } as unknown as MapBridge;
 
@@ -226,9 +212,6 @@ function createMapBridgeStub(buildingsCount = 0): MapBridgeStub {
         },
         triggerEasterEggBuildingClick: (payload: { buildingIndex: number; easterEggId: 'bitcoin_whitepaper' | 'crypto_anarchist_manifesto' | 'cyberspace_independence' }) => {
             easterEggBuildingClickListeners.forEach((listener) => listener(payload));
-        },
-        triggerSpecialBuildingClick: (payload: { buildingIndex: number; specialBuildingId: 'agora' }) => {
-            specialBuildingClickListeners.forEach((listener) => listener(payload));
         },
     };
 }
@@ -694,7 +677,8 @@ describe('Nostr overlay App', () => {
 
         expect(content).toContain('Crear cuenta local');
         expect(content).toContain('Genera una cuenta nueva y guarda tu clave antes de continuar.');
-        expect(rendered.container.querySelector('[data-testid="create-account-step-intro"]')).not.toBeNull();
+        expect(rendered.container.querySelector('[data-testid="create-account-step-intro"]')).toBeNull();
+        expect(rendered.container.querySelector('[data-testid="create-account-step-backup"]')).not.toBeNull();
     });
 
     test('restores persisted session and leaves /login for / after initial load', async () => {
@@ -6847,24 +6831,6 @@ describe('Nostr overlay App', () => {
 
         await waitFor(() => (rendered.container.textContent || '').includes('A Declaration of the Independence of Cyberspace'));
         expect(rendered.container.textContent || '').toContain('Governments of the Industrial World');
-    });
-
-    test('opens Agora route when clicking reserved special building', async () => {
-        const { bridge, triggerSpecialBuildingClick } = createMapBridgeStub();
-        const rendered = await renderApp(<App mapBridge={bridge} services={createBasicOverlayServices()} />);
-        mounted.push(rendered);
-
-        await loginWithNip07(rendered.container);
-        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
-
-        await act(async () => {
-            triggerSpecialBuildingClick({
-                buildingIndex: 4,
-                specialBuildingId: 'agora',
-            });
-        });
-
-        await waitFor(() => (rendered.container.textContent || '').includes('Agora'));
     });
 
     test('persists discovered easter eggs and shows persistent marker on map', async () => {

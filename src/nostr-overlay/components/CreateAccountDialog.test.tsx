@@ -87,10 +87,19 @@ describe('CreateAccountDialog', () => {
         const content = rendered.container.textContent || '';
         const footer = rendered.container.querySelector('[data-testid="auth-flow-footer"]');
         const footerButtons = Array.from(footer?.querySelectorAll('button') ?? []);
+        const backupStep = rendered.container.querySelector('[data-testid="create-account-step-backup"]');
 
         expect(content).toContain('Crear cuenta local');
         expect(content).toContain('Genera una cuenta nueva y guarda tu clave antes de continuar.');
-        expect(rendered.container.querySelector('[data-testid="create-account-step-intro"]')).not.toBeNull();
+        expect(rendered.container.querySelector('[data-testid="create-account-step-intro"]')).toBeNull();
+        expect(backupStep).not.toBeNull();
+        expect(rendered.container.querySelector('textarea#generated-nsec')).not.toBeNull();
+        expect(rendered.container.querySelector('textarea#generated-npub-backup')).not.toBeNull();
+        expect(content).toContain('Copy nsec');
+        expect(content).toContain('Cpy npub');
+        expect(content).toContain('Descargar backup');
+        expect(backupStep?.querySelector('[data-slot="separator"]')).toBeNull();
+        expect(backupStep?.querySelector('label input[name="confirm-backup"]')).not.toBeNull();
         expect(content).not.toContain('Crear cuenta en esta app');
         expect(content).not.toContain('Crea una identidad Nostr local con firma y cifrado NIP-44, y guardala de forma segura en este dispositivo.');
         expect(footerButtons).toHaveLength(2);
@@ -112,8 +121,6 @@ describe('CreateAccountDialog', () => {
                 button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             });
         };
-
-        await next('Continuar');
 
         const continueButtonBefore = Array.from(rendered.container.querySelectorAll('button')).find((candidate) =>
             (candidate.textContent || '').includes('Continuar')
@@ -163,7 +170,6 @@ describe('CreateAccountDialog', () => {
             });
         };
 
-        await clickByLabel('Continuar');
         const backupCheckbox = rendered.container.querySelector('input[name="confirm-backup"]') as HTMLInputElement;
         await act(async () => {
             backupCheckbox.click();
@@ -205,8 +211,6 @@ describe('CreateAccountDialog', () => {
                 button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             });
         };
-
-        await clickByLabel('Continuar');
 
         const backupCheckbox = rendered.container.querySelector('input[name="confirm-backup"]') as HTMLInputElement;
         expect(backupCheckbox).toBeDefined();
@@ -275,8 +279,6 @@ describe('CreateAccountDialog', () => {
                 button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             });
         };
-
-        await clickByLabel('Continuar');
 
         const backupCheckbox = rendered.container.querySelector('input[name="confirm-backup"]') as HTMLInputElement;
         await act(async () => {

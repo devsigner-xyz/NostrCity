@@ -89,7 +89,7 @@ export function ArticlesSurface({
                         </EmptyHeader>
                     </Empty>
                 ) : (
-                    <div className="flex flex-col gap-4">
+                    <div className="mx-auto flex w-full max-w-[600px] flex-col gap-4" data-testid="articles-list">
                         {items.map((item) => (
                             <ArticlePreviewCard
                                 key={item.id}

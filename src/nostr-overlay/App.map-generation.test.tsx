@@ -30,7 +30,6 @@ function createMapBridgeStub(buildingsCount = 12): MapBridgeStub {
                 centroid: { x: index * 10, y: index * 8 },
             }))
         ),
-        listSpecialBuildings: vi.fn().mockReturnValue([]),
         listEasterEggBuildings: vi.fn().mockReturnValue([]),
         applyOccupancy: vi.fn(),
         setVerifiedBuildingIndexes: vi.fn(),
@@ -52,7 +51,6 @@ function createMapBridgeStub(buildingsCount = 12): MapBridgeStub {
         onOccupiedBuildingClick: vi.fn().mockReturnValue(() => {}),
         onOccupiedBuildingContextMenu: vi.fn().mockReturnValue(() => {}),
         onEasterEggBuildingClick: vi.fn().mockReturnValue(() => {}),
-        onSpecialBuildingClick: vi.fn().mockReturnValue(() => {}),
         onViewChanged: vi.fn().mockReturnValue(() => {}),
     } as unknown as MapBridge;
 

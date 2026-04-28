@@ -51,8 +51,11 @@ interface PeopleListTabProps {
     searchAriaLabel?: string;
     verificationByPubkey?: Record<string, Nip05ValidationResult | undefined>;
     followedPubkeys?: string[];
+    followHiddenPubkeys?: string[];
     onFollowPerson?: (pubkey: string) => void | Promise<void>;
     followActionPlacement?: 'inline' | 'context';
+    followCopyScope?: 'peopleList' | 'userSearch';
+    identifierDisplay?: 'short' | 'full';
 }
 
 function personName(pubkey: string, profile: NostrProfile | undefined): string {
@@ -117,8 +120,11 @@ export function PeopleListTab({
     searchAriaLabel,
     verificationByPubkey = {},
     followedPubkeys = [],
+    followHiddenPubkeys = [],
     onFollowPerson,
     followActionPlacement = 'inline',
+    followCopyScope = 'peopleList',
+    identifierDisplay = 'short',
 }: PeopleListTabProps) {
     const { t } = useI18n();
     const hasSearch = typeof onSearchQueryChange === 'function';
@@ -130,6 +136,7 @@ export function PeopleListTab({
     const [loadingMore, setLoadingMore] = useState(false);
     const [pendingFollowByPubkey, setPendingFollowByPubkey] = useState<Record<string, boolean>>({});
     const followedSet = useMemo(() => new Set(followedPubkeys), [followedPubkeys]);
+    const followHiddenSet = useMemo(() => new Set(followHiddenPubkeys), [followHiddenPubkeys]);
 
     useEffect(() => {
         setVisibleCount(Math.min(LOAD_MORE_PAGE_SIZE, people.length));
@@ -249,22 +256,26 @@ export function PeopleListTab({
         const canCopy = typeof onCopyNpub === 'function';
         const canSendMessage = typeof onSendMessage === 'function';
         const canViewDetails = typeof onViewDetails === 'function';
-        const canFollow = typeof onFollowPerson === 'function';
+        const canFollow = typeof onFollowPerson === 'function' && !followHiddenSet.has(pubkey);
         const hasActions = true;
         const display = personName(pubkey, profile);
         const canZapProfile = profileHasZapEndpoint(profile);
         const npub = pubkeyToNpub(pubkey);
-        const npubLabel = npub.startsWith('npub1') ? truncateIdentifier(npub) : `${pubkey.slice(0, 8)}...${pubkey.slice(-6)}`;
+        const npubLabel = identifierDisplay === 'full'
+            ? npub
+            : npub.startsWith('npub1') ? truncateIdentifier(npub) : `${pubkey.slice(0, 8)}...${pubkey.slice(-6)}`;
         const verification = verificationByPubkey[pubkey];
         const isFollowPending = Object.prototype.hasOwnProperty.call(pendingFollowByPubkey, pubkey);
         const isFollowed = isFollowPending ? true : followedSet.has(pubkey);
         const followDisabled = isFollowPending;
-        const followLabel = isFollowed ? t('peopleList.following') : t('peopleList.follow');
+        const followLabel = isFollowed
+            ? t(followCopyScope === 'userSearch' ? 'userSearch.following' : 'peopleList.following')
+            : t(followCopyScope === 'userSearch' ? 'userSearch.follow' : 'peopleList.follow');
         const followAriaLabel = isFollowPending
-            ? t('peopleList.followUpdating', { displayName: display })
+            ? t(followCopyScope === 'userSearch' ? 'userSearch.followUpdating' : 'peopleList.followUpdating', { displayName: display })
             : isFollowed
-                ? t('peopleList.unfollow', { displayName: display })
-                : t('peopleList.followPerson', { displayName: display });
+                ? t(followCopyScope === 'userSearch' ? 'userSearch.unfollow' : 'peopleList.unfollow', { displayName: display })
+                : t(followCopyScope === 'userSearch' ? 'userSearch.followUser' : 'peopleList.followPerson', { displayName: display });
         const contextMenuActionProps = {
             ...(canLocate ? { onLocateOnMap: () => onLocatePerson?.(pubkey) } : {}),
             ...(canCopy ? { onCopyNpub: () => onCopyNpub?.(pubkeyToNpub(pubkey)) } : {}),
@@ -364,7 +375,7 @@ export function PeopleListTab({
                                         disabled={followDisabled}
                                         onSelect={() => followPerson(pubkey)}
                                     >
-                                        {t('peopleList.unfollow', { displayName: display })}
+                                        {t(followCopyScope === 'userSearch' ? 'userSearch.unfollow' : 'peopleList.unfollow', { displayName: display })}
                                     </ContextMenuItem>
                                 ) : null}
                             </ContextMenuGroup>

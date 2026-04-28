@@ -43,7 +43,6 @@ type EasterEggBuildingPayload = {
     buildingIndex: number;
     easterEggId: 'bitcoin_whitepaper' | 'crypto_anarchist_manifesto' | 'cyberspace_independence';
 };
-type SpecialBuildingPayload = { buildingIndex: number; specialBuildingId: 'agora' };
 
 type AppLocation = ReturnType<typeof useLocation>;
 
@@ -52,7 +51,6 @@ interface MapBridgeStub {
     triggerOccupiedBuildingClick: (payload: OccupiedBuildingClickPayload) => void;
     triggerOccupiedBuildingContextMenu: (payload: OccupiedBuildingContextMenuPayload) => void;
     triggerEasterEggBuildingClick: (payload: EasterEggBuildingPayload) => void;
-    triggerSpecialBuildingClick: (payload: SpecialBuildingPayload) => void;
 }
 
 interface Nip07UnsignedEvent {
@@ -165,7 +163,6 @@ function createMapBridgeStub(buildingsCount = 0): MapBridgeStub {
     const occupiedBuildingClickListeners: Array<(payload: OccupiedBuildingClickPayload) => void> = [];
     const occupiedBuildingContextMenuListeners: Array<(payload: OccupiedBuildingContextMenuPayload) => void> = [];
     const easterEggBuildingClickListeners: Array<(payload: EasterEggBuildingPayload) => void> = [];
-    const specialBuildingClickListeners: Array<(payload: SpecialBuildingPayload) => void> = [];
     const bridge = {
         ensureGenerated: vi.fn().mockResolvedValue(undefined),
         regenerateMap: vi.fn().mockResolvedValue(undefined),
@@ -191,7 +188,6 @@ function createMapBridgeStub(buildingsCount = 0): MapBridgeStub {
         mountSettingsPanel: vi.fn(),
         focusBuilding: vi.fn(),
         listEasterEggBuildings: vi.fn().mockReturnValue([]),
-        listSpecialBuildings: vi.fn().mockReturnValue([]),
         getParkCount: vi.fn().mockReturnValue(0),
         getZoom: vi.fn().mockReturnValue(1),
         worldToScreen: vi.fn().mockImplementation((point: { x: number; y: number }) => point),
@@ -224,15 +220,6 @@ function createMapBridgeStub(buildingsCount = 0): MapBridgeStub {
                 }
             };
         }),
-        onSpecialBuildingClick: vi.fn().mockImplementation((listener: (payload: SpecialBuildingPayload) => void) => {
-            specialBuildingClickListeners.push(listener);
-            return () => {
-                const index = specialBuildingClickListeners.indexOf(listener);
-                if (index >= 0) {
-                    specialBuildingClickListeners.splice(index, 1);
-                }
-            };
-        }),
         onViewChanged: vi.fn().mockReturnValue(() => {}),
     } as unknown as MapBridge;
 
@@ -246,9 +233,6 @@ function createMapBridgeStub(buildingsCount = 0): MapBridgeStub {
         },
         triggerEasterEggBuildingClick: (payload: EasterEggBuildingPayload) => {
             easterEggBuildingClickListeners.forEach((listener) => listener(payload));
-        },
-        triggerSpecialBuildingClick: (payload: SpecialBuildingPayload) => {
-            specialBuildingClickListeners.forEach((listener) => listener(payload));
         },
     };
 }

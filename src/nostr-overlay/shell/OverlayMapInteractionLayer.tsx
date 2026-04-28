@@ -22,7 +22,6 @@ import type { ZapIntentInput } from '../controllers/use-wallet-zap-controller';
 import type { MapBridge, OccupiedBuildingContextPayload } from '../map-bridge';
 import { resolveNostrCityMapPreset } from '../map-colour-schemes';
 import type { ResolvedOverlayTheme } from '../hooks/useOverlayTheme';
-import { getSpecialBuildingEntry } from '../special-buildings/catalog';
 import { useMapBridgeController } from './use-map-bridge-controller';
 
 interface OccupiedBuildingContextMenuState extends OccupiedBuildingContextPayload {
@@ -61,7 +60,6 @@ export interface OverlayMapInteractionLayerProps {
     onOpenProfile: (pubkey: string, buildingIndex: number) => void;
     onRequestZapPayment: (input: ZapIntentInput) => Promise<void>;
     onConfigureZapAmounts: () => void;
-    onOpenAgora: () => void;
 }
 
 function encodePubkeyAsNpub(pubkey: string): string {
@@ -104,7 +102,6 @@ export function OverlayMapInteractionLayer({
     onOpenProfile,
     onRequestZapPayment,
     onConfigureZapAmounts,
-    onOpenAgora,
 }: OverlayMapInteractionLayerProps) {
     const [buildingContextMenu, setBuildingContextMenu] = useState<OccupiedBuildingContextMenuState | null>(null);
     const contextMenuTriggerRef = useRef<HTMLSpanElement | null>(null);
@@ -143,23 +140,6 @@ export function OverlayMapInteractionLayer({
             });
         });
     }, [mapBridge, showLoginGate]);
-
-    useEffect(() => {
-        if (!mapBridge) {
-            return;
-        }
-
-        return mapBridge.onSpecialBuildingClick((payload) => {
-            if (showLoginGate) {
-                return;
-            }
-
-            const entry = getSpecialBuildingEntry(payload.specialBuildingId);
-            if (entry.action === 'open_agora') {
-                onOpenAgora();
-            }
-        });
-    }, [mapBridge, onOpenAgora, showLoginGate]);
 
     useEffect(() => {
         if (showLoginGate) {

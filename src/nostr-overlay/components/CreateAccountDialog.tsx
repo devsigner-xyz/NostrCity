@@ -34,7 +34,7 @@ interface CreateAccountDialogProps {
     defaultRelaySettings?: RelaySettingsState;
 }
 
-type LocalStep = 'intro' | 'backup' | 'profile' | 'relays';
+type LocalStep = 'backup' | 'profile' | 'relays';
 
 function downloadTextFile(fileName: string, content: string) {
     if (typeof window === 'undefined') {
@@ -68,7 +68,7 @@ export function CreateAccountDialog({
     const [profileAbout, setProfileAbout] = useState('');
     const [profilePicture, setProfilePicture] = useState('');
     const [devicePassphrase, setDevicePassphrase] = useState('');
-    const [localStep, setLocalStep] = useState<LocalStep>('intro');
+    const [localStep, setLocalStep] = useState<LocalStep>('backup');
     const localSecretKey = useMemo(
         () => (initialMethod === 'local' ? secretKeyFactory() : undefined),
         [initialMethod, secretKeyFactory]
@@ -184,33 +184,26 @@ export function CreateAccountDialog({
                 <CardDescription>{t('auth.createDialog.local.description')}</CardDescription>
             </div>
             <div className="flex flex-col gap-4 px-0">
-                {localStep === 'intro' ? (
-                    <div className="flex flex-col gap-3" data-testid="create-account-step-intro">
-                        <p>{t('auth.createDialog.intro')}</p>
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="generated-npub">{t('auth.createDialog.yourNpub')}</Label>
-                            <Input id="generated-npub" value={npub} readOnly />
-                        </div>
-                    </div>
-                ) : null}
-
                 {localStep === 'backup' ? (
-                    <div className="flex flex-col gap-3" data-testid="create-account-step-backup">
-                        <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-5" data-testid="create-account-step-backup">
+                        <div className="grid w-full gap-2">
                             <Label htmlFor="generated-nsec">{t('auth.createDialog.yourNsec')}</Label>
                             <Textarea id="generated-nsec" value={nsec} readOnly rows={4} />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="generated-npub-backup">{t('auth.createDialog.yourNpub')}</Label>
-                            <Input id="generated-npub-backup" value={npub} readOnly />
-                        </div>
-                        <div className="flex flex-wrap gap-2">
                             <Button type="button" variant="outline" disabled={isBusy} onClick={() => void navigator.clipboard?.writeText(nsec)}>
                                 {t('auth.createDialog.copyNsec')}
                             </Button>
-                            <Button type="button" variant="outline" disabled={isBusy} onClick={() => downloadTextFile(`nostr-${localPubkey ?? 'local-account'}.txt`, `npub=${npub}\nnsec=${nsec}\n`)}>
-                                {t('auth.createDialog.downloadBackup')}
-                            </Button>
+                        </div>
+                        <div className="grid w-full gap-2">
+                            <Label htmlFor="generated-npub-backup">{t('auth.createDialog.yourNpub')}</Label>
+                            <Textarea id="generated-npub-backup" value={npub} readOnly rows={3} />
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button type="button" variant="outline" disabled={isBusy} onClick={() => void navigator.clipboard?.writeText(npub)}>
+                                    {t('auth.createDialog.copyNpub')}
+                                </Button>
+                                <Button type="button" variant="outline" disabled={isBusy} onClick={() => downloadTextFile(`nostr-${localPubkey ?? 'local-account'}.txt`, `npub=${npub}\nnsec=${nsec}\n`)}>
+                                    {t('auth.createDialog.downloadBackup')}
+                                </Button>
+                            </div>
                         </div>
                         <Label className="flex items-center gap-2" htmlFor="confirm-backup">
                             <input
@@ -268,14 +261,14 @@ export function CreateAccountDialog({
                 ) : null}
             </div>
             <AuthFlowFooter>
-                <Button type="button" variant="ghost" disabled={isBusy} onClick={localStep === 'intro' ? onBack : () => setLocalStep(localStep === 'backup' ? 'intro' : localStep === 'profile' ? 'backup' : 'profile')}>
+                <Button type="button" variant="ghost" disabled={isBusy} onClick={localStep === 'backup' ? onBack : () => setLocalStep(localStep === 'profile' ? 'backup' : 'profile')}>
                     {t('auth.createDialog.back')}
                 </Button>
                 {localStep !== 'relays' ? (
                     <Button
                         type="button"
                         disabled={isBusy || (localStep === 'backup' && !canAdvanceFromBackup)}
-                        onClick={() => setLocalStep(localStep === 'intro' ? 'backup' : localStep === 'backup' ? 'profile' : 'relays')}
+                        onClick={() => setLocalStep(localStep === 'backup' ? 'profile' : 'relays')}
                     >
                         {t('auth.createDialog.continue')}
                     </Button>

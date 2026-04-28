@@ -233,6 +233,7 @@ describe('LoginMethodSelector', () => {
         expect(primaryButton).not.toBeNull();
         expect(primaryButton?.classList.contains('mt-2')).toBe(true);
         expect(primaryButton?.classList.contains('w-full')).toBe(true);
+        expect(rendered.container.textContent || '').not.toContain('Usa tu extension Nostr para firmar sin exponer tu clave privada.');
     });
 
     test('exposes a stable nip46 submit test id in development mode', async () => {

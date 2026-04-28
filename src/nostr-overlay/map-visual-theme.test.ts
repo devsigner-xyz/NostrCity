@@ -11,9 +11,9 @@ describe('map visual dark theme styles', () => {
     });
 
     test('defines dark styles for map zoom controls', () => {
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-zoom-group\s*\{[^}]*background:\s*rgba\(1,\s*4,\s*50,/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-regenerate-button\s*\{[^}]*background:\s*rgba\(1,\s*4,\s*50,/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-zoom-level\s*\{[^}]*color:\s*#A2F0FE/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-zoom-group\s*\{[^}]*background:\s*rgba\(6,\s*41,\s*31,/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-regenerate-button\s*\{[^}]*background:\s*rgba\(6,\s*41,\s*31,/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-zoom-level\s*\{[^}]*color:\s*#FFD900/s);
     });
 
     test('keeps light map control surfaces translucent like dark mode', () => {
@@ -33,7 +33,7 @@ describe('map visual dark theme styles', () => {
     test('aligns display toggles with map action control surfaces', () => {
         expect(styles).toMatch(/\.nostr-map-display-toggle-group\s*\{[^}]*min-height:\s*38px;/s);
         expect(styles).toMatch(/\.nostr-map-regenerate-button\s*\{[^}]*width:\s*38px;[^}]*height:\s*38px;/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-display-toggle-group\s*\{[^}]*background:\s*rgba\(1,\s*4,\s*50,/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-display-toggle-group\s*\{[^}]*background:\s*rgba\(6,\s*41,\s*31,/s);
     });
 
     test('separates zoom controls and keeps zoom buttons circular', () => {
@@ -44,13 +44,23 @@ describe('map visual dark theme styles', () => {
 
     test('distinguishes active display toggles from inactive toggles', () => {
         expect(styles).toMatch(/\.nostr-map-display-toggle-button\[data-state="on"\]\s*\{[^}]*border:\s*0;/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-display-toggle-button\[data-state="on"\]\s*\{[^}]*background:\s*rgba\(162,\s*240,\s*254,/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-display-toggle-button\[data-state="on"\]\s*\{[^}]*background:\s*rgba\(255,\s*217,\s*0,/s);
     });
 
-    test('defines dark styles for map occupant and owner badges', () => {
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-occupant-tag\s*\{[^}]*background:\s*rgba\(1,\s*21,\s*86,/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-occupant-name\s*\{[^}]*color:\s*#FCFDFE/s);
-        expect(styles).toMatch(/\.dark\s+\.nostr-map-owner-name\s*\{[^}]*color:\s*#FCFDFE/s);
+    test('defines dark styles for map occupant and icon markers', () => {
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-occupant-tag\s*\{[^}]*border-color:\s*var\(--border\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-occupant-tag\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--card\)\s+96%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-occupant-name\s*\{[^}]*color:\s*var\(--card-foreground\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-occupant-avatar\s*\{[^}]*border-color:\s*var\(--border\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-occupant-avatar-fallback\s*\{[^}]*background:\s*var\(--muted\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-occupant-avatar-fallback\s*\{[^}]*color:\s*var\(--muted-foreground\)/s);
+        expect(styles).not.toMatch(/\.dark\s+\.nostr-map-occupant-tag\s*\{[^}]*rgba\(10,\s*58,\s*38,/s);
+        expect(styles).not.toMatch(/\.dark\s+\.nostr-map-occupant-avatar-fallback\s*\{[^}]*rgba\(255,\s*109,\s*31,/s);
+        expect(styles).toMatch(/\.nostr-map-icon-marker\s*\{[^}]*width:\s*1\.6rem;[^}]*height:\s*1\.6rem;/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-icon-marker\s*\{[^}]*border-color:\s*var\(--border\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-icon-marker\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--card\)\s+96%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.dark\s+\.nostr-map-icon-marker\s*\{[^}]*color:\s*var\(--card-foreground\)/s);
+        expect(styles).not.toMatch(/\.dark\s+\.nostr-map-icon-marker\s*\{[^}]*rgba\(255,\s*109,\s*31,/s);
     });
 });
 

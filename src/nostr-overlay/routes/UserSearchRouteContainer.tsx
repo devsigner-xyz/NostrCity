@@ -11,6 +11,7 @@ export interface UserSearchRouteContainerProps {
     ownerPubkey?: UserSearchPageProps['ownerPubkey'];
     followedPubkeys?: UserSearchPageProps['followedPubkeys'];
     verificationByPubkey?: UserSearchPageProps['verificationByPubkey'];
+    onCopyNpub?: UserSearchPageProps['onCopyNpub'];
     canWrite: boolean;
     onFollowUser?: UserSearchPageProps['onFollowUser'];
     canAccessDirectMessages: boolean;
@@ -25,6 +26,7 @@ export function UserSearchRouteContainer({
     ownerPubkey,
     followedPubkeys,
     verificationByPubkey,
+    onCopyNpub,
     canWrite,
     onFollowUser,
     canAccessDirectMessages,
@@ -41,6 +43,7 @@ export function UserSearchRouteContainer({
             {...(ownerPubkey ? { ownerPubkey } : {})}
             {...(followedPubkeys ? { followedPubkeys } : {})}
             {...(verificationByPubkey ? { verificationByPubkey } : {})}
+            {...(onCopyNpub ? { onCopyNpub } : {})}
             {...(canWrite && onFollowUser ? { onFollowUser } : {})}
             {...(canAccessDirectMessages && onMessageUser ? { onMessageUser } : {})}
         />

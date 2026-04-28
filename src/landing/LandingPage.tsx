@@ -11,28 +11,45 @@ import {
   type SiteTheme,
 } from '@/site/theme-preference';
 
-const MAP_PRESET_BY_THEME: Record<SiteTheme, 'Nostr City Light' | 'Nostr City Dark'> = {
-  light: 'Nostr City Light',
-  dark: 'Nostr City Dark',
-};
-
 const GITHUB_REPOSITORY_URL = 'https://github.com/devsigner-xyz/NostrCity';
 
-const HERO_MARKERS = [
+const VALUE_PILLS = [
+  'landing.values.openSource',
+  'landing.values.nonprofit',
+  'landing.values.protocolFirst',
+  'landing.values.nostrNative',
+] as const;
+
+const FEATURE_ITEMS = [
   {
-    label: '01',
-    titleKey: 'landing.hero.card.spatial.title',
-    bodyKey: 'landing.hero.card.spatial.body',
+    eyebrowKey: 'landing.features.generativeMap.eyebrow',
+    titleKey: 'landing.features.generativeMap.title',
+    bodyKey: 'landing.features.generativeMap.body',
   },
   {
-    label: '02',
-    titleKey: 'landing.hero.card.social.title',
-    bodyKey: 'landing.hero.card.social.body',
+    eyebrowKey: 'landing.features.identity.eyebrow',
+    titleKey: 'landing.features.identity.title',
+    bodyKey: 'landing.features.identity.body',
   },
   {
-    label: '03',
-    titleKey: 'landing.hero.card.lab.title',
-    bodyKey: 'landing.hero.card.lab.body',
+    eyebrowKey: 'landing.features.relays.eyebrow',
+    titleKey: 'landing.features.relays.title',
+    bodyKey: 'landing.features.relays.body',
+  },
+  {
+    eyebrowKey: 'landing.features.feed.eyebrow',
+    titleKey: 'landing.features.feed.title',
+    bodyKey: 'landing.features.feed.body',
+  },
+  {
+    eyebrowKey: 'landing.features.export.eyebrow',
+    titleKey: 'landing.features.export.title',
+    bodyKey: 'landing.features.export.body',
+  },
+  {
+    eyebrowKey: 'landing.features.lab.eyebrow',
+    titleKey: 'landing.features.lab.title',
+    bodyKey: 'landing.features.lab.body',
   },
 ] as const;
 
@@ -51,30 +68,13 @@ const HOW_STEPS = [
   },
 ] as const;
 
-const FEATURE_DISTRICTS = [
-  {
-    titleKey: 'landing.features.generativeCity.title',
-    bodyKey: 'landing.features.generativeCity.body',
-  },
-  {
-    titleKey: 'landing.features.overlay.title',
-    bodyKey: 'landing.features.overlay.body',
-  },
-  {
-    titleKey: 'landing.features.relays.title',
-    bodyKey: 'landing.features.relays.body',
-  },
-  {
-    titleKey: 'landing.features.export.title',
-    bodyKey: 'landing.features.export.body',
-  },
-] as const;
-
-const MAP_LEGEND_ITEMS = [
-  { className: 'water', labelKey: 'landing.mapPreview.legend.water' },
-  { className: 'park', labelKey: 'landing.mapPreview.legend.park' },
-  { className: 'roads', labelKey: 'landing.mapPreview.legend.roads' },
-  { className: 'social', labelKey: 'landing.mapPreview.legend.social' },
+const STACK_TAGS = [
+  'landing.stack.tag.nostr',
+  'landing.stack.tag.relays',
+  'landing.stack.tag.nip07',
+  'landing.stack.tag.nip46',
+  'landing.stack.tag.webln',
+  'landing.stack.tag.exports',
 ] as const;
 
 export default function LandingPage() {
@@ -136,15 +136,15 @@ export default function LandingPage() {
     setTheme(saveSiteThemePreference(nextTheme));
   };
 
-  const logoSrc = theme === 'dark' ? '/logo-v2-dark.png' : '/logo-v2-light.png';
-  const activePreset = MAP_PRESET_BY_THEME[theme];
+  const logoSrc = theme === 'dark' ? '/icon-dark-32x32.png' : '/icon-light-32x32.png';
 
   return (
     <div className="landing-shell" data-theme={theme}>
       <a className="skip-link" href="#main-content">{t('landing.nav.skipToContent')}</a>
+
       <header className="topbar">
         <a className="brand" href="#hero" aria-label={t('landing.brand.homeAria')}>
-          <img className="brand-logo" src={logoSrc} width="1536" height="1024" alt={t('landing.brand.logoAlt')} />
+          <img className="brand-logo" src={logoSrc} width="32" height="32" alt={t('landing.brand.logoAlt')} />
           <span>Nostr City</span>
         </a>
 
@@ -153,9 +153,7 @@ export default function LandingPage() {
           <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer">
             {t('landing.nav.github')}
           </a>
-          <a href="#features">
-            {t('landing.nav.features')}
-          </a>
+          <a href="#features">{t('landing.nav.features')}</a>
           <div className="theme-toggle" role="group" aria-label={t('landing.theme.label')}>
             <button type="button" aria-pressed={theme === 'light'} onClick={() => selectTheme('light')}>
               {t('landing.theme.light')}
@@ -170,88 +168,53 @@ export default function LandingPage() {
 
       <main id="main-content" tabIndex={-1}>
         <section className="hero" id="hero">
-          <div className="hero-copy">
-            <p className="kicker">{t('landing.hero.kicker')}</p>
-            <h1>{t('landing.hero.title')}</h1>
-            <p>{t('landing.hero.body')}</p>
+          <p className="kicker">{t('landing.hero.kicker')}</p>
+          <h1>{t('landing.hero.title')}</h1>
+          <p className="hero-lead">{t('landing.hero.body')}</p>
 
-            <div className="hero-actions">
-              <a className="app-link" href={appUrl}>{t('landing.hero.openApp')}</a>
-              <a href="#como-funciona">
-                {t('landing.hero.howItWorks')}
-              </a>
-            </div>
-
-            <div className="hero-grid" role="list" aria-label={t('landing.hero.markerList')}>
-              {HERO_MARKERS.map((marker) => (
-                <article key={marker.label} role="listitem">
-                  <span>{marker.label}</span>
-                  <p className="marker-title">{t(marker.titleKey)}</p>
-                  <p>{t(marker.bodyKey)}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <aside className="map-preview-card" aria-labelledby="landing-map-preview-title">
-            <div className="map-preview-heading">
-              <p>{t('landing.mapPreview.activePreset')}</p>
-              <h2 id="landing-map-preview-title" data-active-preset={activePreset}>{activePreset}</h2>
-            </div>
-
-            <div
-              className="map-preview"
-              data-testid="landing-map-preview"
-              role="img"
-              aria-label={t('landing.mapPreview.aria', { preset: activePreset })}
-            >
-              <span className="map-water" aria-hidden="true" />
-              <span className="map-park map-park-a" aria-hidden="true" />
-              <span className="map-park map-park-b" aria-hidden="true" />
-              <span className="map-road map-road-main" aria-hidden="true" />
-              <span className="map-road map-road-cross" aria-hidden="true" />
-              <span className="map-road map-road-arc" aria-hidden="true" />
-              <span className="map-block map-block-a" aria-hidden="true" />
-              <span className="map-block map-block-b" aria-hidden="true" />
-              <span className="map-block map-block-c" aria-hidden="true" />
-              <span className="map-node map-node-a" aria-hidden="true" />
-              <span className="map-node map-node-b" aria-hidden="true" />
-              <span className="map-node map-node-c" aria-hidden="true" />
-            </div>
-
-            <div className="map-legend" role="list" aria-label={t('landing.mapPreview.legendLabel')}>
-              {MAP_LEGEND_ITEMS.map((item) => (
-                <span key={item.className} className={`legend-item legend-${item.className}`} role="listitem">
-                  <span aria-hidden="true" />
-                  {t(item.labelKey)}
-                </span>
-              ))}
-            </div>
-          </aside>
-        </section>
-
-        <section className="content atlas-story" id="que-es">
-          <div>
-            <p className="section-kicker">{t('landing.whatIs.kicker')}</p>
-            <h2>{t('landing.whatIs.title')}</h2>
-            <p>{t('landing.whatIs.body')}</p>
-          </div>
-
-          <div className="story-route" aria-hidden="true">
-            <span>npub</span>
-            <span />
-            <span>relays</span>
-            <span />
-            <span>city</span>
+          <div className="hero-actions">
+            <a className="app-link" href={appUrl}>{t('landing.hero.openApp')}</a>
+            <a href="#como-funciona">{t('landing.hero.howItWorks')}</a>
+            <a href={docsUrl}>{t('landing.hero.readDocs')}</a>
           </div>
         </section>
 
-        <section className="content" id="como-funciona">
-          <p className="section-kicker">{t('landing.how.kicker')}</p>
-          <h2>{t('landing.how.title')}</h2>
-          <div className="steps route-steps">
+        <section className="value-strip" aria-label={t('landing.values.label')}>
+          {VALUE_PILLS.map((valueKey) => (
+            <p key={valueKey}>{t(valueKey)}</p>
+          ))}
+        </section>
+
+        <section className="content feature-intro" id="features">
+          <div className="section-copy">
+            <p className="section-kicker">{t('landing.features.kicker')}</p>
+            <h2>{t('landing.features.title')}</h2>
+            <p>{t('landing.features.body')}</p>
+          </div>
+
+          <div className="feature-list" data-testid="landing-feature-list">
+            {FEATURE_ITEMS.map((feature) => (
+              <article className="feature-row" key={feature.titleKey}>
+                <p className="feature-eyebrow">{t(feature.eyebrowKey)}</p>
+                <div>
+                  <h3>{t(feature.titleKey)}</h3>
+                  <p>{t(feature.bodyKey)}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="content how-section" id="como-funciona">
+          <div className="section-copy">
+            <p className="section-kicker">{t('landing.how.kicker')}</p>
+            <h2>{t('landing.how.title')}</h2>
+            <p>{t('landing.how.body')}</p>
+          </div>
+
+          <div className="steps">
             {HOW_STEPS.map((step, index) => (
-              <article className="card route-card" key={step.titleKey}>
+              <article className="step-card" key={step.titleKey}>
                 <span>{String(index + 1).padStart(2, '0')}</span>
                 <h3>{t(step.titleKey)}</h3>
                 <p>{t(step.bodyKey)}</p>
@@ -260,51 +223,32 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="content" id="features">
-          <p className="section-kicker">{t('landing.features.kicker')}</p>
-          <h2>{t('landing.features.title')}</h2>
-          <div className="features district-grid">
-            {FEATURE_DISTRICTS.map((feature) => (
-              <article className="card district-card" key={feature.titleKey}>
-                <span className="district-glyph" aria-hidden="true" />
-                <h3>{t(feature.titleKey)}</h3>
-                <p>{t(feature.bodyKey)}</p>
-              </article>
+        <section className="content stack-section" id="protocolo">
+          <div className="section-copy">
+            <p className="section-kicker">{t('landing.stack.kicker')}</p>
+            <h2>{t('landing.stack.title')}</h2>
+            <p>{t('landing.stack.body')}</p>
+          </div>
+
+          <div className="stack-tags" aria-label={t('landing.stack.tagsLabel')}>
+            {STACK_TAGS.map((tagKey) => (
+              <span key={tagKey}>{t(tagKey)}</span>
             ))}
           </div>
         </section>
 
-        <section className="content nostr-native" id="nostr-native">
-          <div className="nostr-native-copy">
-            <p className="section-kicker">{t('landing.nostrNative.kicker')}</p>
-            <h2>{t('landing.nostrNative.title')}</h2>
-            <p>{t('landing.nostrNative.body')}</p>
-          </div>
-
-          <div className="features">
-            <article className="card">
-              <h3>{t('landing.nostrNative.stack.title')}</h3>
-              <p>{t('landing.nostrNative.stack.body')}</p>
-            </article>
-            <article className="card">
-              <h3>{t('landing.nostrNative.protocol.title')}</h3>
-              <p>{t('landing.nostrNative.protocol.body')}</p>
-            </article>
-          </div>
-        </section>
-
-        <section className="content" id="filosofia">
+        <section className="content philosophy-section" id="filosofia">
+          <p className="section-kicker">{t('landing.philosophy.kicker')}</p>
           <h2>{t('landing.philosophy.title')}</h2>
           <p>{t('landing.philosophy.body')}</p>
-
           <p className="manifest">{t('landing.philosophy.manifesto')}</p>
 
           <div className="footer-cta">
             <a className="app-link" href={appUrl}>{t('landing.footer.openApp')}</a>
+            <a href={docsUrl}>{t('landing.footer.readDocs')}</a>
             <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer">
               {t('landing.footer.viewRepo')}
             </a>
-            <a href={docsUrl}>{t('landing.footer.readDocs')}</a>
           </div>
         </section>
       </main>

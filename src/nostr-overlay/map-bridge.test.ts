@@ -8,7 +8,6 @@ function createMainApiStub(overrides: Partial<MapMainApi> = {}): MapMainApi {
         roadsEmpty: vi.fn().mockReturnValue(false),
         getBuildingCentroidsWorld: vi.fn().mockReturnValue([{ x: 10, y: 20 }, { x: 30, y: 40 }]),
         getEasterEggBuildings: vi.fn().mockReturnValue([]),
-        getSpecialBuildings: vi.fn().mockReturnValue([]),
         setOccupancyByBuildingIndex: vi.fn(),
         setVerifiedBuildingIndexes: vi.fn(),
         setViewportInsetLeft: vi.fn(),
@@ -32,7 +31,6 @@ function createMainApiStub(overrides: Partial<MapMainApi> = {}): MapMainApi {
         subscribeOccupiedBuildingClick: vi.fn().mockReturnValue(() => {}),
         subscribeOccupiedBuildingContextMenu: vi.fn().mockReturnValue(() => {}),
         subscribeEasterEggBuildingClick: vi.fn().mockReturnValue(() => {}),
-        subscribeSpecialBuildingClick: vi.fn().mockReturnValue(() => {}),
         subscribeViewChanged: vi.fn().mockReturnValue(() => {}),
         ...overrides,
     };
@@ -101,19 +99,6 @@ describe('createMapBridge', () => {
         expect(bridge.listEasterEggBuildings?.()).toEqual([
             { index: 2, easterEggId: 'bitcoin_whitepaper' },
             { index: 7, easterEggId: 'crypto_anarchist_manifesto' },
-        ]);
-    });
-
-    test('listSpecialBuildings delegates current assignment to map api', () => {
-        const api = createMainApiStub({
-            getSpecialBuildings: vi.fn().mockReturnValue([
-                { index: 3, specialBuildingId: 'agora' },
-            ]),
-        });
-
-        const bridge = createMapBridge(api);
-        expect(bridge.listSpecialBuildings()).toEqual([
-            { index: 3, specialBuildingId: 'agora' },
         ]);
     });
 
@@ -313,20 +298,6 @@ describe('createMapBridge', () => {
 
         expect(subscribe).toHaveBeenCalledWith(listener);
         off?.();
-        expect(unsubscribe).toHaveBeenCalledTimes(1);
-    });
-
-    test('onSpecialBuildingClick subscribes and unsubscribes using map api listener hooks', () => {
-        const unsubscribe = vi.fn();
-        const subscribe = vi.fn().mockReturnValue(unsubscribe);
-        const api = createMainApiStub({ subscribeSpecialBuildingClick: subscribe });
-        const bridge = createMapBridge(api);
-        const listener = vi.fn();
-
-        const off = bridge.onSpecialBuildingClick(listener);
-
-        expect(subscribe).toHaveBeenCalledWith(listener);
-        off();
         expect(unsubscribe).toHaveBeenCalledTimes(1);
     });
 

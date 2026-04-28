@@ -29,6 +29,17 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 describe('colour schemes defaults', () => {
+    test('legacy presets are not exposed in the map preset catalog', () => {
+        expect(Object.keys(colourSchemes)).not.toEqual(expect.arrayContaining([
+            'Default',
+            'Drawn (slow)',
+            'Drawn2 (slow)',
+            'Paper',
+            'GoogleNoZoom',
+            'Assassin',
+        ]));
+    });
+
     test('Nostr City Light replaces Google as the default light preset', () => {
         const nostrCityLight = (colourSchemes as any)['Nostr City Light'];
 
@@ -42,32 +53,32 @@ describe('colour schemes defaults', () => {
         });
     });
 
-    test('Nostr City Dark mirrors Nostr City Light behavior with neon logo colours', () => {
+    test('Nostr City Dark uses the dark logo neon palette', () => {
         const nostrCityDark = (colourSchemes as any)['Nostr City Dark'];
 
         expect(nostrCityDark).toMatchObject({
-            bgColour: '#010432',
-            bgColourIn: '#011556',
-            buildingColour: '#0D2279',
-            buildingSideColour: '#011556',
-            buildingStroke: '#233CB5',
-            seaColour: '#34108A',
-            grassColour: '#4C1FAE',
-            minorRoadColour: '#A2F0FE',
-            minorRoadOutline: '#233CB5',
-            majorRoadColour: '#2ABAFB',
-            majorRoadOutline: '#7546D4',
-            mainRoadColour: '#DB5FF7',
-            mainRoadOutline: '#C586F2',
-            frameColour: '#010432',
-            frameTextColour: '#FCFDFE',
-            occupiedBuildingColour: '#2ABAFB',
-            occupiedBuildingStroke: '#233CB5',
-            hoveredBuildingColour: '#DB5FF7',
-            hoveredBuildingStroke: '#A2F0FE',
-            streetLabelColour: '#010B2D',
-            waterLabelColour: '#BFEFFF',
-            parkLabelColour: '#F0D7FF',
+            bgColour: '#030511',
+            bgColourIn: '#080D2A',
+            buildingColour: '#10164A',
+            buildingSideColour: '#070A24',
+            buildingStroke: '#8E35FF',
+            seaColour: '#073D85',
+            grassColour: '#392072',
+            minorRoadColour: '#35D7FF',
+            minorRoadOutline: '#13205F',
+            majorRoadColour: '#D33CFF',
+            majorRoadOutline: '#8E35FF',
+            mainRoadColour: '#F6F8FF',
+            mainRoadOutline: '#8E35FF',
+            frameColour: '#030511',
+            frameTextColour: '#F6F8FF',
+            occupiedBuildingColour: '#35D7FF',
+            occupiedBuildingStroke: '#8EEAFF',
+            hoveredBuildingColour: '#D33CFF',
+            hoveredBuildingStroke: '#F6F8FF',
+            streetLabelColour: '#030511',
+            waterLabelColour: '#8EEAFF',
+            parkLabelColour: '#FF8AF3',
             zoomBuildings: true,
             buildingModels: false,
             outlineSize: 2,

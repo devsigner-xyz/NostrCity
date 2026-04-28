@@ -1,7 +1,6 @@
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-import { UI_SETTINGS_STORAGE_KEY } from '../../nostr/ui-settings';
 import type { NostrProfile } from '../../nostr/types';
 import { MapPresenceLayer } from './MapPresenceLayer';
 import type { MapBridge } from '../map-bridge';
@@ -33,12 +32,10 @@ function createMapBridgeStub(zoom: number): MapBridge {
         mountSettingsPanel: vi.fn(),
         focusBuilding: vi.fn(),
         listEasterEggBuildings: vi.fn().mockReturnValue([]),
-        listSpecialBuildings: vi.fn().mockReturnValue([]),
         getParkCount: vi.fn().mockReturnValue(0),
         onMapGenerated: vi.fn().mockReturnValue(() => {}),
         onOccupiedBuildingClick: vi.fn().mockReturnValue(() => {}),
         onOccupiedBuildingContextMenu: vi.fn().mockReturnValue(() => {}),
-        onSpecialBuildingClick: vi.fn().mockReturnValue(() => {}),
         getZoom: vi.fn().mockReturnValue(zoom),
         worldToScreen: vi.fn().mockImplementation((point: { x: number; y: number }) => point),
         getViewportInsetLeft: vi.fn().mockReturnValue(0),
@@ -86,7 +83,7 @@ describe('MapPresenceLayer', () => {
         },
     };
 
-    test('shows owner tooltip regardless of zoom threshold', async () => {
+    test('shows owner marker without avatar or owner identity copy regardless of zoom threshold', async () => {
         const bridge = createMapBridgeStub(3);
         const rendered = await renderElement(
             <MapPresenceLayer
@@ -102,39 +99,12 @@ describe('MapPresenceLayer', () => {
         );
         mounted.push(rendered);
 
-        expect(rendered.container.textContent || '').toContain('You are here');
-        const ownerAvatar = rendered.container.querySelector('.nostr-map-owner-avatar-fallback') as HTMLElement;
-        expect(ownerAvatar).toBeDefined();
-        expect(ownerAvatar.textContent || '').toContain('OW');
-    });
-
-    test('renders special building title in english when ui language is en', async () => {
-        window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
-
-        const bridge = createMapBridgeStub(3);
-        (bridge.listSpecialBuildings as any).mockReturnValue([
-            {
-                index: 0,
-                specialBuildingId: 'agora',
-            },
-        ]);
-        const rendered = await renderElement(
-            <MapPresenceLayer
-                mapBridge={bridge}
-                occupancyByBuildingIndex={{}}
-                discoveredEasterEggIds={[]}
-                profiles={profiles}
-                ownerPubkey={ownerPubkey}
-                ownerProfile={{ pubkey: ownerPubkey, displayName: 'Owner' }}
-                ownerBuildingIndex={0}
-                occupiedLabelsZoomLevel={10}
-            />
-        );
-        mounted.push(rendered);
-
-        const marker = rendered.container.querySelector('.nostr-map-special-building-marker') as HTMLDivElement;
-        expect(marker).toBeDefined();
-        expect(marker.getAttribute('title')).toBe('Special building: Agora');
+        expect(rendered.container.textContent || '').not.toContain('You are here');
+        expect(rendered.container.textContent || '').not.toContain('Owner');
+        expect(rendered.container.querySelector('.nostr-map-owner-marker')).not.toBeNull();
+        expect(rendered.container.querySelector('.nostr-map-owner-avatar')).toBeNull();
+        expect(rendered.container.querySelector('.nostr-map-owner-badge')).toBeNull();
+        expect(rendered.container.querySelector('.nostr-map-owner-name')).toBeNull();
     });
 
     test('hides occupied labels below configured zoom level', async () => {
@@ -317,7 +287,7 @@ describe('MapPresenceLayer', () => {
         }
     });
 
-    test('renders persistent discovered easter egg marker', async () => {
+    test('renders persistent discovered easter egg marker with a star icon', async () => {
         const bridge = createMapBridgeStub(4);
         (bridge.listBuildings as any).mockReturnValue([
             {
@@ -345,62 +315,24 @@ describe('MapPresenceLayer', () => {
 
         const marker = rendered.container.querySelector('.nostr-map-easter-egg-marker') as HTMLElement;
         expect(marker).toBeDefined();
-        expect(marker.textContent || '').toContain('★');
+        expect(marker.classList.contains('nostr-map-icon-marker')).toBe(true);
+        expect(marker.querySelector('.lucide-star')).not.toBeNull();
+        expect(marker.querySelector('.lucide-map-pin')).toBeNull();
+        expect(marker.textContent || '').not.toContain('★');
     });
 
-    test('renders reserved special building marker', async () => {
-        const bridge = createMapBridgeStub(4);
-        (bridge.listBuildings as any).mockReturnValue([
-            {
-                index: 2,
-                centroid: { x: 180, y: 120 },
-            },
-        ]);
-        (bridge.listSpecialBuildings as any).mockReturnValue([
-            {
-                index: 2,
-                specialBuildingId: 'agora',
-            },
-        ]);
-
-        const rendered = await renderElement(
-            <MapPresenceLayer
-                mapBridge={bridge}
-                occupancyByBuildingIndex={{}}
-                discoveredEasterEggIds={[]}
-                profiles={profiles}
-                occupiedLabelsZoomLevel={10}
-            />
-        );
-        mounted.push(rendered);
-
-        const marker = rendered.container.querySelector('.nostr-map-special-building-marker') as HTMLElement;
-        expect(marker).toBeDefined();
-        expect(marker.textContent || '').toContain('A');
-    });
-
-    test('hides easter egg and special markers when special markers toggle is disabled', async () => {
+    test('hides easter egg markers when special markers toggle is disabled', async () => {
         const bridge = createMapBridgeStub(4);
         (bridge.listBuildings as any).mockReturnValue([
             {
                 index: 5,
                 centroid: { x: 120, y: 90 },
             },
-            {
-                index: 7,
-                centroid: { x: 180, y: 90 },
-            },
         ]);
         (bridge.listEasterEggBuildings as any).mockReturnValue([
             {
                 index: 5,
                 easterEggId: 'crypto_anarchist_manifesto',
-            },
-        ]);
-        (bridge.listSpecialBuildings as any).mockReturnValue([
-            {
-                index: 7,
-                specialBuildingId: 'agora',
             },
         ]);
 
@@ -417,6 +349,5 @@ describe('MapPresenceLayer', () => {
         mounted.push(rendered);
 
         expect(rendered.container.querySelector('.nostr-map-easter-egg-marker')).toBeNull();
-        expect(rendered.container.querySelector('.nostr-map-special-building-marker')).toBeNull();
     });
 });

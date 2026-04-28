@@ -69,6 +69,8 @@ describe('LoginGateScreen', () => {
         const shellContent = rendered.container.querySelector('[data-slot="card-content"]');
 
         expect(shellCard?.getAttribute('data-variant')).toBe('elevated');
+        expect(shellCard?.className).toContain('w-full');
+        expect(shellCard?.className).toContain('max-w-[448px]');
         expect(shellCard?.className).toContain('py-0');
         expect(shellCard?.className).toContain('gap-0');
         expect(shellContent?.classList.contains('nostr-login-screen-content')).toBe(false);

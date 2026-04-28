@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { UI_SETTINGS_STORAGE_KEY } from '../../nostr/ui-settings';
+import { encodeHexToNpub } from '../../nostr/npub';
 import type { NostrProfile } from '../../nostr/types';
 import { createNostrOverlayQueryClient } from '../query/query-client';
 import { UserSearchPage } from './UserSearchPage';
@@ -176,7 +177,9 @@ describe('UserSearchPage', () => {
             });
 
             expect(rendered.container.querySelector('[data-slot="overlay-page-header"]')).not.toBeNull();
-            expect(rendered.container.querySelector('[data-slot="command-item"] [data-slot="item"]')).not.toBeNull();
+            expect(rendered.container.querySelector('[data-slot="item"]')).not.toBeNull();
+            expect(rendered.container.querySelector(`[data-testid="person-actions-${pubkey}"]`)).not.toBeNull();
+            expect(rendered.container.textContent || '').toContain(encodeHexToNpub(pubkey));
         } finally {
             vi.useRealTimers();
         }
@@ -223,7 +226,7 @@ describe('UserSearchPage', () => {
                 expect(rendered.container.textContent || '').toContain('Elena');
             });
 
-            const row = Array.from(rendered.container.querySelectorAll('[data-slot="command-item"]')).find((item) =>
+            const row = Array.from(rendered.container.querySelectorAll('[data-slot="item"]')).find((item) =>
                 (item.textContent || '').includes('Elena')
             ) as HTMLElement;
             expect(row).toBeDefined();
@@ -274,7 +277,7 @@ describe('UserSearchPage', () => {
                 expect(rendered.container.textContent || '').toContain('Felix');
             });
 
-            const row = Array.from(rendered.container.querySelectorAll('[data-slot="command-item"]')).find((item) =>
+            const row = Array.from(rendered.container.querySelectorAll('[data-slot="item"]')).find((item) =>
                 (item.textContent || '').includes('Felix')
             ) as HTMLElement;
             expect(row).toBeDefined();
@@ -315,9 +318,10 @@ describe('UserSearchPage', () => {
 
             let userRow: HTMLElement | null = null;
             await waitForAssertion(() => {
-                userRow = Array.from(rendered.container.querySelectorAll('[data-slot="command-item"]')).find((row) =>
-                    (row.textContent || '').includes('Bob')
+                const row = Array.from(rendered.container.querySelectorAll('[data-slot="item"]')).find((item) =>
+                    (item.textContent || '').includes('Bob')
                 ) as HTMLElement | null;
+                userRow = row?.querySelector('button[aria-pressed]') as HTMLElement | null;
                 expect(userRow).toBeDefined();
             });
 
@@ -366,12 +370,9 @@ describe('UserSearchPage', () => {
                 expect(rendered.container.textContent || '').toContain('Dora');
             });
 
-            const messageButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
-                (button.textContent || '').trim() === 'Mensaje'
-            ) as HTMLButtonElement;
+            const actionsButton = rendered.container.querySelector(`[data-testid="person-actions-${pubkey}"]`) as HTMLButtonElement;
             const followButton = rendered.container.querySelector('button[aria-label="Unfollow Dora"]') as HTMLButtonElement;
-            expect(messageButton).toBeDefined();
-            expect(messageButton.textContent || '').toContain('Mensaje');
+            expect(actionsButton).toBeDefined();
             expect(followButton).toBeDefined();
             expect(followButton.disabled).toBe(false);
             expect((followButton.textContent || '').trim()).toBe('Following');
