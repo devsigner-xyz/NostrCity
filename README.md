@@ -135,7 +135,10 @@ The BFF reads these environment variables:
 | `BFF_RATE_LIMIT_MAX` | `120` | Max requests per route/IP/window. |
 | `BFF_RATE_LIMIT_MAX_STORE_ENTRIES` | `10000` | Max in-memory rate-limit entries. |
 | `BFF_RATE_LIMIT_STORE` | In-memory outside production | Set to `redis` for shared production rate-limit storage. |
-| `REDIS_URL` | unset | Required when `BFF_RATE_LIMIT_STORE=redis`; on Railway reference the Redis service `REDIS_URL`. Production public Redis URLs must use `rediss://` and include auth material; `redis://` is accepted only for local/private/internal hosts. |
+| `BFF_AUTH_REPLAY_STORE` | Uses Redis when `BFF_RATE_LIMIT_STORE=redis`, memory outside production | Set to `redis` for shared replay protection of Nostr auth proofs. Production requires Redis-backed replay protection. |
+| `BFF_REDIS_KEY_PREFIX` | `nostr-city:local:bff:` outside production | Required in production when Redis security features are enabled. Use a per-environment prefix such as `nostr-city:prod:bff:`. |
+| `BFF_REDIS_KEY_HASH_SECRET` | local development secret outside production | Required in production. Used to HMAC user-derived Redis key material so IPs, pubkeys, event IDs, and routes are not stored in cleartext keys. |
+| `REDIS_URL` | unset | Required when Redis-backed security features are enabled; on Railway reference the Redis service `REDIS_URL`. Production public Redis URLs must use `rediss://` and include a password; `redis://` is accepted only for local/private/internal hosts. |
 | `BFF_RATE_LIMIT_ACCEPT_IN_MEMORY_RISK` | unset | Temporary production risk acceptance for in-memory rate limits. Requires owner and review date variables. |
 | `BFF_RATE_LIMIT_IN_MEMORY_RISK_OWNER` | unset | Required owner when accepting temporary in-memory production risk. |
 | `BFF_RATE_LIMIT_IN_MEMORY_RISK_REVIEW_DATE` | unset | Required non-stale `YYYY-MM-DD` review date when accepting temporary in-memory production risk. |

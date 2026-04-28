@@ -2,12 +2,20 @@ import type { FastifyPluginAsync } from 'fastify';
 import { createClient } from '@redis/client';
 
 import { isProductionRuntime } from '../production-config';
+import {
+  buildRedisKey,
+  digestRedisKeyPart,
+  resolveRedisKeyHashSecret,
+  resolveRedisKeyPrefix,
+  resolveRedisUrl,
+  type EnvLike,
+} from '../redis/redis-security';
 
 const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_MAX_REQUESTS = 120;
 const DEFAULT_MAX_STORE_ENTRIES = 10_000;
 const DEFAULT_REDIS_COMMAND_TIMEOUT_MS = 500;
-const REDIS_RATE_LIMIT_KEY_PREFIX = 'nostr-city:bff:rate-limit:v1:';
+const REDIS_RATE_LIMIT_NAMESPACE = 'rate-limit:v1';
 
 type RateLimitEntry = {
   count: number;
@@ -36,6 +44,7 @@ export interface RedisRateLimitConnectionClient extends RedisRateLimitClient {
 type RedisRateLimitStoreOptions = {
   commandTimeoutMs?: number;
   keyPrefix?: string;
+  keyHashSecret?: string;
 };
 
 class InMemoryRateLimitStore implements RateLimitStore {
@@ -144,19 +153,22 @@ export const connectRedisRateLimitClient = async (
 export class RedisRateLimitStore implements RateLimitStore {
   private readonly commandTimeoutMs: number;
   private readonly keyPrefix: string;
+  private readonly keyHashSecret: string;
 
   constructor(
     private readonly client: RedisRateLimitClient,
     options: RedisRateLimitStoreOptions = {},
   ) {
     this.commandTimeoutMs = options.commandTimeoutMs ?? DEFAULT_REDIS_COMMAND_TIMEOUT_MS;
-    this.keyPrefix = options.keyPrefix ?? REDIS_RATE_LIMIT_KEY_PREFIX;
+    this.keyPrefix = options.keyPrefix ?? buildRedisKey(resolveRedisKeyPrefix(), REDIS_RATE_LIMIT_NAMESPACE);
+    this.keyHashSecret = options.keyHashSecret ?? resolveRedisKeyHashSecret();
   }
 
   async increment(key: string, now: number, windowMs: number): Promise<RateLimitEntry> {
+    const keyDigest = digestRedisKeyPart(this.keyHashSecret, key);
     const result = await withRedisTimeout(
       this.client.eval(REDIS_INCREMENT_SCRIPT, {
-        keys: [`${this.keyPrefix}${key}`],
+        keys: [buildRedisKey(this.keyPrefix, keyDigest)],
         arguments: [`${now}`, `${windowMs}`],
       }),
       this.commandTimeoutMs,
@@ -173,8 +185,6 @@ type RouteRateLimitConfig = {
   max?: unknown;
   windowMs?: unknown;
 };
-
-type EnvLike = Partial<Record<string, string | undefined>>;
 
 export type RateLimitStoreMode = 'memory' | 'memory-risk-accepted' | 'redis';
 
@@ -195,60 +205,22 @@ const isStaleDateOnly = (value: string): boolean => {
   return value < new Date().toISOString().slice(0, 10);
 };
 
-const isPrivateRedisHost = (hostname: string): boolean => {
-  const normalizedHost = hostname.toLowerCase();
-  if (
-    normalizedHost === 'localhost'
-    || normalizedHost === '127.0.0.1'
-    || normalizedHost === '::1'
-    || normalizedHost.endsWith('.internal')
-  ) {
-    return true;
-  }
-
-  const octets = normalizedHost.split('.').map((part) => Number(part));
-  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet))) {
-    return false;
-  }
-
-  return (
-    octets[0] === 10
-    || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
-    || (octets[0] === 192 && octets[1] === 168)
-  );
+export const resolveRedisRateLimitUrl = (env: EnvLike = process.env): string => {
+  return resolveRedisUrl(env);
 };
 
-export const resolveRedisRateLimitUrl = (env: EnvLike = process.env): string => {
-  const redisUrl = env.REDIS_URL?.trim();
-  if (!redisUrl) {
-    throw new Error('REDIS_URL is required when BFF_RATE_LIMIT_STORE=redis.');
+const toLoggableRedisError = (error: unknown): Record<string, unknown> => {
+  if (!(error instanceof Error)) {
+    return { message: 'Unknown Redis error' };
   }
 
-  let parsed: URL;
-  try {
-    parsed = new URL(redisUrl);
-  } catch {
-    throw new Error('REDIS_URL must be a valid Redis connection URL.');
-  }
-
-  if (parsed.protocol !== 'redis:' && parsed.protocol !== 'rediss:') {
-    throw new Error('REDIS_URL must use redis:// or rediss://.');
-  }
-
-  if (isProductionRuntime(env) && parsed.protocol !== 'rediss:' && !isPrivateRedisHost(parsed.hostname)) {
-    throw new Error('Production REDIS_URL must use rediss:// unless Redis is on a private/internal host.');
-  }
-
-  if (
-    isProductionRuntime(env)
-    && !isPrivateRedisHost(parsed.hostname)
-    && !parsed.username
-    && !parsed.password
-  ) {
-    throw new Error('Production public REDIS_URL requires authentication material.');
-  }
-
-  return redisUrl;
+  return {
+    name: error.name,
+    message: error.message,
+    ...(typeof (error as Error & { code?: unknown }).code === 'string'
+      ? { code: (error as Error & { code: string }).code }
+      : {}),
+  };
 };
 
 export const resolveRateLimitStoreMode = (
@@ -349,6 +321,8 @@ export const rateLimitPlugin: FastifyPluginAsync = async (app) => {
 
   if (storeMode === 'redis') {
     const redisUrl = resolveRedisRateLimitUrl();
+    const redisKeyPrefix = buildRedisKey(resolveRedisKeyPrefix(), REDIS_RATE_LIMIT_NAMESPACE);
+    const redisKeyHashSecret = resolveRedisKeyHashSecret();
 
     const redisClient = createClient({
       url: redisUrl,
@@ -359,7 +333,7 @@ export const rateLimitPlugin: FastifyPluginAsync = async (app) => {
       },
     });
     redisClient.on('error', (error: unknown) => {
-      app.log.error({ error }, 'Redis rate limit client error');
+      app.log.error({ error: toLoggableRedisError(error) }, 'Redis rate limit client error');
     });
     await connectRedisRateLimitClient(
       redisClient as RedisRateLimitConnectionClient,
@@ -368,7 +342,10 @@ export const rateLimitPlugin: FastifyPluginAsync = async (app) => {
     app.addHook('onClose', async () => {
       await redisClient.quit();
     });
-    store = new RedisRateLimitStore(redisClient as RedisRateLimitClient);
+    store = new RedisRateLimitStore(redisClient as RedisRateLimitClient, {
+      keyPrefix: redisKeyPrefix,
+      keyHashSecret: redisKeyHashSecret,
+    });
   } else {
     store = new InMemoryRateLimitStore();
   }
@@ -408,7 +385,7 @@ export const rateLimitPlugin: FastifyPluginAsync = async (app) => {
       incrementedEntry = await store.increment(key, now, effectiveWindowMs);
     } catch (error) {
       app.log.error({
-        error,
+        error: toLoggableRedisError(error),
         route: request.routeOptions.url,
         storeMode,
       }, 'Rate limit store failed');

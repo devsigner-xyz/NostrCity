@@ -3,8 +3,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { finalizeEvent, getPublicKey } from 'nostr-tools';
 import { createHash } from 'node:crypto';
+import Fastify from 'fastify';
 
 import { buildApp } from '../app';
+import type { AuthReplayStore } from '../security/auth-replay-store';
+import { ownerAuthPlugin } from './owner-auth';
 
 const hexToBytes = (hex: string): Uint8Array => {
   const pairs = hex.match(/.{1,2}/g);
@@ -411,5 +414,83 @@ describe('owner auth plugin', () => {
 
     expect(first.statusCode).toBe(200);
     expect(second.statusCode).toBe(401);
+  });
+
+  it('fails closed when the auth replay store fails', async () => {
+    const failingReplayStore: AuthReplayStore = {
+      consume: async () => {
+        throw new Error('redis unavailable');
+      },
+      close: async () => undefined,
+    };
+    const isolatedApp = Fastify({ logger: false });
+    await isolatedApp.register(ownerAuthPlugin, { authReplayStore: failingReplayStore });
+    isolatedApp.post<{
+      Body: {
+        ownerPubkey: string;
+      };
+    }>(
+      '/protected',
+      {
+        preHandler: isolatedApp.verifyOwnerAuth,
+      },
+      async () => ({ ok: true }),
+    );
+    await isolatedApp.ready();
+
+    try {
+      const response = await isolatedApp.inject({
+        method: 'POST',
+        url: '/protected',
+        headers: {
+          authorization: buildNostrAuthHeader({
+            secretKey: OWNER_SECRET_KEY,
+            method: 'POST',
+            url: `http://${HOST}/protected`,
+            payload: {
+              ownerPubkey: OWNER_PUBKEY,
+            },
+          }),
+          host: HOST,
+        },
+        payload: {
+          ownerPubkey: OWNER_PUBKEY,
+        },
+      });
+
+      expect(response.statusCode).toBe(401);
+    } finally {
+      await isolatedApp.close();
+    }
+  });
+
+  it('rejects injected auth replay stores in production', async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    const injectedReplayStore: AuthReplayStore = {
+      consume: async () => 'consumed',
+      close: async () => undefined,
+    };
+    const isolatedApp = Fastify({ logger: false });
+    isolatedApp.register(ownerAuthPlugin, { authReplayStore: injectedReplayStore });
+
+    try {
+      let readyError: unknown;
+      try {
+        await isolatedApp.ready();
+      } catch (error) {
+        readyError = error;
+      }
+
+      expect(readyError).toBeInstanceOf(Error);
+      expect((readyError as Error).message).toContain('production');
+    } finally {
+      await isolatedApp.close();
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
   });
 });

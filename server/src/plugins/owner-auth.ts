@@ -3,14 +3,31 @@ import type {
   FastifyRequest,
   preHandlerHookHandler,
 } from 'fastify';
+import { createClient } from '@redis/client';
 
 import { verifyNostrHttpAuth } from '../nostr/http-auth-verify';
+import { isProductionRuntime } from '../production-config';
+import { resolveRedisUrl } from '../redis/redis-security';
+import {
+  InMemoryAuthReplayStore,
+  RedisAuthReplayStore,
+  connectRedisAuthReplayClient,
+  resolveAuthReplayStoreMode,
+  type AuthReplayStore,
+  type RedisAuthReplayClient,
+  type RedisAuthReplayConnectionClient,
+} from '../security/auth-replay-store';
 
 type StringRecord = Record<string, unknown>;
 
 declare module 'fastify' {
   interface FastifyInstance {
     verifyOwnerAuth: preHandlerHookHandler;
+    consumeAuthReplayProof(input: {
+      pubkey: string;
+      eventId: string;
+      ttlSeconds: number;
+    }): Promise<void>;
   }
 }
 
@@ -71,29 +88,85 @@ const buildHttpError = (
 };
 
 const AUTH_PROOF_REPLAY_TTL_SECONDS = 120;
-const MAX_AUTH_PROOFS = 5_000;
+const DEFAULT_REDIS_COMMAND_TIMEOUT_MS = 500;
 
-export const ownerAuthPlugin: FastifyPluginAsync = async (app) => {
-  const seenAuthProofs = new Map<string, number>();
+export interface OwnerAuthPluginOptions {
+  authReplayStore?: AuthReplayStore;
+}
 
-  const sweepExpiredProofs = (nowSeconds: number): void => {
-    for (const [key, expiresAt] of seenAuthProofs.entries()) {
-      if (expiresAt <= nowSeconds) {
-        seenAuthProofs.delete(key);
-      }
-    }
+const toLoggableRedisError = (error: unknown): Record<string, unknown> => {
+  if (!(error instanceof Error)) {
+    return { message: 'Unknown Redis error' };
+  }
+
+  return {
+    name: error.name,
+    message: error.message,
+    ...(typeof (error as Error & { code?: unknown }).code === 'string'
+      ? { code: (error as Error & { code: string }).code }
+      : {}),
   };
+};
 
-  const trimProofs = (): void => {
-    while (seenAuthProofs.size > MAX_AUTH_PROOFS) {
-      const oldestKey = seenAuthProofs.keys().next().value;
-      if (oldestKey === undefined) {
-        return;
+export const ownerAuthPlugin: FastifyPluginAsync<OwnerAuthPluginOptions> = async (app, options) => {
+  let authReplayStore = options.authReplayStore;
+  let ownsAuthReplayStore = false;
+
+  if (authReplayStore && isProductionRuntime()) {
+    throw new Error('Injected auth replay stores are not allowed in production. Use Redis-backed replay protection.');
+  }
+
+  if (!authReplayStore) {
+    const storeMode = resolveAuthReplayStoreMode();
+    if (storeMode === 'redis') {
+      const redisClient = createClient({
+        url: resolveRedisUrl(),
+        disableOfflineQueue: true,
+        socket: {
+          connectTimeout: DEFAULT_REDIS_COMMAND_TIMEOUT_MS,
+          reconnectStrategy: false,
+        },
+      });
+      redisClient.on('error', (error: unknown) => {
+        app.log.error({ error: toLoggableRedisError(error) }, 'Redis auth replay client error');
+      });
+      const redisReplayStore = new RedisAuthReplayStore(redisClient as RedisAuthReplayClient);
+      try {
+        await connectRedisAuthReplayClient(
+          redisClient as RedisAuthReplayConnectionClient,
+          DEFAULT_REDIS_COMMAND_TIMEOUT_MS,
+        );
+      } catch (error) {
+        await redisClient.quit().catch(() => undefined);
+        throw error;
       }
-
-      seenAuthProofs.delete(oldestKey);
+      authReplayStore = redisReplayStore;
+      ownsAuthReplayStore = true;
+    } else {
+      authReplayStore = new InMemoryAuthReplayStore();
+      ownsAuthReplayStore = true;
     }
-  };
+  }
+
+  app.addHook('onClose', async () => {
+    if (ownsAuthReplayStore) {
+      await authReplayStore.close();
+    }
+  });
+
+  app.decorate('consumeAuthReplayProof', async (input) => {
+    let replayResult: 'consumed' | 'replayed';
+    try {
+      replayResult = await authReplayStore.consume(input);
+    } catch (error) {
+      app.log.error({ error: toLoggableRedisError(error) }, 'Auth replay store failed');
+      throw buildHttpError(401, 'OWNER_AUTH_REPLAY_STORE_FAILED', 'Nostr auth proof replay check failed');
+    }
+
+    if (replayResult === 'replayed') {
+      throw buildHttpError(401, 'OWNER_AUTH_REPLAY', 'Nostr auth proof already used');
+    }
+  });
 
   app.decorate('verifyOwnerAuth', async (request) => {
     const authResult = verifyNostrHttpAuth(request);
@@ -110,15 +183,11 @@ export const ownerAuthPlugin: FastifyPluginAsync = async (app) => {
       throw buildHttpError(401, 'OWNER_AUTH_INVALID', 'Missing or invalid Nostr auth proof');
     }
 
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    sweepExpiredProofs(nowSeconds);
-
-    const replayKey = `${authenticatedPubkey}:${authResult.event.id}`;
-    if (seenAuthProofs.has(replayKey)) {
-      throw buildHttpError(401, 'OWNER_AUTH_REPLAY', 'Nostr auth proof already used');
-    }
-    seenAuthProofs.set(replayKey, nowSeconds + AUTH_PROOF_REPLAY_TTL_SECONDS);
-    trimProofs();
+    await app.consumeAuthReplayProof({
+      pubkey: authenticatedPubkey,
+      eventId: authResult.event.id,
+      ttlSeconds: AUTH_PROOF_REPLAY_TTL_SECONDS,
+    });
 
     const ownerPubkeys = readOwnerPubkeys(request);
     if (ownerPubkeys.length === 0) {
@@ -137,11 +206,13 @@ export const ownerAuthPlugin: FastifyPluginAsync = async (app) => {
       throw buildHttpError(403, 'OWNER_PUBKEY_MISMATCH', 'ownerPubkey mismatch');
     }
 
-    const context = request.context as {
+    const context = (request as FastifyRequest & { context?: {
       requestId: string;
       authenticatedPubkey?: string;
-    };
-    context.authenticatedPubkey = authenticatedPubkey;
+    } }).context;
+    if (context) {
+      context.authenticatedPubkey = authenticatedPubkey;
+    }
   });
 };
 

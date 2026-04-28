@@ -3,8 +3,11 @@
 import { finalizeEvent } from 'nostr-tools';
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import Fastify from 'fastify';
 
 import { buildApp } from '../../app';
+import type { AuthReplayStore } from '../../security/auth-replay-store';
+import { publishRoutes } from './publish.routes';
 import type { PublishForwardRequestDto } from './publish.schemas';
 import { relayScopePolicies, type PublishService } from './publish.service';
 
@@ -198,6 +201,59 @@ describe('publish routes', () => {
       },
     });
     expect(forwardMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when publish auth replay storage fails', async () => {
+    const failingReplayStore: AuthReplayStore = {
+      consume: async () => {
+        throw new Error('redis unavailable');
+      },
+      close: async () => undefined,
+    };
+    const isolatedForwardMock = vi.fn<PublishService['forward']>();
+    const isolatedApp = buildApp({
+      publishService: { forward: isolatedForwardMock },
+      authReplayStore: failingReplayStore,
+    });
+    await isolatedApp.ready();
+
+    try {
+      const payload = buildPayload();
+      const url = '/v1/publish/forward';
+      const response = await isolatedApp.inject({
+        method: 'POST',
+        url,
+        payload,
+        headers: {
+          authorization: buildNostrAuthHeader('POST', `http://${HOST}${url}`, payload),
+          host: HOST,
+        },
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(isolatedForwardMock).not.toHaveBeenCalled();
+    } finally {
+      await isolatedApp.close();
+    }
+  });
+
+  it('fails fast when owner auth plugin is not registered first', async () => {
+    const isolatedApp = Fastify({ logger: false });
+    isolatedApp.register(publishRoutes, { service: publishService });
+
+    try {
+      let readyError: unknown;
+      try {
+        await isolatedApp.ready();
+      } catch (error) {
+        readyError = error;
+      }
+
+      expect(readyError).toBeInstanceOf(Error);
+      expect((readyError as Error).message).toContain('ownerAuthPlugin');
+    } finally {
+      await isolatedApp.close();
+    }
   });
 
   it('returns deterministic 400 when event id is invalid', async () => {

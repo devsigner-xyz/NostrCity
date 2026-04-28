@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 
 import { SimplePool } from 'nostr-tools';
 
+import { createTTLCache, type TTLCache } from '../../cache/ttl-cache';
 import { shouldUseFallbackRelays } from '../../relay/relay-fallback';
 import { resolveRelaySets } from '../../relay/relay-resolver';
 import type {
@@ -45,16 +46,6 @@ interface ParsedNip05Identifier {
   display: string;
 }
 
-interface Nip05CacheEntry {
-  result: Nip05BatchResultDto;
-  expiresAtMs: number;
-}
-
-interface ProfileCacheEntry {
-  profile: IdentityProfileDto | null;
-  expiresAtMs: number;
-}
-
 const DEFAULT_BOOTSTRAP_RELAYS = [
   'wss://relay.damus.io',
   'wss://relay.primal.net',
@@ -69,6 +60,11 @@ const NIP05_SUCCESS_TTL_MS = 15 * 60_000;
 const NIP05_ERROR_TTL_MS = 3 * 60_000;
 const NIP05_MAX_RESPONSE_BYTES = 128 * 1024;
 const PROFILE_CACHE_TTL_MS = 5 * 60_000;
+const NIP05_SUCCESS_CACHE_MAX_ENTRIES = 5_000;
+const NIP05_ERROR_CACHE_MAX_ENTRIES = 2_000;
+const PROFILE_CACHE_MAX_ENTRIES = 5_000;
+const NIP05_INFLIGHT_MAX_ENTRIES = 500;
+const PROFILE_BATCH_INFLIGHT_MAX_ENTRIES = 100;
 const PROFILE_NAME_MAX_LENGTH = 128;
 const PROFILE_DISPLAY_NAME_MAX_LENGTH = 128;
 const PROFILE_ABOUT_MAX_LENGTH = 2_048;
@@ -373,6 +369,11 @@ export interface IdentityServiceOptions {
   nip05SuccessTtlMs?: number;
   nip05ErrorTtlMs?: number;
   profileCacheTtlMs?: number;
+  nip05SuccessCacheMaxEntries?: number;
+  nip05ErrorCacheMaxEntries?: number;
+  profileCacheMaxEntries?: number;
+  nip05InflightMaxEntries?: number;
+  profileBatchInflightMaxEntries?: number;
   defaultNip05TimeoutMs?: number;
 }
 
@@ -386,24 +387,40 @@ export interface IdentityService {
 }
 
 class GatewayIdentityService implements IdentityService {
-  private readonly nip05SuccessCache = new Map<string, Nip05CacheEntry>();
+  private readonly nip05SuccessCache: TTLCache<string, Nip05BatchResultDto>;
 
-  private readonly nip05ErrorCache = new Map<string, Nip05CacheEntry>();
+  private readonly nip05ErrorCache: TTLCache<string, Nip05BatchResultDto>;
 
   private readonly nip05Inflight = new Map<string, Promise<Nip05BatchResultDto>>();
 
-  private readonly profileCache = new Map<string, ProfileCacheEntry>();
+  private readonly profileCache: TTLCache<string, IdentityProfileDto | null>;
 
   private readonly profileBatchInflight = new Map<string, Promise<Record<string, IdentityProfileDto | null>>>();
 
   constructor(
     private readonly options: Required<
-      Pick<IdentityServiceOptions, 'fetchImpl' | 'nowMs' | 'resolveHostname' | 'nip05SuccessTtlMs' | 'nip05ErrorTtlMs' | 'profileCacheTtlMs' | 'defaultNip05TimeoutMs'>
+      Pick<IdentityServiceOptions, 'fetchImpl' | 'nowMs' | 'resolveHostname' | 'nip05SuccessTtlMs' | 'nip05ErrorTtlMs' | 'profileCacheTtlMs' | 'nip05SuccessCacheMaxEntries' | 'nip05ErrorCacheMaxEntries' | 'profileCacheMaxEntries' | 'nip05InflightMaxEntries' | 'profileBatchInflightMaxEntries' | 'defaultNip05TimeoutMs'>
       > & {
         pool: SimplePool;
         bootstrapRelays: string[];
       },
-  ) {}
+  ) {
+    this.nip05SuccessCache = createTTLCache<string, Nip05BatchResultDto>({
+      ttlMs: options.nip05SuccessTtlMs,
+      maxEntries: options.nip05SuccessCacheMaxEntries,
+      now: options.nowMs,
+    });
+    this.nip05ErrorCache = createTTLCache<string, Nip05BatchResultDto>({
+      ttlMs: options.nip05ErrorTtlMs,
+      maxEntries: options.nip05ErrorCacheMaxEntries,
+      now: options.nowMs,
+    });
+    this.profileCache = createTTLCache<string, IdentityProfileDto | null>({
+      ttlMs: options.profileCacheTtlMs,
+      maxEntries: options.profileCacheMaxEntries,
+      now: options.nowMs,
+    });
+  }
 
   async verifyNip05Batch(
     input: Nip05VerifyBatchRequestDto,
@@ -451,30 +468,29 @@ class GatewayIdentityService implements IdentityService {
     return { profiles };
   }
 
-  private getNip05CacheEntry(cache: Map<string, Nip05CacheEntry>, key: string): Nip05BatchResultDto | undefined {
-    const entry = cache.get(key);
-    if (!entry) {
-      return undefined;
-    }
-
-    if (entry.expiresAtMs <= this.options.nowMs()) {
-      cache.delete(key);
-      return undefined;
-    }
-
-    return entry.result;
+  private getNip05CacheEntry(cache: TTLCache<string, Nip05BatchResultDto>, key: string): Nip05BatchResultDto | undefined {
+    return cache.get(key);
   }
 
   private setNip05CacheEntry(
-    cache: Map<string, Nip05CacheEntry>,
+    cache: TTLCache<string, Nip05BatchResultDto>,
     key: string,
     result: Nip05BatchResultDto,
     ttlMs: number,
   ): void {
-    cache.set(key, {
-      result,
-      expiresAtMs: this.options.nowMs() + Math.max(0, ttlMs),
-    });
+    cache.set(key, result, ttlMs);
+  }
+
+  private toNip05InflightLimitResult(pubkey: string, parsed: ParsedNip05Identifier): Nip05BatchResultDto {
+    return {
+      pubkey,
+      nip05: parsed.normalized,
+      status: 'error',
+      identifier: parsed.normalized,
+      displayIdentifier: parsed.display,
+      error: 'Too many in-flight NIP-05 checks',
+      checkedAt: this.options.nowMs(),
+    };
   }
 
   private async verifySingleNip05(
@@ -519,6 +535,10 @@ class GatewayIdentityService implements IdentityService {
     const inflight = this.nip05Inflight.get(cacheKey);
     if (inflight) {
       return inflight;
+    }
+
+    if (this.nip05Inflight.size >= this.options.nip05InflightMaxEntries) {
+      return this.toNip05InflightLimitResult(pubkey, parsed);
     }
 
     const expectedPubkey = pubkey;
@@ -620,24 +640,11 @@ class GatewayIdentityService implements IdentityService {
   }
 
   private getProfileFromCache(pubkey: string): IdentityProfileDto | null | undefined {
-    const entry = this.profileCache.get(pubkey);
-    if (!entry) {
-      return undefined;
-    }
-
-    if (entry.expiresAtMs <= this.options.nowMs()) {
-      this.profileCache.delete(pubkey);
-      return undefined;
-    }
-
-    return entry.profile;
+    return this.profileCache.get(pubkey);
   }
 
   private setProfileInCache(pubkey: string, profile: IdentityProfileDto | null): void {
-    this.profileCache.set(pubkey, {
-      profile,
-      expiresAtMs: this.options.nowMs() + this.options.profileCacheTtlMs,
-    });
+    this.profileCache.set(pubkey, profile, this.options.profileCacheTtlMs);
   }
 
   private async loadProfilesBatch(pubkeys: string[]): Promise<Record<string, IdentityProfileDto | null>> {
@@ -645,6 +652,12 @@ class GatewayIdentityService implements IdentityService {
     const inflight = this.profileBatchInflight.get(batchKey);
     if (inflight) {
       return inflight;
+    }
+
+    if (this.profileBatchInflight.size >= this.options.profileBatchInflightMaxEntries) {
+      return Object.fromEntries(
+        pubkeys.map((pubkey) => [pubkey, null]),
+      ) as Record<string, IdentityProfileDto | null>;
     }
 
     const promise = (async (): Promise<Record<string, IdentityProfileDto | null>> => {
@@ -725,6 +738,11 @@ export const createIdentityService = (options: IdentityServiceOptions = {}): Ide
     nip05SuccessTtlMs: options.nip05SuccessTtlMs ?? NIP05_SUCCESS_TTL_MS,
     nip05ErrorTtlMs: options.nip05ErrorTtlMs ?? NIP05_ERROR_TTL_MS,
     profileCacheTtlMs: options.profileCacheTtlMs ?? PROFILE_CACHE_TTL_MS,
+    nip05SuccessCacheMaxEntries: options.nip05SuccessCacheMaxEntries ?? NIP05_SUCCESS_CACHE_MAX_ENTRIES,
+    nip05ErrorCacheMaxEntries: options.nip05ErrorCacheMaxEntries ?? NIP05_ERROR_CACHE_MAX_ENTRIES,
+    profileCacheMaxEntries: options.profileCacheMaxEntries ?? PROFILE_CACHE_MAX_ENTRIES,
+    nip05InflightMaxEntries: options.nip05InflightMaxEntries ?? NIP05_INFLIGHT_MAX_ENTRIES,
+    profileBatchInflightMaxEntries: options.profileBatchInflightMaxEntries ?? PROFILE_BATCH_INFLIGHT_MAX_ENTRIES,
     defaultNip05TimeoutMs: options.defaultNip05TimeoutMs ?? DEFAULT_NIP05_TIMEOUT_MS,
   });
 };

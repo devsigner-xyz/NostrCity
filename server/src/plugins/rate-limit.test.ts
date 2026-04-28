@@ -450,10 +450,36 @@ describe('Redis rate limit store', () => {
     expect(entry).toEqual({ count: 2, resetAt: 1_719_000_060_000 });
     expect(calls).toEqual([
       {
-        keys: ['nostr-city:bff:rate-limit:v1:client:/v1/health:60000:120'],
+        keys: [expect.stringMatching(/^nostr-city:local:bff:rate-limit:v1:[a-f0-9]{64}$/)],
         arguments: ['1719000000000', '60000'],
       },
     ]);
+    expect(calls[0]?.keys[0]).not.toContain('client');
+    expect(calls[0]?.keys[0]).not.toContain('/v1/health');
+  });
+
+  it('hashes user-derived Redis rate limit key material', async () => {
+    const calls: Array<{ keys: string[]; arguments: string[] }> = [];
+    const client: RedisRateLimitClient = {
+      eval: async (_script, options) => {
+        calls.push(options);
+        return [1, 1_719_000_060_000];
+      },
+      ping: async () => 'PONG',
+      quit: async () => undefined,
+    };
+
+    const store = new RedisRateLimitStore(client, {
+      keyPrefix: 'nostr-city:test:bff:rate-limit:v1:',
+      keyHashSecret: 'x'.repeat(32),
+    });
+
+    await store.increment('203.0.113.42:/v1/health:60000:120', 1_719_000_000_000, 60_000);
+
+    const redisKey = calls[0]?.keys[0] ?? '';
+    expect(redisKey).toMatch(/^nostr-city:test:bff:rate-limit:v1:[a-f0-9]{64}$/);
+    expect(redisKey).not.toContain('203.0.113.42');
+    expect(redisKey).not.toContain('/v1/health');
   });
 
   it('rejects insecure public Redis URLs in production', () => {
@@ -467,7 +493,7 @@ describe('Redis rate limit store', () => {
     expect(() => resolveRedisRateLimitUrl({
       NODE_ENV: 'production',
       REDIS_URL: 'rediss://cache.example.com:6379',
-    })).toThrow('authentication');
+    })).toThrow('password');
   });
 
   it('times out Redis startup health checks', async () => {

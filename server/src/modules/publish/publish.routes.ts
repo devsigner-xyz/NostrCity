@@ -17,30 +17,13 @@ export interface PublishRoutesOptions {
 }
 
 export const publishRoutes: FastifyPluginAsync<PublishRoutesOptions> = async (app, options) => {
+  if (!app.hasDecorator('consumeAuthReplayProof')) {
+    throw new Error('publishRoutes requires ownerAuthPlugin to be registered first.');
+  }
+
   const service = options.service ?? createPublishService();
   const lowerHex64Pattern = /^[0-9a-f]{64}$/;
   const authProofReplayTtlSeconds = 120;
-  const maxAuthProofs = 5_000;
-  const seenAuthProofs = new Map<string, number>();
-
-  const sweepExpiredProofs = (nowSeconds: number): void => {
-    for (const [key, expiresAt] of seenAuthProofs.entries()) {
-      if (expiresAt <= nowSeconds) {
-        seenAuthProofs.delete(key);
-      }
-    }
-  };
-
-  const trimProofs = (): void => {
-    while (seenAuthProofs.size > maxAuthProofs) {
-      const oldestKey = seenAuthProofs.keys().next().value;
-      if (oldestKey === undefined) {
-        return;
-      }
-
-      seenAuthProofs.delete(oldestKey);
-    }
-  };
 
   const verifyPublishOwnerAuth = async (
     request: FastifyRequest<{ Body: PublishForwardRequestDto }>,
@@ -57,22 +40,11 @@ export const publishRoutes: FastifyPluginAsync<PublishRoutesOptions> = async (ap
     }
 
     const authenticatedPubkey = authResult.pubkey.trim().toLowerCase();
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    sweepExpiredProofs(nowSeconds);
-
-    const replayKey = `${authenticatedPubkey}:${authResult.event.id}`;
-    if (seenAuthProofs.has(replayKey)) {
-      const error = new Error('Nostr auth proof already used') as Error & {
-        statusCode: number;
-        code: string;
-      };
-      error.statusCode = 401;
-      error.code = 'OWNER_AUTH_REPLAY';
-      throw error;
-    }
-
-    seenAuthProofs.set(replayKey, nowSeconds + authProofReplayTtlSeconds);
-    trimProofs();
+    await app.consumeAuthReplayProof({
+      pubkey: authenticatedPubkey,
+      eventId: authResult.event.id,
+      ttlSeconds: authProofReplayTtlSeconds,
+    });
 
     const eventPubkey = request.body.event.pubkey.trim().toLowerCase();
 

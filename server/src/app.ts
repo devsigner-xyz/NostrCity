@@ -19,6 +19,7 @@ import { socialRoutes } from './modules/social/social.routes';
 import type { SocialService } from './modules/social/social.service';
 import { usersRoutes } from './modules/users/users.routes';
 import type { UsersService } from './modules/users/users.service';
+import type { AuthReplayStore } from './security/auth-replay-store';
 import { corsPlugin } from './plugins/cors';
 import { errorHandlerPlugin } from './plugins/error-handler';
 import { ownerAuthPlugin } from './plugins/owner-auth';
@@ -39,6 +40,7 @@ export interface BuildAppOptions {
   usersService?: UsersService;
   dmService?: DmService;
   publishService?: PublishService;
+  authReplayStore?: AuthReplayStore;
   staticAssetsPath?: string;
 }
 
@@ -74,7 +76,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
   app.register(corsPlugin);
   app.register(securityHeadersPlugin);
   app.register(rateLimitPlugin);
-  app.register(ownerAuthPlugin);
+  app.register(ownerAuthPlugin, { authReplayStore: options.authReplayStore });
   app.register(errorHandlerPlugin);
 
   app.register(healthRoute, { prefix: '/v1' });

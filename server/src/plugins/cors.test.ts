@@ -1,9 +1,11 @@
 // @vitest-environment node
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import Fastify from 'fastify';
 
 import { buildApp } from '../app';
 import { resolveAllowedOrigins } from './cors';
+import { corsPlugin } from './cors';
 
 const futureReviewDate = (): string => {
   const reviewDate = new Date();
@@ -70,7 +72,9 @@ describe('cors plugin in production', () => {
     process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_OWNER = 'security@example.com';
     process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_REVIEW_DATE = futureReviewDate();
 
-    const productionApp = buildApp();
+    const productionApp = Fastify({ logger: false });
+    productionApp.register(corsPlugin);
+    productionApp.get('/v1/health', async () => ({ ok: true }));
 
     try {
       await productionApp.ready();
