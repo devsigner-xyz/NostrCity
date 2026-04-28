@@ -22,7 +22,7 @@ Redis request-time checks use a bounded command timeout and disable offline queu
 ## Railway Variables
 
 - `BFF_RATE_LIMIT_STORE`: set to `redis` when Redis integration is enabled.
-- `REDIS_URL`: required when `BFF_RATE_LIMIT_STORE=redis`; on Railway use `${{Redis.REDIS_URL}}`. Production public Redis URLs must use `rediss://` and include authentication material; `redis://` is accepted only for local/private/internal hosts.
+- `REDIS_URL`: required when `BFF_RATE_LIMIT_STORE=redis`; on Railway reference the Redis service `REDIS_URL`. Production public Redis URLs must use `rediss://` and include authentication material; `redis://` is accepted only for local/private/internal hosts.
 - `BFF_RATE_LIMIT_ACCEPT_IN_MEMORY_RISK`: temporary risk acceptance only.
 - `BFF_RATE_LIMIT_IN_MEMORY_RISK_OWNER`: required owner when temporary in-memory production risk is accepted.
 - `BFF_RATE_LIMIT_IN_MEMORY_RISK_REVIEW_DATE`: required non-stale `YYYY-MM-DD` review date when temporary in-memory production risk is accepted.

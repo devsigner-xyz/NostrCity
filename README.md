@@ -135,7 +135,7 @@ The BFF reads these environment variables:
 | `BFF_RATE_LIMIT_MAX` | `120` | Max requests per route/IP/window. |
 | `BFF_RATE_LIMIT_MAX_STORE_ENTRIES` | `10000` | Max in-memory rate-limit entries. |
 | `BFF_RATE_LIMIT_STORE` | In-memory outside production | Set to `redis` for shared production rate-limit storage. |
-| `REDIS_URL` | unset | Required when `BFF_RATE_LIMIT_STORE=redis`; on Railway use `${{Redis.REDIS_URL}}`. Production public Redis URLs must use `rediss://` and include auth material; `redis://` is accepted only for local/private/internal hosts. |
+| `REDIS_URL` | unset | Required when `BFF_RATE_LIMIT_STORE=redis`; on Railway reference the Redis service `REDIS_URL`. Production public Redis URLs must use `rediss://` and include auth material; `redis://` is accepted only for local/private/internal hosts. |
 | `BFF_RATE_LIMIT_ACCEPT_IN_MEMORY_RISK` | unset | Temporary production risk acceptance for in-memory rate limits. Requires owner and review date variables. |
 | `BFF_RATE_LIMIT_IN_MEMORY_RISK_OWNER` | unset | Required owner when accepting temporary in-memory production risk. |
 | `BFF_RATE_LIMIT_IN_MEMORY_RISK_REVIEW_DATE` | unset | Required non-stale `YYYY-MM-DD` review date when accepting temporary in-memory production risk. |
