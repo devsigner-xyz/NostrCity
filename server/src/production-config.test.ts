@@ -49,6 +49,13 @@ describe('production security config', () => {
     expect(isProductionRuntime({ RAILWAY_ENVIRONMENT_NAME: 'production' })).toBe(true);
   });
 
+  it.each(['prod', 'Production', 'PROD'])(
+    'treats Railway environment name %s as production runtime',
+    (environmentName) => {
+      expect(isProductionRuntime({ RAILWAY_ENVIRONMENT_NAME: environmentName })).toBe(true);
+    },
+  );
+
   it('does not treat local development as production runtime', () => {
     expect(isProductionRuntime({ NODE_ENV: 'test' })).toBe(false);
   });
@@ -73,12 +80,12 @@ describe('production security config', () => {
       validateProductionSecurityConfig({
         NODE_ENV: 'production',
         BFF_CORS_ORIGINS: 'https://nostrcity.xyz',
-        FASTIFY_TRUST_PROXY: 'true',
+        FASTIFY_TRUST_PROXY: 'loopback',
       }),
     ).not.toThrow();
   });
 
-  it.each(['true', 'false', 'loopback', '127.0.0.1,10.0.0.1'])(
+  it.each(['false', 'loopback', '127.0.0.1,10.0.0.1'])(
     'accepts explicit FASTIFY_TRUST_PROXY=%s',
     (value) => {
       expect(() =>
@@ -90,6 +97,46 @@ describe('production security config', () => {
       ).not.toThrow();
     },
   );
+
+  it('rejects accept-all trust proxy in production', () => {
+    expect(() =>
+      validateProductionSecurityConfig({
+        NODE_ENV: 'production',
+        BFF_CORS_ORIGINS: 'https://nostrcity.xyz',
+        FASTIFY_TRUST_PROXY: 'true',
+      }),
+    ).toThrow('FASTIFY_TRUST_PROXY');
+  });
+
+  it('rejects disabled trust proxy in Railway production', () => {
+    expect(() =>
+      validateProductionSecurityConfig({
+        RAILWAY_ENVIRONMENT_NAME: 'production',
+        BFF_CORS_ORIGINS: 'https://nostrcity.xyz',
+        FASTIFY_TRUST_PROXY: 'false',
+      }),
+    ).toThrow('FASTIFY_TRUST_PROXY');
+  });
+
+  it('rejects loopback-only trust proxy in Railway production', () => {
+    expect(() =>
+      validateProductionSecurityConfig({
+        RAILWAY_ENVIRONMENT_NAME: 'production',
+        BFF_CORS_ORIGINS: 'https://nostrcity.xyz',
+        FASTIFY_TRUST_PROXY: 'loopback',
+      }),
+    ).toThrow('FASTIFY_TRUST_PROXY');
+  });
+
+  it('accepts explicit proxy allowlist in Railway production', () => {
+    expect(() =>
+      validateProductionSecurityConfig({
+        RAILWAY_ENVIRONMENT_NAME: 'production',
+        BFF_CORS_ORIGINS: 'https://nostrcity.xyz',
+        FASTIFY_TRUST_PROXY: '100.64.0.0/10',
+      }),
+    ).not.toThrow();
+  });
 
   it('fails to build in production when security config is missing', () => {
     const previousNodeEnv = process.env.NODE_ENV;

@@ -5,6 +5,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app';
 import { resolveAllowedOrigins } from './cors';
 
+const futureReviewDate = (): string => {
+  const reviewDate = new Date();
+  reviewDate.setUTCDate(reviewDate.getUTCDate() + 30);
+  return reviewDate.toISOString().slice(0, 10);
+};
+
 describe('cors plugin', () => {
   const app = buildApp();
 
@@ -53,10 +59,16 @@ describe('cors plugin in production', () => {
     const previousNodeEnv = process.env.NODE_ENV;
     const previousCors = process.env.BFF_CORS_ORIGINS;
     const previousTrustProxy = process.env.FASTIFY_TRUST_PROXY;
+    const previousRateLimitRisk = process.env.BFF_RATE_LIMIT_ACCEPT_IN_MEMORY_RISK;
+    const previousRateLimitRiskOwner = process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_OWNER;
+    const previousRateLimitRiskReviewDate = process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_REVIEW_DATE;
 
     process.env.NODE_ENV = 'production';
     process.env.BFF_CORS_ORIGINS = 'https://nostrcity.xyz';
     process.env.FASTIFY_TRUST_PROXY = 'loopback';
+    process.env.BFF_RATE_LIMIT_ACCEPT_IN_MEMORY_RISK = 'true';
+    process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_OWNER = 'security@example.com';
+    process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_REVIEW_DATE = futureReviewDate();
 
     const productionApp = buildApp();
 
@@ -89,6 +101,21 @@ describe('cors plugin in production', () => {
       else process.env.BFF_CORS_ORIGINS = previousCors;
       if (previousTrustProxy === undefined) delete process.env.FASTIFY_TRUST_PROXY;
       else process.env.FASTIFY_TRUST_PROXY = previousTrustProxy;
+      if (previousRateLimitRisk === undefined) {
+        delete process.env.BFF_RATE_LIMIT_ACCEPT_IN_MEMORY_RISK;
+      } else {
+        process.env.BFF_RATE_LIMIT_ACCEPT_IN_MEMORY_RISK = previousRateLimitRisk;
+      }
+      if (previousRateLimitRiskOwner === undefined) {
+        delete process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_OWNER;
+      } else {
+        process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_OWNER = previousRateLimitRiskOwner;
+      }
+      if (previousRateLimitRiskReviewDate === undefined) {
+        delete process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_REVIEW_DATE;
+      } else {
+        process.env.BFF_RATE_LIMIT_IN_MEMORY_RISK_REVIEW_DATE = previousRateLimitRiskReviewDate;
+      }
     }
   });
 });

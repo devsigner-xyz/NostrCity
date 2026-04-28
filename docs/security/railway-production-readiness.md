@@ -7,7 +7,10 @@ This checklist applies to the Railway production service for Nostr City.
 ## Required Variables
 
 - `BFF_CORS_ORIGINS`: must be explicit; do not use localhost in production.
-- `FASTIFY_TRUST_PROXY`: must be explicit; document the chosen value internally without exposing it in public reports. Prefer a bounded proxy setting such as `loopback` or an allowlist unless `true` has been reviewed and accepted for the deployment boundary.
+- `FASTIFY_TRUST_PROXY`: must be an explicit Railway proxy allowlist in Railway production. `true` is rejected because it trusts all forwarded IP headers; `false` and `loopback` are rejected on Railway because they can key client IPs to the proxy.
+- `BFF_RATE_LIMIT_STORE`: set to `redis` for shared production rate-limit storage, or document temporary in-memory risk acceptance.
+- `REDIS_URL`: required when `BFF_RATE_LIMIT_STORE=redis`; use the Railway Redis reference and do not expose the value.
+- `BFF_RATE_LIMIT_ACCEPT_IN_MEMORY_RISK`, `BFF_RATE_LIMIT_IN_MEMORY_RISK_OWNER`, and `BFF_RATE_LIMIT_IN_MEMORY_RISK_REVIEW_DATE`: required only for temporary in-memory production risk acceptance.
 - `PORT`: provided by Railway.
 - `HOST`: optional; the app defaults to `0.0.0.0`.
 
