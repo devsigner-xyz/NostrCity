@@ -36,6 +36,72 @@ describe('buildApp', () => {
     expect(response.headers['x-content-type-options']).toBe('nosniff');
   });
 
+  it('returns readiness status for GET /v1/ready', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/ready',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      status: 'ok',
+      checks: {
+        redisRateLimit: 'not_configured',
+      },
+    });
+  });
+
+  it('returns degraded readiness when a readiness dependency fails', async () => {
+    const degradedApp = buildApp({
+      readinessChecks: {
+        redisRateLimit: async () => {
+          throw new Error('redis unavailable');
+        },
+      },
+    });
+    await degradedApp.ready();
+
+    try {
+      const response = await degradedApp.inject({
+        method: 'GET',
+        url: '/v1/ready',
+      });
+
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({
+        status: 'degraded',
+        checks: {
+          redisRateLimit: 'failed',
+        },
+      });
+    } finally {
+      await degradedApp.close();
+    }
+  });
+
+  it('caches readiness check results briefly', async () => {
+    let readinessCalls = 0;
+    const cachedApp = buildApp({
+      readinessChecks: {
+        redisRateLimit: async () => {
+          readinessCalls += 1;
+        },
+      },
+    });
+    await cachedApp.ready();
+
+    try {
+      const first = await cachedApp.inject({ method: 'GET', url: '/v1/ready' });
+      const second = await cachedApp.inject({ method: 'GET', url: '/v1/ready' });
+
+      expect(first.statusCode).toBe(200);
+      expect(second.statusCode).toBe(200);
+      expect(readinessCalls).toBe(1);
+    } finally {
+      await cachedApp.close();
+    }
+  });
+
   it('returns not found for POST /v1/health', async () => {
     const response = await app.inject({
       method: 'POST',

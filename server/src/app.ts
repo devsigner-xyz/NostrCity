@@ -28,6 +28,7 @@ import { requestContextPlugin } from './plugins/request-context';
 import { securityHeadersPlugin } from './plugins/security-headers';
 import { staticAssetsPlugin } from './plugins/static-assets';
 import { validateProductionSecurityConfig } from './production-config';
+import type { ReadinessChecks } from './readiness';
 import { healthRoute } from './routes/health.route';
 import { createAppServices } from './services/app-services';
 
@@ -41,6 +42,7 @@ export interface BuildAppOptions {
   dmService?: DmService;
   publishService?: PublishService;
   authReplayStore?: AuthReplayStore;
+  readinessChecks?: ReadinessChecks;
   staticAssetsPath?: string;
 }
 
@@ -71,15 +73,16 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 
   const app = Fastify({ logger: false, trustProxy: resolveTrustProxy() });
   const defaultServices = createAppServices();
+  const readinessChecks: ReadinessChecks = { ...options.readinessChecks };
 
   app.register(requestContextPlugin);
   app.register(corsPlugin);
   app.register(securityHeadersPlugin);
-  app.register(rateLimitPlugin);
+  app.register(rateLimitPlugin, { readinessChecks });
   app.register(ownerAuthPlugin, { authReplayStore: options.authReplayStore });
   app.register(errorHandlerPlugin);
 
-  app.register(healthRoute, { prefix: '/v1' });
+  app.register(healthRoute, { prefix: '/v1', readinessChecks });
   app.register(identityRoutes, {
     prefix: '/v1',
     service: options.identityService ?? defaultServices.identityService,

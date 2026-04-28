@@ -10,6 +10,7 @@ import {
   resolveRedisUrl,
   type EnvLike,
 } from '../redis/redis-security';
+import type { ReadinessChecks } from '../readiness';
 
 const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_MAX_REQUESTS = 120;
@@ -150,6 +151,16 @@ export const connectRedisRateLimitClient = async (
   await withRedisTimeout(client.ping(), timeoutMs);
 };
 
+export const registerRedisRateLimitReadinessCheck = (
+  readinessChecks: ReadinessChecks,
+  client: RedisRateLimitClient,
+  timeoutMs = DEFAULT_REDIS_COMMAND_TIMEOUT_MS,
+): void => {
+  readinessChecks.redisRateLimit = async () => {
+    await withRedisTimeout(client.ping(), timeoutMs);
+  };
+};
+
 export class RedisRateLimitStore implements RateLimitStore {
   private readonly commandTimeoutMs: number;
   private readonly keyPrefix: string;
@@ -184,6 +195,10 @@ export class RedisRateLimitStore implements RateLimitStore {
 type RouteRateLimitConfig = {
   max?: unknown;
   windowMs?: unknown;
+} | false;
+
+type RateLimitPluginOptions = {
+  readinessChecks?: ReadinessChecks;
 };
 
 export type RateLimitStoreMode = 'memory' | 'memory-risk-accepted' | 'redis';
@@ -303,7 +318,7 @@ const parsePositiveIntUnknown = (rawValue: unknown, fallback: number): number =>
   return fallback;
 };
 
-export const rateLimitPlugin: FastifyPluginAsync = async (app) => {
+export const rateLimitPlugin: FastifyPluginAsync<RateLimitPluginOptions> = async (app, options) => {
   const storeMode = resolveRateLimitStoreMode();
   const windowMs = parsePositiveInt(
     process.env.BFF_RATE_LIMIT_WINDOW_MS,
@@ -342,6 +357,13 @@ export const rateLimitPlugin: FastifyPluginAsync = async (app) => {
     app.addHook('onClose', async () => {
       await redisClient.quit();
     });
+    if (options.readinessChecks) {
+      registerRedisRateLimitReadinessCheck(
+        options.readinessChecks,
+        redisClient as RedisRateLimitClient,
+        DEFAULT_REDIS_COMMAND_TIMEOUT_MS,
+      );
+    }
     store = new RedisRateLimitStore(redisClient as RedisRateLimitClient, {
       keyPrefix: redisKeyPrefix,
       keyHashSecret: redisKeyHashSecret,
@@ -363,6 +385,9 @@ export const rateLimitPlugin: FastifyPluginAsync = async (app) => {
     }
 
     const routeRateLimitConfig = (request.routeOptions.config as { rateLimit?: RouteRateLimitConfig } | undefined)?.rateLimit;
+    if (routeRateLimitConfig === false) {
+      return;
+    }
 
     const effectiveWindowMs = parsePositiveIntUnknown(
       routeRateLimitConfig?.windowMs,

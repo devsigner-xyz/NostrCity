@@ -12,10 +12,12 @@ import {
   RedisRateLimitStore,
   connectRedisRateLimitClient,
   rateLimitPlugin,
+  registerRedisRateLimitReadinessCheck,
   resolveRedisRateLimitUrl,
   resolveRateLimitStoreMode,
   type RedisRateLimitClient,
 } from './rate-limit';
+import type { ReadinessChecks } from '../readiness';
 
 const futureReviewDate = (): string => {
   const reviewDate = new Date();
@@ -150,12 +152,14 @@ describe('rate limit plugin', () => {
   });
 
   it('returns 429 with retry-after when rate limit is exceeded', async () => {
-    await app.inject({ method: 'GET', url: '/v1/health', remoteAddress: '1.2.3.4' });
-    await app.inject({ method: 'GET', url: '/v1/health', remoteAddress: '1.2.3.4' });
+    const url = '/v1/identity/profiles?pubkeys=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+    await app.inject({ method: 'GET', url, remoteAddress: '1.2.3.4' });
+    await app.inject({ method: 'GET', url, remoteAddress: '1.2.3.4' });
 
     const limited = await app.inject({
       method: 'GET',
-      url: '/v1/health',
+      url,
       remoteAddress: '1.2.3.4',
     });
 
@@ -166,6 +170,16 @@ describe('rate limit plugin', () => {
         code: 'RATE_LIMITED',
       },
     });
+  });
+
+  it('does not rate limit health and readiness checks', async () => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const health = await app.inject({ method: 'GET', url: '/v1/health', remoteAddress: '2.2.2.2' });
+      const ready = await app.inject({ method: 'GET', url: '/v1/ready', remoteAddress: '2.2.2.2' });
+
+      expect(health.statusCode).toBe(200);
+      expect(ready.statusCode).toBe(200);
+    }
   });
 
   it('uses route-specific rate limit overrides when configured', async () => {
@@ -541,5 +555,23 @@ describe('Redis rate limit store', () => {
     await expect(store.increment('client:/v1/health:60000:120', 1_719_000_000_000, 60_000)).rejects.toThrow(
       'Redis rate limit store failed',
     );
+  });
+
+  it('registers Redis rate limit readiness checks with a bounded ping', async () => {
+    let pingCalls = 0;
+    const readinessChecks: ReadinessChecks = {};
+    const client: RedisRateLimitClient = {
+      eval: async () => [1, 1_719_000_060_000],
+      ping: async () => {
+        pingCalls += 1;
+        return 'PONG';
+      },
+      quit: async () => undefined,
+    };
+
+    registerRedisRateLimitReadinessCheck(readinessChecks, client, 10);
+
+    await expect(readinessChecks.redisRateLimit?.()).resolves.toBeUndefined();
+    expect(pingCalls).toBe(1);
   });
 });
