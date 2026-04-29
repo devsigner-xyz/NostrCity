@@ -87,6 +87,7 @@ For Playwright smoke tests, CI installs Chromium with `pnpm exec playwright inst
 - Prefer existing components, hooks, services, and utilities before introducing new abstractions.
 - Do not add backward-compatibility code unless there is persisted data, shipped behavior, external consumers, or an explicit requirement.
 - Do not introduce user-visible strings directly in components, labels, placeholders, `title`, `aria-label`, or similar copy. Add keys to the existing i18n infrastructure in `src/i18n/messages/en.ts` and `src/i18n/messages/es.ts`, then use `useI18n()` or `translate()`.
+- When generating Spanish copy, use correct Spanish orthography: include required accents, `ñ`, opening question/exclamation marks (`¿`, `¡`), and natural Spanish phrasing. Preserve placeholders such as `{{count}}` exactly, and only leave English technical terms when they are deliberate product or protocol vocabulary.
 - Avoid custom styles if shadcn defaults can be applied. Use existing `src/components/ui` primitives first.
 - For Tailwind CSS v4 and shadcn/ui changes, keep theme variables in the existing CSS architecture and verify dark mode when relevant.
 - For React UI work, follow existing component patterns. Do not add `useMemo` or `useCallback` by default; use them only when there is a clear performance or referential-stability reason already aligned with nearby code.
