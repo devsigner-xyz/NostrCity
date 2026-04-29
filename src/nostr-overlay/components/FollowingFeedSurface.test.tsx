@@ -7,6 +7,8 @@ import { UI_SETTINGS_STORAGE_KEY } from '../../nostr/ui-settings';
 import { createNostrOverlayQueryClient } from '../query/query-client';
 import { FollowingFeedSurface } from './FollowingFeedSurface';
 
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 interface RenderResult {
     container: HTMLDivElement;
     root: Root;
@@ -939,7 +941,7 @@ describe('FollowingFeedSurface', () => {
         expect(actionButtons[actionButtons.length - 1]).toBe(sendButton);
 
         const imageInput = actionsRow.querySelector('input[type="file"]') as HTMLInputElement;
-        const image = new File(['inline-image'], 'reply.png', { type: 'image/png' });
+        const image = new File([PNG_BYTES], 'reply.png', { type: 'image/png' });
         await act(async () => {
             Object.defineProperty(imageInput, 'files', {
                 configurable: true,
@@ -949,6 +951,7 @@ describe('FollowingFeedSurface', () => {
         });
 
         expect(rendered.container.querySelector('img[src="blob:inline-preview"]')).not.toBeNull();
+        expect(rendered.container.querySelector('[role="status"]')?.textContent).toContain('Imagen seleccionada');
 
         await act(async () => {
             sendButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -1017,6 +1020,51 @@ describe('FollowingFeedSurface', () => {
         });
         expect(rendered.container.querySelector('[aria-label="Sats recibidos: 210"]')).toBeDefined();
         expect(rendered.container.querySelector('[aria-label="Sats recibidos: 21"]')).toBeDefined();
+    });
+
+    test('announces invalid thread reply image selection', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    activeThread: {
+                        rootEventId: 'root-1',
+                        root: {
+                            id: 'root-1',
+                            pubkey: 'b'.repeat(64),
+                            createdAt: 500,
+                            eventKind: 1,
+                            content: 'root',
+                            rawEvent: {
+                                id: 'root-1',
+                                pubkey: 'b'.repeat(64),
+                                kind: 1,
+                                created_at: 500,
+                                tags: [],
+                                content: 'root',
+                            },
+                        },
+                        replies: [],
+                        isLoading: false,
+                        isLoadingMore: false,
+                        error: null,
+                        hasMore: false,
+                    },
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const imageInput = rendered.container.querySelector('.nostr-following-feed-reply-box input[type="file"]') as HTMLInputElement;
+        await act(async () => {
+            Object.defineProperty(imageInput, 'files', {
+                configurable: true,
+                value: [new File(['<svg></svg>'], 'vector.svg', { type: 'image/svg+xml' })],
+            });
+            imageInput.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        expect(rendered.container.querySelector('.nostr-following-feed-reply-box [role="alert"]')?.textContent)
+            .toContain('El archivo seleccionado no es una imagen compatible.');
     });
 
     test('auto-grows thread reply textarea while keeping replies below it', async () => {

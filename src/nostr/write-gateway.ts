@@ -69,6 +69,15 @@ export function createWriteGateway(options: WriteGatewayOptions) {
             });
         },
 
+        async publishProfileMetadata(content: string): Promise<NostrEvent> {
+            return this.publishEvent({
+                kind: 0,
+                content,
+                created_at: now(),
+                tags: [],
+            });
+        },
+
         async publishContactList(follows: string[]): Promise<NostrEvent> {
             const tags = dedupePubkeys(follows).map((pubkey) => ['p', pubkey]);
 

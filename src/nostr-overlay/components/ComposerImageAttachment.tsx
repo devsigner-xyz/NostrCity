@@ -1,11 +1,10 @@
-import { useEffect, type RefObject } from 'react';
+import type { RefObject } from 'react';
 import { ImageIcon, PencilIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n/useI18n';
-import { MAX_BLOSSOM_IMAGE_BYTES } from '../media/blossom-image-upload';
-
-const COMPOSER_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/avif';
-const COMPOSER_IMAGE_TYPES = new Set(COMPOSER_IMAGE_ACCEPT.split(','));
+import { ImageFilePickerButton } from './media/ImageFilePickerButton';
+import type { ImageFileRejectionReason } from '../media/image-file-policy';
+import type { AppMessageKey } from '@/i18n/catalog';
 
 export interface ComposerImageAttachmentValue {
     file: File;
@@ -13,10 +12,10 @@ export interface ComposerImageAttachmentValue {
 }
 
 interface ComposerImageAttachmentButtonProps {
-    value: ComposerImageAttachmentValue | null;
-    onChange: (value: ComposerImageAttachmentValue | null) => void;
     inputRef: RefObject<HTMLInputElement | null>;
     disabled?: boolean;
+    onSelect: (file: File) => void;
+    onReject?: (reason: ImageFileRejectionReason) => void;
 }
 
 interface ComposerImageAttachmentPreviewProps {
@@ -27,47 +26,36 @@ interface ComposerImageAttachmentPreviewProps {
     disabled?: boolean;
 }
 
-export function ComposerImageAttachmentButton({ value, onChange, inputRef, disabled = false }: ComposerImageAttachmentButtonProps) {
-    const { t } = useI18n();
+export function imageFileRejectionMessageKey(reason: ImageFileRejectionReason): AppMessageKey {
+    if (reason === 'too-large') {
+        return 'feed.imageRejectedTooLarge';
+    }
 
-    useEffect(() => {
-        return () => {
-            if (value?.previewUrl) {
-                URL.revokeObjectURL(value.previewUrl);
-            }
-        };
-    }, [value]);
+    if (reason === 'invalid-signature') {
+        return 'feed.imageRejectedInvalidSignature';
+    }
+
+    if (reason === 'missing-file') {
+        return 'feed.imageRejectedMissingFile';
+    }
+
+    return 'feed.imageRejectedUnsupportedType';
+}
+
+export function ComposerImageAttachmentButton({ inputRef, disabled = false, onSelect, onReject }: ComposerImageAttachmentButtonProps) {
+    const { t } = useI18n();
 
     return (
         <>
-            <input
-                ref={inputRef}
-                type="file"
-                accept={COMPOSER_IMAGE_ACCEPT}
-                className="hidden"
-                onChange={(event) => {
-                    const file = event.currentTarget.files?.[0];
-                    event.currentTarget.value = '';
-                    if (!file || !COMPOSER_IMAGE_TYPES.has(file.type) || file.size > MAX_BLOSSOM_IMAGE_BYTES) {
-                        return;
-                    }
-
-                    onChange({
-                        file,
-                        previewUrl: URL.createObjectURL(file),
-                    });
-                }}
-            />
-            <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label={t('feed.attachImage')}
+            <ImageFilePickerButton
+                ariaLabel={t('feed.attachImage')}
                 disabled={disabled}
-                onClick={() => inputRef.current?.click()}
+                inputRef={inputRef}
+                {...(onReject ? { onReject } : {})}
+                onSelect={onSelect}
             >
                 <ImageIcon aria-hidden="true" />
-            </Button>
+            </ImageFilePickerButton>
         </>
     );
 }

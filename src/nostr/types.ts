@@ -35,6 +35,12 @@ export interface NostrClient {
     fetchEvents(filter: NostrFilter): Promise<NostrEvent[]>;
 }
 
+export interface NostrProfileBirthday {
+    year?: number;
+    month?: number;
+    day?: number;
+}
+
 export interface NostrProfile {
     pubkey: string;
     name?: string;
@@ -47,6 +53,7 @@ export interface NostrProfile {
     lud16?: string;
     lud06?: string;
     bot?: boolean;
+    birthday?: NostrProfileBirthday;
     externalIdentities?: string[];
 }
 

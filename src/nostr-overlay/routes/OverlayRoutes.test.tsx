@@ -32,6 +32,10 @@ vi.mock('./NotificationsRouteContainer', () => ({
     NotificationsRouteContainer: () => <div data-testid="notifications-route" />,
 }));
 
+vi.mock('./ProfileRouteContainer', () => ({
+    ProfileRouteContainer: () => <div data-testid="profile-route" />,
+}));
+
 vi.mock('./SettingsRouteContainer', () => ({
     SettingsRouteContainer: () => <div data-testid="settings-route" />,
 }));
@@ -206,6 +210,21 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             disconnectWallet: noop,
             refreshWallet: asyncNoop,
         },
+        profile: {
+            ownerPubkey: 'f'.repeat(64),
+            canWrite: true,
+            onBack: noop,
+            onUploadProfileImage: async () => 'https://example.com/image.jpg',
+            onPublishProfileMetadata: async () => ({
+                id: '1'.repeat(64),
+                pubkey: 'f'.repeat(64),
+                kind: 0,
+                created_at: 123,
+                tags: [],
+                content: '{}',
+                sig: '2'.repeat(128),
+            }),
+        },
         userSearch: {
             onClose: noop,
             onSearch: async () => ({ pubkeys: [], profiles: {} }),
@@ -349,6 +368,14 @@ describe('OverlayRoutes', () => {
 
         expect(rendered.container.querySelector('[data-testid="wallet-route"]')).not.toBeNull();
         expect(lastLocation(rendered.locations)).toBe('/wallet');
+    });
+
+    test('routes authenticated /perfil requests to the profile editor', async () => {
+        const rendered = await renderOverlayRoutes('/perfil');
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('[data-testid="profile-route"]')).not.toBeNull();
+        expect(lastLocation(rendered.locations)).toBe('/perfil');
     });
 
     test('preserves search params for legacy settings relay detail redirect', async () => {

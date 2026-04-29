@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { OverlayUnreadIndicator } from './OverlayUnreadIndicator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { sanitizeImageUrl } from '../media/image-url-policy';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -88,6 +89,7 @@ interface OverlaySidebarProps {
     onCopyOwnerNpub?: (value: string) => void | Promise<void>;
     onLocateOwner?: () => void;
     onViewOwnerDetails?: () => void;
+    onOpenProfileEditor?: () => void;
     missionsDiscoveredCount: number;
     missionsTotal: number;
     relaysConnectedCount: number;
@@ -471,8 +473,9 @@ function SidebarUserMenu({
     onCopyOwnerNpub,
     onLocateOwner,
     onViewOwnerDetails,
+    onOpenProfileEditor,
     onLogout,
-}: Pick<OverlaySidebarProps, 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout'>) {
+}: Pick<OverlaySidebarProps, 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onOpenProfileEditor' | 'onLogout'>) {
     const { t } = useI18n();
     const { isMobile } = useSidebar();
     const resolvedOwnerPubkey = ownerPubkey ?? authSession?.pubkey;
@@ -484,6 +487,7 @@ function SidebarUserMenu({
     const shortPubkey = `${resolvedOwnerPubkey.slice(0, 10)}...${resolvedOwnerPubkey.slice(-6)}`;
     const ownerName = resolveDisplayName(ownerProfile, shortPubkey);
     const ownerFallback = resolveInitials(ownerProfile, resolvedOwnerPubkey);
+    const ownerPicture = sanitizeImageUrl(ownerProfile?.picture);
     let ownerNpub: string | undefined;
     try {
         ownerNpub = encodeHexToNpub(resolvedOwnerPubkey);
@@ -507,7 +511,7 @@ function SidebarUserMenu({
                             title={t('sidebar.profileActions')}
                         >
                             <Avatar className="h-8 w-8 rounded-lg">
-                                <AvatarImage src={ownerProfile?.picture} alt={t('sidebar.profileAvatarAlt')} />
+                                {ownerPicture ? <AvatarImage src={ownerPicture} alt={t('sidebar.profileAvatarAlt')} /> : null}
                                 <AvatarFallback className="rounded-lg">{ownerFallback}</AvatarFallback>
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
@@ -530,6 +534,12 @@ function SidebarUserMenu({
                         }}>
                             <UserRoundIcon />
                             {t('sidebar.copyNpub')}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => {
+                            onOpenProfileEditor?.();
+                        }}>
+                            <UserRoundIcon />
+                            {t('sidebar.editProfile')}
                         </DropdownMenuItem>
                         {ownerPubkey ? (
                             <DropdownMenuItem onSelect={() => {
@@ -608,6 +618,7 @@ export function OverlaySidebar({
     onCopyOwnerNpub,
     onLocateOwner,
     onViewOwnerDetails,
+    onOpenProfileEditor,
     missionsDiscoveredCount,
     missionsTotal,
     relaysConnectedCount,
@@ -664,6 +675,7 @@ export function OverlaySidebar({
                         {...(onCopyOwnerNpub ? { onCopyOwnerNpub } : {})}
                         {...(onLocateOwner ? { onLocateOwner } : {})}
                         {...(onViewOwnerDetails ? { onViewOwnerDetails } : {})}
+                        {...(onOpenProfileEditor ? { onOpenProfileEditor } : {})}
                         {...(onLogout ? { onLogout } : {})}
                     />
                 </SidebarFooter>

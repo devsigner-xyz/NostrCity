@@ -43,6 +43,7 @@ export function createBootstrapOverlayServices(): OverlayServices {
     const deferredWriteGateway: OverlayWriteGateway = {
         publishEvent: (event) => requireWriteGateway().publishEvent(event),
         publishTextNote: (content, tags) => requireWriteGateway().publishTextNote(content, tags),
+        publishProfileMetadata: (content) => requireWriteGateway().publishProfileMetadata(content),
         publishContactList: (follows) => requireWriteGateway().publishContactList(follows),
         encryptDm: (pubkey, plaintext) => requireWriteGateway().encryptDm(pubkey, plaintext),
         decryptDm: (pubkey, ciphertext, scheme) => requireWriteGateway().decryptDm(pubkey, ciphertext, scheme),

@@ -13,7 +13,7 @@ import { fetchFollowsByNpub, fetchFollowsByPubkey } from '../../nostr/follows';
 import { fetchLatestPostsByPubkey } from '../../nostr/posts';
 import { loadProfileRelaySuggestions } from '../../nostr/profile-relay-discovery';
 import { fetchProfileStats } from '../../nostr/profile-stats';
-import { fetchProfiles } from '../../nostr/profiles';
+import { cacheProfile, fetchProfiles } from '../../nostr/profiles';
 import { searchUsers as searchUsersDomain } from '../../nostr/user-search';
 import { buildFollowDrivenTargetBuildings } from '../domain/map-generation-target';
 import type { SocialFeedService } from '../../nostr/social-feed-service';
@@ -1593,6 +1593,23 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
         return result;
     };
 
+    const applyOwnerProfile = (profile: NostrProfile): void => {
+        cacheProfile(profile);
+        setState((nextState) => ({
+            ...nextState,
+            data: {
+                ...nextState.data,
+                ownerProfile: nextState.data.ownerPubkey === profile.pubkey ? profile : nextState.data.ownerProfile,
+                profiles: {
+                    ...nextState.data.profiles,
+                    [profile.pubkey]: profile,
+                },
+            },
+        }));
+
+        void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.activeProfile() });
+    };
+
     const closeActiveProfileDialog = (): void => {
         setState((current) => ({
             ...current,
@@ -1761,6 +1778,7 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
         searchUsers,
         loadProfilesByPubkeys,
         loadEventsByIds,
+        applyOwnerProfile,
         selectFollowing,
         followPerson,
         openActiveProfile,

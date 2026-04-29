@@ -41,6 +41,7 @@ import {
 } from './app.selectors';
 import type { SocialComposeSubmitInput } from './components/SocialComposeDialog';
 import { uploadImageToBlossom, type UploadedImageAttachment } from './media/blossom-image-upload';
+import { uploadImageBlobToBlossom } from './media/blossom-upload';
 import type { MapBridge } from './map-bridge';
 import { extractStreetLabelUsernames } from './domain/street-label-users';
 import { EASTER_EGG_MISSIONS } from './easter-eggs/missions';
@@ -629,6 +630,28 @@ export function App({ mapBridge, services }: AppProps) {
         }
     }, [overlay.writeGateway, uiSettings.language]);
 
+    const uploadProfileImage = useCallback(async (file: File): Promise<string> => {
+        const uploaded = await uploadImageBlobToBlossom(file, {
+            signEvent: (event) => overlay.writeGateway.publishEvent(event),
+        });
+
+        return uploaded.url;
+    }, [overlay.writeGateway]);
+
+    const loadLatestProfileMetadata = useCallback(async (): Promise<string | undefined> => {
+        if (!overlay.ownerPubkey) {
+            return undefined;
+        }
+
+        try {
+            const client = services.createClient(overlay.relayHints);
+            await client.connect();
+            return (await client.fetchLatestReplaceableEvent(overlay.ownerPubkey, 0))?.content;
+        } catch {
+            return undefined;
+        }
+    }, [overlay.ownerPubkey, overlay.relayHints, services]);
+
     const publishReplyWithImage = useCallback(async (input: Omit<Parameters<typeof followingFeed.publishReply>[0], 'image'> & { image?: { file: File } }): Promise<boolean> => {
         const { image: selectedImage, ...replyInput } = input;
         const image = await uploadComposeImage(selectedImage);
@@ -911,6 +934,7 @@ export function App({ mapBridge, services }: AppProps) {
                     onOpenGlobalSearch={openGlobalUserSearch}
                     onOpenWallet={() => navigate('/wallet')}
                     onOpenPublish={openPublishComposer}
+                    onOpenProfileEditor={() => navigate('/perfil')}
                     onOpenSettings={openSettingsDestination}
                     isUiSettingsOpen={isUiSettingsDialogOpen}
                     onLogout={handleLogout}
@@ -1117,6 +1141,22 @@ export function App({ mapBridge, services }: AppProps) {
                         connectWebLnWallet,
                         disconnectWallet,
                         refreshWallet,
+                    }}
+                    profile={{
+                        ownerPubkey: overlay.ownerPubkey ?? '',
+                        ...(overlay.ownerProfile ? { ownerProfile: overlay.ownerProfile } : {}),
+                        canWrite: overlay.canWrite && Boolean(overlay.ownerPubkey),
+                        onBack: () => navigate('/'),
+                        onUploadProfileImage: uploadProfileImage,
+                        onLoadLatestProfileMetadata: loadLatestProfileMetadata,
+                        onPublishProfileMetadata: async (content) => {
+                            if (!overlay.writeGateway) {
+                                throw new Error('Write gateway is unavailable');
+                            }
+
+                            return overlay.writeGateway.publishProfileMetadata(content);
+                        },
+                        onProfileSaved: (profile) => overlay.applyOwnerProfile(profile),
                     }}
                     userSearch={{
                         onClose: closeGlobalUserSearch,

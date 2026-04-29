@@ -41,6 +41,7 @@ interface OverlaySidebarLayerProps {
     onCopyOwnerNpub?: (value: string) => void | Promise<void>;
     onLocateOwner?: () => void;
     onViewOwnerDetails?: () => void;
+    onOpenProfileEditor?: () => void;
     missionsDiscoveredCount: number;
     missionsTotal: number;
     relaysConnectedCount: number;
@@ -94,6 +95,7 @@ export function OverlaySidebarLayer({
     onCopyOwnerNpub,
     onLocateOwner,
     onViewOwnerDetails,
+    onOpenProfileEditor,
     missionsDiscoveredCount,
     missionsTotal,
     relaysConnectedCount,
@@ -150,6 +152,7 @@ export function OverlaySidebarLayer({
             {...(onCopyOwnerNpub ? { onCopyOwnerNpub } : {})}
             {...(onLocateOwner ? { onLocateOwner } : {})}
             {...(onViewOwnerDetails ? { onViewOwnerDetails } : {})}
+            {...(onOpenProfileEditor ? { onOpenProfileEditor } : {})}
             missionsDiscoveredCount={missionsDiscoveredCount}
             missionsTotal={missionsTotal}
             relaysConnectedCount={relaysConnectedCount}

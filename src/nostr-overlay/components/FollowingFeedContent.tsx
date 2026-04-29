@@ -9,7 +9,7 @@ import { MentionTextarea } from './MentionTextarea';
 import {
     ComposerImageAttachmentButton,
     ComposerImageAttachmentPreview,
-    type ComposerImageAttachmentValue,
+    imageFileRejectionMessageKey,
 } from './ComposerImageAttachment';
 import type { FollowingFeedThreadView } from '../query/following-feed.selectors';
 import { fromEmbeddedRepost, fromFeedItem, fromThreadItem } from './note-card-adapters';
@@ -29,6 +29,8 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import { useI18n } from '@/i18n/useI18n';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { useSelectedImageFile } from '../hooks/useSelectedImageFile';
+import type { ImageFileRejectionReason } from '../media/image-file-policy';
 
 function buildThreadReplyTree(replies: FollowingFeedThreadView['replies']) {
     const childrenByParentId = new Map<string, FollowingFeedThreadView['replies']>();
@@ -226,7 +228,9 @@ export function FollowingFeedContent({
 }: FollowingFeedContentProps) {
     const { t } = useI18n();
     const [replyDraft, setReplyDraft] = useState<MentionDraft>(createMentionDraft(''));
-    const [replyImage, setReplyImage] = useState<ComposerImageAttachmentValue | null>(null);
+    const { selectedImage: replyImage, setSelectedImageFile: setReplyImageFile, clearSelectedImage: clearReplyImage } = useSelectedImageFile();
+    const [replyImageStatus, setReplyImageStatus] = useState('');
+    const [replyImageError, setReplyImageError] = useState('');
     const replyImageInputRef = useRef<HTMLInputElement | null>(null);
     const [replyTargetEventId, setReplyTargetEventId] = useState<string | null>(null);
     const [replyTargetPubkey, setReplyTargetPubkey] = useState<string | undefined>(undefined);
@@ -234,7 +238,9 @@ export function FollowingFeedContent({
     useEffect(() => {
         if (!activeThread) {
             setReplyDraft(createMentionDraft(''));
-            setReplyImage(null);
+            clearReplyImage();
+            setReplyImageStatus('');
+            setReplyImageError('');
             setReplyTargetEventId(null);
             setReplyTargetPubkey(undefined);
             return;
@@ -244,7 +250,24 @@ export function FollowingFeedContent({
             setReplyTargetEventId(activeThread.root.id);
             setReplyTargetPubkey(activeThread.root.pubkey);
         }
-    }, [activeThread, replyTargetEventId]);
+    }, [activeThread, clearReplyImage, replyTargetEventId]);
+
+    const selectReplyImage = (file: File): void => {
+        setReplyImageFile(file);
+        setReplyImageError('');
+        setReplyImageStatus(t('feed.imageSelected'));
+    };
+
+    const removeReplyImage = (): void => {
+        clearReplyImage();
+        setReplyImageError('');
+        setReplyImageStatus(t('feed.imageRemoved'));
+    };
+
+    const rejectReplyImage = (reason: ImageFileRejectionReason): void => {
+        setReplyImageStatus('');
+        setReplyImageError(t(imageFileRejectionMessageKey(reason)));
+    };
 
     const onFeedScroll = (container: HTMLDivElement | null): void => {
         if (!container || isLoadingFeed || !hasMoreFeed) {
@@ -651,17 +674,29 @@ export function FollowingFeedContent({
                                         />
                                         <ComposerImageAttachmentPreview
                                             value={replyImage}
-                                            onChange={setReplyImage}
+                                            onChange={(value) => {
+                                                if (!value) {
+                                                    removeReplyImage();
+                                                }
+                                            }}
                                             onEdit={() => replyImageInputRef.current?.click()}
                                             compact
                                             disabled={replyDisabled}
                                         />
+                                        <div className="sr-only" role="status" aria-live="polite">
+                                            {replyImageStatus}
+                                        </div>
+                                        {replyImageError ? (
+                                            <p className="mt-2 text-xs text-destructive" role="alert">
+                                                {replyImageError}
+                                            </p>
+                                        ) : null}
                                         <div className="nostr-following-feed-compose-actions mt-3 flex items-center justify-between gap-2">
                                             <ComposerImageAttachmentButton
-                                                value={replyImage}
-                                                onChange={setReplyImage}
                                                 inputRef={replyImageInputRef}
                                                 disabled={replyDisabled}
+                                                onSelect={selectReplyImage}
+                                                onReject={rejectReplyImage}
                                             />
                                             <Button
                                                 type="button"
@@ -683,7 +718,9 @@ export function FollowingFeedContent({
                                                     const submitted = await onPublishReply(replyInput);
                                                     if (submitted) {
                                                         setReplyDraft(createMentionDraft(''));
-                                                        setReplyImage(null);
+                                                        clearReplyImage();
+                                                        setReplyImageStatus('');
+                                                        setReplyImageError('');
                                                     }
                                                 }}
                                             >

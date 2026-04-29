@@ -3,6 +3,7 @@ import type { Nip05ValidationResult } from '../../nostr/nip05';
 import { getNip05DisplayIdentifier } from '../../nostr/nip05';
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useI18n } from '@/i18n/useI18n';
+import { sanitizeImageUrl } from '../media/image-url-policy';
 
 interface VerifiedAvatarBadgeState {
     label: string;
@@ -74,10 +75,11 @@ export function VerifiedUserAvatar({
 }: VerifiedUserAvatarProps) {
     const { t } = useI18n();
     const badgeState = resolveBadgeState(nip05, verification, t);
+    const safePicture = sanitizeImageUrl(picture);
 
     return (
         <Avatar size="lg" className={className} aria-hidden={ariaHidden}>
-            {picture ? <AvatarImage src={picture} alt={imageAlt} /> : null}
+            {safePicture ? <AvatarImage src={safePicture} alt={imageAlt} /> : null}
             <AvatarFallback className={fallbackClassName}>{fallback}</AvatarFallback>
             {badgeState ? (
                 <AvatarBadge className={badgeState.className} title={badgeState.label} aria-label={badgeState.label}>

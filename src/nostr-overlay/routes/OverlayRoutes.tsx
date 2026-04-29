@@ -13,6 +13,7 @@ import { ChatsRouteContainer, type ChatsRouteContainerProps } from './ChatsRoute
 import { CityStatsRouteContainer, type CityStatsRouteContainerProps } from './CityStatsRouteContainer';
 import { DiscoverRouteContainer, type DiscoverRouteContainerProps } from './DiscoverRouteContainer';
 import { NotificationsRouteContainer, type NotificationsRouteContainerProps } from './NotificationsRouteContainer';
+import { ProfileRouteContainer, type ProfileRouteContainerProps } from './ProfileRouteContainer';
 import { SettingsRouteContainer, type SettingsRouteContainerProps } from './SettingsRouteContainer';
 import { UserSearchRouteContainer, type UserSearchRouteContainerProps } from './UserSearchRouteContainer';
 import { WalletRouteContainer, type WalletRouteContainerProps } from './WalletRouteContainer';
@@ -31,6 +32,7 @@ export interface OverlayRoutesProps {
     relayDetail: ComponentProps<typeof RelayDetailRoute>;
     discover: DiscoverRouteContainerProps;
     wallet: WalletRouteContainerProps;
+    profile: ProfileRouteContainerProps;
     userSearch: UserSearchRouteContainerProps;
     settings: SettingsRouteContainerProps;
 }
@@ -49,6 +51,7 @@ export function OverlayRoutes({
     relayDetail,
     discover,
     wallet,
+    profile,
     userSearch,
     settings,
 }: OverlayRoutesProps) {
@@ -74,6 +77,7 @@ export function OverlayRoutes({
                     <Route path="/relays/detail" element={<RelayDetailRoute {...relayDetail} />} />
                     <Route path="/descubre" element={<DiscoverRouteContainer {...discover} />} />
                     <Route path="/wallet" element={<WalletRouteContainer {...wallet} />} />
+                    <Route path="/perfil" element={<ProfileRouteContainer {...profile} />} />
                     <Route path="/buscar-usuarios" element={<UserSearchRouteContainer {...userSearch} />} />
                     <Route path="/settings" element={<SettingsRouteContainer {...settings} />}>
                         <Route index element={<Navigate to="zaps" replace />} />

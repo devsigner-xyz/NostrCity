@@ -32,6 +32,7 @@ import { PersonContextMenuItems } from './PersonContextMenuItems';
 import { VerifiedUserAvatar } from './VerifiedUserAvatar';
 import { toast } from 'sonner';
 import type { SocialEngagementMetrics, ViewerReactionByEventId, ViewerReplyByEventId, ViewerZapByEventId } from '../../nostr/social-feed-service';
+import { sanitizeImageUrl } from '../media/image-url-policy';
 
 interface OccupantProfileDialogProps {
     ownerPubkey?: string;
@@ -467,55 +468,43 @@ export function OccupantProfileDialog({
     };
 
     const infoRows: Array<{ label: string; value: ReactNode }> = [
-        {
-            label: t('profile.info.description'),
-            value: profile?.about || t('profile.info.notDeclared.female'),
-        },
-        {
-            label: 'NIP-05',
-            value: profile?.nip05
-                ? (
+        ...(profile?.about ? [{ label: t('profile.info.description'), value: profile.about }] : []),
+        ...(profile?.nip05
+            ? [{
+                label: 'NIP-05',
+                value: (
                     <Nip05Identifier
                         {...(profile ? { profile } : {})}
                         {...(verification ? { verification } : {})}
                     />
-                )
-                : t('profile.info.notDeclared'),
-        },
-        {
-            label: t('profile.info.website'),
-            value: profile?.website
-                ? (
+                ),
+            }]
+            : []),
+        ...(profile?.website
+            ? [{
+                label: t('profile.info.website'),
+                value: (
                     <a href={profile.website} target="_blank" rel="noreferrer noopener" className="nostr-profile-info-link">
                         {profile.website}
                     </a>
-                )
-                : t('profile.info.notDeclared'),
-        },
-        {
-            label: 'LUD16',
-            value: profile?.lud16 || t('profile.info.notDeclared'),
-        },
-        {
-            label: 'LUD06',
-            value: profile?.lud06 || t('profile.info.notDeclared'),
-        },
-        {
-            label: t('profile.info.bot'),
-            value: profile?.bot ? t('profile.info.yes') : t('profile.info.no'),
-        },
-        {
-            label: t('profile.info.externalIdentities'),
-            value: profile?.externalIdentities?.length
-                ? (
+                ),
+            }]
+            : []),
+        ...(profile?.lud16 ? [{ label: 'LUD16', value: profile.lud16 }] : []),
+        ...(profile?.lud06 ? [{ label: 'LUD06', value: profile.lud06 }] : []),
+        ...(typeof profile?.bot === 'boolean' ? [{ label: t('profile.info.bot'), value: profile.bot ? t('profile.info.yes') : t('profile.info.no') }] : []),
+        ...(profile?.externalIdentities?.length
+            ? [{
+                label: t('profile.info.externalIdentities'),
+                value: (
                     <ul className="nostr-profile-identities">
                         {profile.externalIdentities.map((identity) => (
                             <li key={identity}>{identity}</li>
                         ))}
                     </ul>
-                )
-                : t('profile.info.externalIdentitiesNone'),
-        },
+                ),
+            }]
+            : []),
     ];
 
     const renderNetworkPersonItem = (personPubkey: string) => {
@@ -653,6 +642,7 @@ export function OccupantProfileDialog({
             </Empty>
         </div>
     );
+    const safeBanner = sanitizeImageUrl(profile?.banner);
 
     return (
         <Dialog open onOpenChange={(open) => {
@@ -698,8 +688,8 @@ export function OccupantProfileDialog({
                             style={{ scrollbarGutter: 'stable', height: '100%' }}
                             onScroll={(event) => handleTabScroll(activeTab, event)}
                         >
-                            <div className={`nostr-profile-dialog-banner-shell${profile?.banner ? '' : ' is-placeholder'}`}>
-                                {profile?.banner ? <img className="nostr-profile-dialog-banner" src={profile.banner} alt={t('profile.dialog.bannerAlt')} /> : null}
+                            <div className={`nostr-profile-dialog-banner-shell${safeBanner ? '' : ' is-placeholder'}`}>
+                                {safeBanner ? <img className="nostr-profile-dialog-banner" src={safeBanner} alt={t('profile.dialog.bannerAlt')} /> : null}
                             </div>
 
                             <div className="nostr-profile-dialog-sticky-shell">
@@ -790,62 +780,60 @@ export function OccupantProfileDialog({
                                         ))}
                                     </dl>
 
-                                    <section className="nostr-profile-info-section">
-                                        <div className="nostr-profile-info-section-header">
-                                            <h5 className="nostr-profile-info-section-title">{t('profile.relays.declared')}</h5>
-                                            {canAddAllRelaySuggestions ? (
-                                                <Button
-                                                    type="button"
-                                                    size="xs"
-                                                    variant="outline"
-                                                    aria-label={t('profile.relays.addAllAria')}
-                                                    onClick={addAllRelaySuggestions}
-                                                >
-                                                    {t('profile.relays.addAll')}
-                                                </Button>
-                                            ) : null}
-                                        </div>
+                                    {relaySuggestionRows.length > 0 ? (
+                                        <section className="nostr-profile-info-section">
+                                            <div className="nostr-profile-info-section-header">
+                                                <h5 className="nostr-profile-info-section-title">{t('profile.relays.declared')}</h5>
+                                                {canAddAllRelaySuggestions ? (
+                                                    <Button
+                                                        type="button"
+                                                        size="xs"
+                                                        variant="outline"
+                                                        aria-label={t('profile.relays.addAllAria')}
+                                                        onClick={addAllRelaySuggestions}
+                                                    >
+                                                        {t('profile.relays.addAll')}
+                                                    </Button>
+                                                ) : null}
+                                            </div>
 
-                                        {relaySuggestionRows.length === 0 ? (
-                                            <p className="nostr-profile-info-muted">{t('profile.relays.none')}</p>
-                                        ) : (
                                             <ItemGroup className="nostr-profile-network-list">
                                                 {relaySuggestionRows.map((relayRow) => (
-                                                    <div key={relayRow.relayUrl} className="nostr-profile-network-item-wrap">
-                                                        <Item variant="outline" size="sm" className="gap-2">
-                                                            <ItemContent className="min-w-0 flex-1">
-                                                                <ItemTitle className="nostr-profile-info-section-value">
-                                                                    <span className="truncate">{relayRow.relayUrl}</span>
-                                                                </ItemTitle>
-                                                                <ItemDescription>
-                                                                    <span className="nostr-relay-nip-badges">
-                                                                        {relayRow.relayTypes.map((relayType) => (
-                                                                            <Badge key={`${relayRow.relayUrl}-${relayType}`} variant="outline">
-                                                                                {RELAY_TYPE_LABELS[relayType]}
-                                                                            </Badge>
-                                                                        ))}
-                                                                    </span>
-                                                                </ItemDescription>
-                                                            </ItemContent>
+                                                        <div key={relayRow.relayUrl} className="nostr-profile-network-item-wrap">
+                                                            <Item variant="outline" size="sm" className="gap-2">
+                                                                <ItemContent className="min-w-0 flex-1">
+                                                                    <ItemTitle className="nostr-profile-info-section-value">
+                                                                        <span className="truncate">{relayRow.relayUrl}</span>
+                                                                    </ItemTitle>
+                                                                    <ItemDescription>
+                                                                        <span className="nostr-relay-nip-badges">
+                                                                            {relayRow.relayTypes.map((relayType) => (
+                                                                                <Badge key={`${relayRow.relayUrl}-${relayType}`} variant="outline">
+                                                                                    {RELAY_TYPE_LABELS[relayType]}
+                                                                                </Badge>
+                                                                            ))}
+                                                                        </span>
+                                                                    </ItemDescription>
+                                                                </ItemContent>
 
-                                                            {canAddRelaySuggestions ? (
-                                                                <Button
-                                                                    type="button"
-                                                                    size="xs"
-                                                                    variant="outline"
-                                                                    className="shrink-0"
-                                                                    aria-label={t('profile.relays.addOne', { relayUrl: relayRow.relayUrl })}
-                                                                    onClick={() => addRelaySuggestion(relayRow.relayUrl, relayRow.relayTypes)}
-                                                                >
-                                                                    {t('settings.relays.add')}
-                                                                </Button>
-                                                            ) : null}
-                                                        </Item>
-                                                    </div>
-                                                ))}
+                                                                {canAddRelaySuggestions ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="xs"
+                                                                        variant="outline"
+                                                                        className="shrink-0"
+                                                                        aria-label={t('profile.relays.addOne', { relayUrl: relayRow.relayUrl })}
+                                                                        onClick={() => addRelaySuggestion(relayRow.relayUrl, relayRow.relayTypes)}
+                                                                    >
+                                                                        {t('settings.relays.add')}
+                                                                    </Button>
+                                                                ) : null}
+                                                            </Item>
+                                                        </div>
+                                                    ))}
                                             </ItemGroup>
-                                        )}
-                                    </section>
+                                        </section>
+                                    ) : null}
                             </section>
                         </TabsContent>
 

@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item';
 import type { I18nContextValue } from '@/i18n/I18nProvider';
 import { useI18n } from '@/i18n/useI18n';
+import { sanitizeImageUrl } from '../media/image-url-policy';
 
 export interface NoteCardProps {
     note: NoteCardModel;
@@ -128,12 +129,13 @@ interface NoteHeaderItemProps {
 function NoteHeaderItem({ note, profile, t }: NoteHeaderItemProps) {
     const publishedAt = formatCreatedAt(note.createdAt, t);
     const authorName = profileDisplayName(note.pubkey, profile);
+    const safePicture = sanitizeImageUrl(profile?.picture);
 
     return (
         <Item className="px-0 py-0">
             <ItemMedia>
                 <Avatar size="lg">
-                    {profile?.picture ? <AvatarImage src={profile.picture} alt={authorName} /> : null}
+                    {safePicture ? <AvatarImage src={safePicture} alt={authorName} /> : null}
                     <AvatarFallback>{profileInitials(note.pubkey, profile)}</AvatarFallback>
                 </Avatar>
             </ItemMedia>

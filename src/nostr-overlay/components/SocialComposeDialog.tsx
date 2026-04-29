@@ -5,7 +5,7 @@ import { MentionTextarea } from './MentionTextarea';
 import {
     ComposerImageAttachmentButton,
     ComposerImageAttachmentPreview,
-    type ComposerImageAttachmentValue,
+    imageFileRejectionMessageKey,
 } from './ComposerImageAttachment';
 import type { NoteCardModel } from './note-card-model';
 import { withoutNoteActions } from './note-card-model';
@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog';
 import { useI18n } from '@/i18n/useI18n';
 import type { NostrProfile } from '../../nostr/types';
+import { useSelectedImageFile } from '../hooks/useSelectedImageFile';
+import type { ImageFileRejectionReason } from '../media/image-file-policy';
 
 export interface SocialComposeSubmitInput {
     content: MentionDraft;
@@ -49,15 +51,36 @@ export function SocialComposeDialog({
 }: SocialComposeDialogProps) {
     const { t } = useI18n();
     const [draft, setDraft] = useState<MentionDraft>(createMentionDraft(''));
-    const [image, setImage] = useState<ComposerImageAttachmentValue | null>(null);
+    const { selectedImage: image, setSelectedImageFile, clearSelectedImage } = useSelectedImageFile();
+    const [imageStatus, setImageStatus] = useState('');
+    const [imageError, setImageError] = useState('');
     const imageInputRef = useRef<HTMLInputElement | null>(null);
 
     useEffect(() => {
         if (open) {
             setDraft(createMentionDraft(''));
-            setImage(null);
+            clearSelectedImage();
+            setImageStatus('');
+            setImageError('');
         }
-    }, [open, mode, quoteTarget?.id]);
+    }, [clearSelectedImage, open, mode, quoteTarget?.id]);
+
+    const selectImage = (file: File): void => {
+        setSelectedImageFile(file);
+        setImageError('');
+        setImageStatus(t('feed.imageSelected'));
+    };
+
+    const removeImage = (): void => {
+        clearSelectedImage();
+        setImageError('');
+        setImageStatus(t('feed.imageRemoved'));
+    };
+
+    const rejectImage = (reason: ImageFileRejectionReason): void => {
+        setImageStatus('');
+        setImageError(t(imageFileRejectionMessageKey(reason)));
+    };
 
     const canSubmit = draft.text.trim().length > 0 || Boolean(image);
 
@@ -80,10 +103,22 @@ export function SocialComposeDialog({
 
                     <ComposerImageAttachmentPreview
                         value={image}
-                        onChange={setImage}
+                        onChange={(value) => {
+                            if (!value) {
+                                removeImage();
+                            }
+                        }}
                         onEdit={() => imageInputRef.current?.click()}
                         disabled={isSubmitting}
                     />
+                    <div className="sr-only" role="status" aria-live="polite">
+                        {imageStatus}
+                    </div>
+                    {imageError ? (
+                        <p className="text-xs text-destructive" role="alert">
+                            {imageError}
+                        </p>
+                    ) : null}
 
                     {mode === 'quote' && quoteTarget ? (
                         <NoteCard
@@ -95,10 +130,10 @@ export function SocialComposeDialog({
 
                 <DialogFooter className="nostr-social-compose-footer mx-0 mb-0 flex-row justify-between rounded-none border-t bg-background px-4 py-3 sm:px-6">
                     <ComposerImageAttachmentButton
-                        value={image}
-                        onChange={setImage}
                         inputRef={imageInputRef}
                         disabled={isSubmitting}
+                        onSelect={selectImage}
+                        onReject={rejectImage}
                     />
                     <Button
                         type="button"

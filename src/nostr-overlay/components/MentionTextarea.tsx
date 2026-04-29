@@ -13,6 +13,7 @@ import { useI18n } from '@/i18n/useI18n';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { sanitizeImageUrl } from '../media/image-url-policy';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -262,6 +263,7 @@ export function MentionTextarea({ value, onChangeDraft, onSearch, ownerPubkey, s
                                         {rows.map(({ pubkey, profile }, index) => {
                                             const display = profileDisplayName(pubkey, profile);
                                             const isActive = index === activeIndex;
+                                            const safePicture = sanitizeImageUrl(profile?.picture);
 
                                             return (
                                                 <CommandItem
@@ -284,7 +286,7 @@ export function MentionTextarea({ value, onChangeDraft, onSearch, ownerPubkey, s
                                                         }}
                                                     >
                                                         <Avatar className="size-8">
-                                                            {profile?.picture ? <AvatarImage src={profile.picture} alt={display} /> : null}
+                                                            {safePicture ? <AvatarImage src={safePicture} alt={display} /> : null}
                                                             <AvatarFallback>{display.slice(0, 2).toUpperCase()}</AvatarFallback>
                                                         </Avatar>
                                                         <div className="flex min-w-0 flex-1 flex-col">

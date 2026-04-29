@@ -18,6 +18,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/u
 import { Item, ItemContent, ItemDescription, ItemHeader, ItemMedia, ItemTitle } from '@/components/ui/item';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { sanitizeImageUrl } from '../media/image-url-policy';
 
 interface NotificationsPageProps {
     hasUnread: boolean;
@@ -177,11 +178,12 @@ function NotificationMedia({
     const isGrouped = item.actors.length > 1;
     const profile = profilesByPubkey[item.primaryActorPubkey];
     const label = resolveDisplayName(item.primaryActorPubkey, profilesByPubkey, t('notifications.actor.anonymous'));
+    const safePicture = sanitizeImageUrl(profile?.picture);
 
     return (
         <ItemMedia>
             <Avatar size="lg">
-                {!isGrouped && profile?.picture ? <AvatarImage src={profile.picture} alt={label} /> : null}
+                {!isGrouped && safePicture ? <AvatarImage src={safePicture} alt={label} /> : null}
                 <AvatarFallback className="font-medium">
                     {isGrouped ? item.actors.length : profileInitials(item.primaryActorPubkey, profile, label)}
                 </AvatarFallback>

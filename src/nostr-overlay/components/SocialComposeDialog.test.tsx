@@ -6,6 +6,8 @@ import { UI_SETTINGS_STORAGE_KEY } from '../../nostr/ui-settings';
 import { createNostrOverlayQueryClient } from '../query/query-client';
 import { type SocialComposeSubmitInput, SocialComposeDialog } from './SocialComposeDialog';
 
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 interface RenderResult {
     container: HTMLDivElement;
     root: Root;
@@ -94,7 +96,7 @@ describe('SocialComposeDialog', () => {
         const input = rendered.container.querySelector('input[type="file"]') as HTMLInputElement | null;
         expect(input?.getAttribute('accept')).toBe('image/jpeg,image/png,image/webp,image/avif');
 
-        const image = new File(['image-bytes'], 'city.png', { type: 'image/png' });
+        const image = new File([PNG_BYTES], 'city.png', { type: 'image/png' });
         await act(async () => {
             Object.defineProperty(input, 'files', {
                 configurable: true,
@@ -106,6 +108,7 @@ describe('SocialComposeDialog', () => {
         const preview = rendered.container.querySelector('img[src="blob:test-preview"]') as HTMLImageElement | null;
         expect(preview).not.toBeNull();
         expect(preview?.getAttribute('alt')).toBe('Selected image preview');
+        expect(rendered.container.querySelector('[role="status"]')?.textContent).toContain('Image selected');
 
         const textarea = rendered.container.querySelector('textarea[aria-label="Compose note"]') as HTMLTextAreaElement;
         await act(async () => {
@@ -126,5 +129,25 @@ describe('SocialComposeDialog', () => {
         const submitted = rendered.onSubmit.mock.calls[0]?.[0] as SocialComposeSubmitInput;
         expect(submitted.content.text).toBe('Testing image note');
         expect(submitted.image?.file).toBe(image);
+    });
+
+    test('announces invalid image rejection instead of silently ignoring it', async () => {
+        window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
+
+        const rendered = await renderElement();
+        mounted.push(rendered);
+
+        const input = rendered.container.querySelector('input[type="file"]') as HTMLInputElement | null;
+        const image = new File(['<svg></svg>'], 'vector.svg', { type: 'image/svg+xml' });
+        await act(async () => {
+            Object.defineProperty(input, 'files', {
+                configurable: true,
+                value: [image],
+            });
+            input?.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        expect(rendered.container.querySelector('img[src="blob:test-preview"]')).toBeNull();
+        expect(rendered.container.querySelector('[role="alert"]')?.textContent).toContain('The selected file is not a supported image.');
     });
 });

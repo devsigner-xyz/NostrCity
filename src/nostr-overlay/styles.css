@@ -1338,6 +1338,8 @@
 .nostr-profile-dialog {
     width: min(640px, calc(100vw - 32px));
     max-height: min(82vh, 760px);
+    background: color-mix(in oklab, var(--muted) 30%, var(--background));
+    color: var(--foreground);
     padding: 0;
     overflow: hidden;
 }
@@ -2254,10 +2256,9 @@
     display: grid;
     gap: 0.55rem;
     border-bottom: 1px solid var(--border);
-    background: var(--popover);
-    background: color-mix(in oklab, var(--popover) 94%, transparent);
+    background: color-mix(in oklab, var(--muted) 30%, var(--background));
     padding: 0.8rem 0.85rem 0.75rem;
-    backdrop-filter: blur(16px);
+    backdrop-filter: none;
 }
 
 .nostr-profile-dialog-sticky-shell .nostr-profile-dialog-separator {
@@ -2324,7 +2325,7 @@
 
 .nostr-profile-info-row,
 .nostr-profile-info-section {
-    border: 1px solid var(--border);
+    border: none;
     border-radius: var(--radius-md);
     background: color-mix(in oklab, var(--card) 94%, transparent);
     color: var(--card-foreground);

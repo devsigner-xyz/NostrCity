@@ -93,6 +93,24 @@ describe('createWriteGateway', () => {
         });
     });
 
+    test('publishes profile metadata as kind 0 replaceable event', async () => {
+        const provider = buildProvider();
+        const gateway = createWriteGateway({
+            getSession: () => buildSession(),
+            getProvider: () => provider,
+            now: () => 333,
+        });
+
+        await gateway.publishProfileMetadata('{"name":"alice"}');
+
+        expect(provider.signEvent).toHaveBeenCalledWith({
+            kind: 0,
+            content: '{"name":"alice"}',
+            created_at: 333,
+            tags: [],
+        });
+    });
+
     test('encrypts and decrypts dm through provider', async () => {
         const provider = buildProvider();
         const gateway = createWriteGateway({

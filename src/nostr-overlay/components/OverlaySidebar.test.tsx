@@ -9,6 +9,7 @@ import type { AuthSessionState } from '../../nostr/auth/session';
 interface RenderResult {
     container: HTMLDivElement;
     root: Root;
+    onOpenProfileEditor: ReturnType<typeof vi.fn>;
 }
 
 async function renderSidebar({ pathname = '/', open = true, resolvedTheme = 'dark' }: { pathname?: string; open?: boolean; resolvedTheme?: 'light' | 'dark' } = {}): Promise<RenderResult> {
@@ -28,6 +29,7 @@ async function renderSidebar({ pathname = '/', open = true, resolvedTheme = 'dar
             encryptionSchemes: ['nip44'],
         },
     };
+    const onOpenProfileEditor = vi.fn();
 
     await act(async () => {
         root.render(
@@ -62,6 +64,7 @@ async function renderSidebar({ pathname = '/', open = true, resolvedTheme = 'dar
                     onCopyOwnerNpub={vi.fn()}
                     onLocateOwner={vi.fn()}
                     onViewOwnerDetails={vi.fn()}
+                    onOpenProfileEditor={onOpenProfileEditor}
                     missionsDiscoveredCount={2}
                     missionsTotal={5}
                     relaysConnectedCount={3}
@@ -74,7 +77,17 @@ async function renderSidebar({ pathname = '/', open = true, resolvedTheme = 'dar
         );
     });
 
-    return { container, root };
+    return { container, root, onOpenProfileEditor };
+}
+
+async function openUserMenu(container: ParentNode): Promise<void> {
+    const userMenuButton = container.querySelector('button[aria-label="Abrir menu de usuario"]') as HTMLButtonElement;
+    expect(userMenuButton).toBeDefined();
+
+    await act(async () => {
+        userMenuButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+        userMenuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
 }
 
 let mounted: RenderResult[] = [];
@@ -173,6 +186,24 @@ describe('OverlaySidebar', () => {
         expect(text).toContain('Chats');
         expect(text).toContain('Relays');
         expect(text).toContain('Social platform');
+    });
+
+    test('opens the localized profile editor action from the user menu', async () => {
+        const rendered = await renderSidebar({ pathname: '/' });
+        mounted.push(rendered);
+
+        await openUserMenu(rendered.container);
+        const editProfileAction = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+            (item.textContent || '').trim() === 'Editar perfil'
+        ) as HTMLElement;
+
+        expect(editProfileAction).toBeDefined();
+
+        await act(async () => {
+            editProfileAction.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(rendered.onOpenProfileEditor).toHaveBeenCalledTimes(1);
     });
 
     test('uses the resolved theme logo in the platform header avatar', async () => {

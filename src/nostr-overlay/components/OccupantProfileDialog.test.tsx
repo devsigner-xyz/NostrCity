@@ -304,6 +304,46 @@ describe('OccupantProfileDialog', () => {
         expect(document.body.innerHTML).not.toContain('Avatar of Alice');
     });
 
+    test('hides incomplete profile information rows in the information tab', async () => {
+        const rendered = await renderElement(<OccupantProfileDialog {...buildProps()} />);
+        mounted.push(rendered);
+
+        await selectTab('Información');
+
+        const text = document.body.textContent || '';
+        expect(text).not.toContain('Descripcion');
+        expect(text).not.toContain('NIP-05');
+        expect(text).not.toContain('Sitio web');
+        expect(text).not.toContain('LUD16');
+        expect(text).not.toContain('LUD06');
+        expect(text).not.toContain('Bot');
+        expect(text).not.toContain('Identidades externas');
+        expect(text).not.toContain('No declarado');
+        expect(text).not.toContain('No declaradas');
+        expect(text).not.toContain('Relays declarados');
+    });
+
+    test('shows explicitly declared negative bot profile metadata', async () => {
+        const rendered = await renderElement(
+            <OccupantProfileDialog
+                {...buildProps({
+                    profile: {
+                        pubkey: 'a'.repeat(64),
+                        displayName: 'Alice',
+                        bot: false,
+                    },
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        await selectTab('Información');
+
+        const text = document.body.textContent || '';
+        expect(text).toContain('Bot');
+        expect(text).toContain('No');
+    });
+
     test('uses shadcn empty loading state with spinner in feed tab', async () => {
         const rendered = await renderElement(
             <OccupantProfileDialog
@@ -561,6 +601,15 @@ describe('OccupantProfileDialog', () => {
     test('keeps declared relay section typography aligned with information rows', () => {
         expect(overlayStyles).toMatch(/\.nostr-profile-info\s+\.nostr-profile-info-section-title\s*\{[^}]*font-size:\s*0\.75rem;[^}]*font-weight:\s*500;[^}]*color:\s*var\(--muted-foreground\)/s);
         expect(overlayStyles).toMatch(/\.nostr-profile-info\s+\.nostr-profile-info-section-value\s*\{[^}]*font-size:\s*0\.82rem;[^}]*font-weight:\s*400;[^}]*line-height:\s*1\.45;[^}]*color:\s*var\(--card-foreground\)/s);
+    });
+
+    test('keeps profile information section backgrounds without visible borders', () => {
+        expect(overlayStyles).toMatch(/\.nostr-profile-info-row,\s*\.nostr-profile-info-section\s*\{[^}]*border:\s*none;[^}]*background:\s*color-mix\(in oklab, var\(--card\) 94%, transparent\)/s);
+    });
+
+    test('uses the profile editor preview surface color for the profile dialog', () => {
+        expect(overlayStyles).toMatch(/\.nostr-profile-dialog\s*\{[^}]*background:\s*color-mix\(in oklab, var\(--muted\) 30%, var\(--background\)\)/s);
+        expect(overlayStyles).toMatch(/\.nostr-profile-dialog-sticky-shell\s*\{[^}]*background:\s*color-mix\(in oklab, var\(--muted\) 30%, var\(--background\)\)/s);
     });
 
     test('fires callbacks to add one relay or all relay suggestions', async () => {
