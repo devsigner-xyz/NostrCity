@@ -39,7 +39,8 @@ import {
     type LocalViewerZapEntry,
     type OptimisticZapEntry,
 } from './app.selectors';
-import type { MentionDraft } from './mention-serialization';
+import type { SocialComposeSubmitInput } from './components/SocialComposeDialog';
+import { uploadImageToBlossom, type UploadedImageAttachment } from './media/blossom-image-upload';
 import type { MapBridge } from './map-bridge';
 import { extractStreetLabelUsernames } from './domain/street-label-users';
 import { EASTER_EGG_MISSIONS } from './easter-eggs/missions';
@@ -613,15 +614,53 @@ export function App({ mapBridge, services }: AppProps) {
         return false;
     }, [followingFeed.repostByEventId, followingFeed.toggleRepost, uiSettings.language]);
 
-    const submitSocialCompose = useCallback(async (content: MentionDraft): Promise<void> => {
+    const uploadComposeImage = useCallback(async (image: { file: File } | undefined): Promise<UploadedImageAttachment | undefined> => {
+        if (!image) {
+            return undefined;
+        }
+
+        try {
+            return await uploadImageToBlossom(image.file, {
+                signEvent: (event) => overlay.writeGateway.publishEvent(event),
+            });
+        } catch {
+            toast.error(translate(uiSettings.language, 'feed.toast.imageUploadFailed'), { duration: 2200 });
+            return undefined;
+        }
+    }, [overlay.writeGateway, uiSettings.language]);
+
+    const publishReplyWithImage = useCallback(async (input: Omit<Parameters<typeof followingFeed.publishReply>[0], 'image'> & { image?: { file: File } }): Promise<boolean> => {
+        const { image: selectedImage, ...replyInput } = input;
+        const image = await uploadComposeImage(selectedImage);
+        if (selectedImage && !image) {
+            return false;
+        }
+
+        return followingFeed.publishReply({
+            ...replyInput,
+            ...(image ? { image } : {}),
+        });
+    }, [followingFeed.publishReply, uploadComposeImage]);
+
+    const submitSocialCompose = useCallback(async (input: SocialComposeSubmitInput): Promise<void> => {
         if (!socialComposeState) {
             return;
         }
 
+        const content = input.content;
+
         setIsSubmittingSocialCompose(true);
         try {
+            const image = await uploadComposeImage(input.image);
+            if (input.image && !image) {
+                return;
+            }
+
             if (socialComposeState.mode === 'post') {
-                const succeeded = await followingFeed.publishPost(content);
+                const succeeded = await followingFeed.publishPost({
+                    content,
+                    ...(image ? { image } : {}),
+                });
                 if (succeeded) {
                     toast.success(translate(uiSettings.language, 'feed.toast.postPublished'), { duration: 1800 });
                     setSocialComposeState(null);
@@ -642,6 +681,7 @@ export function App({ mapBridge, services }: AppProps) {
                 targetEventId: quoteTarget.id,
                 targetPubkey: quoteTarget.pubkey,
                 content,
+                ...(image ? { image } : {}),
             });
 
             if (succeeded) {
@@ -654,7 +694,7 @@ export function App({ mapBridge, services }: AppProps) {
         } finally {
             setIsSubmittingSocialCompose(false);
         }
-    }, [followingFeed.publishPost, followingFeed.publishQuote, socialComposeState, uiSettings.language]);
+    }, [followingFeed.publishPost, followingFeed.publishQuote, socialComposeState, uiSettings.language, uploadComposeImage]);
 
     const openMentionedProfile = (pubkey: string): void => {
         if (!pubkey) {
@@ -978,7 +1018,7 @@ export function App({ mapBridge, services }: AppProps) {
                             closeThread: followingFeed.closeThread,
                             loadNextThreadPage: followingFeed.loadNextThreadPage,
                             publishPost: followingFeed.publishPost,
-                            publishReply: followingFeed.publishReply,
+                            publishReply: publishReplyWithImage,
                             toggleReaction: followingFeed.toggleReaction,
                         },
                         profilesByPubkey: richContentProfilesByPubkey,

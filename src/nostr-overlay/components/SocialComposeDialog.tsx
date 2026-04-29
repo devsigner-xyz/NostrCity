@@ -1,14 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SearchUsersResult } from '../query/user-search.query';
 import { createMentionDraft, type MentionDraft } from '../mention-serialization';
 import { MentionTextarea } from './MentionTextarea';
+import {
+    ComposerImageAttachmentButton,
+    ComposerImageAttachmentPreview,
+    type ComposerImageAttachmentValue,
+} from './ComposerImageAttachment';
 import type { NoteCardModel } from './note-card-model';
 import { withoutNoteActions } from './note-card-model';
 import { NoteCard } from './NoteCard';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog';
 import { useI18n } from '@/i18n/useI18n';
 import type { NostrProfile } from '../../nostr/types';
+
+export interface SocialComposeSubmitInput {
+    content: MentionDraft;
+    image?: {
+        file: File;
+    };
+}
 
 interface SocialComposeDialogProps {
     open: boolean;
@@ -20,7 +32,7 @@ interface SocialComposeDialogProps {
     searchRelaySetKey?: string | undefined;
     ownerPubkey?: string | undefined;
     onOpenChange: (open: boolean) => void;
-    onSubmit: (content: MentionDraft) => Promise<void> | void;
+    onSubmit: (input: SocialComposeSubmitInput) => Promise<void> | void;
 }
 
 export function SocialComposeDialog({
@@ -37,32 +49,40 @@ export function SocialComposeDialog({
 }: SocialComposeDialogProps) {
     const { t } = useI18n();
     const [draft, setDraft] = useState<MentionDraft>(createMentionDraft(''));
+    const [image, setImage] = useState<ComposerImageAttachmentValue | null>(null);
+    const imageInputRef = useRef<HTMLInputElement | null>(null);
 
     useEffect(() => {
         if (open) {
             setDraft(createMentionDraft(''));
+            setImage(null);
         }
     }, [open, mode, quoteTarget?.id]);
 
+    const canSubmit = draft.text.trim().length > 0 || Boolean(image);
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
-                <DialogTitle>{mode === 'quote' ? t('socialCompose.quoteTitle') : t('socialCompose.postTitle')}</DialogTitle>
-                <DialogDescription>
-                    {mode === 'quote'
-                        ? t('socialCompose.quoteDescription')
-                        : t('socialCompose.postDescription')}
-                </DialogDescription>
+            <DialogContent aria-describedby={undefined} className="flex max-h-[min(720px,calc(100vh-2rem))] max-w-xl flex-col gap-0 overflow-hidden p-0">
+                <DialogTitle className="sr-only">{mode === 'quote' ? t('socialCompose.quoteTitle') : t('socialCompose.postTitle')}</DialogTitle>
 
-                <div className="grid gap-4">
+                <div className="nostr-social-compose-scroll-body grid max-h-[min(560px,calc(100vh-8rem))] min-h-0 flex-1 gap-4 overflow-y-auto px-4 pb-4 pt-10 sm:px-6">
                     <MentionTextarea
                         aria-label={t('socialCompose.textareaAria')}
+                        className="min-h-40 resize-none border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0 dark:bg-transparent"
                         placeholder={mode === 'quote' ? t('socialCompose.quotePlaceholder') : t('socialCompose.postPlaceholder')}
                         value={draft}
                         onSearch={onSearchUsers}
                         ownerPubkey={ownerPubkey}
                         searchRelaySetKey={searchRelaySetKey}
                         onChangeDraft={setDraft}
+                    />
+
+                    <ComposerImageAttachmentPreview
+                        value={image}
+                        onChange={setImage}
+                        onEdit={() => imageInputRef.current?.click()}
+                        disabled={isSubmitting}
                     />
 
                     {mode === 'quote' && quoteTarget ? (
@@ -73,15 +93,22 @@ export function SocialComposeDialog({
                     ) : null}
                 </div>
 
-                <DialogFooter className="sm:justify-end">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                        {t('socialCompose.cancel')}
-                    </Button>
+                <DialogFooter className="nostr-social-compose-footer mx-0 mb-0 flex-row justify-between rounded-none border-t bg-background px-4 py-3 sm:px-6">
+                    <ComposerImageAttachmentButton
+                        value={image}
+                        onChange={setImage}
+                        inputRef={imageInputRef}
+                        disabled={isSubmitting}
+                    />
                     <Button
                         type="button"
-                        disabled={isSubmitting || draft.text.trim().length === 0}
+                        size="sm"
+                        disabled={isSubmitting || !canSubmit}
                         onClick={() => {
-                            void onSubmit(draft);
+                            void onSubmit({
+                                content: draft,
+                                ...(image ? { image: { file: image.file } } : {}),
+                            });
                         }}
                     >
                         {isSubmitting ? t('socialCompose.publishing') : t('socialCompose.postTitle')}

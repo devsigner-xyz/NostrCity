@@ -119,12 +119,24 @@ interface PublishQuoteMutationVariables {
 
 type ComposerContentInput = string | MentionDraft;
 
+interface ComposerImageAttachmentInput {
+    url: string;
+    tags: string[][];
+}
+
+interface PublishPostComposerInput {
+    content: ComposerContentInput;
+    image?: ComposerImageAttachmentInput;
+}
+
 interface PublishReplyComposerInput extends Omit<PublishReplyInput, 'content'> {
     content: ComposerContentInput;
+    image?: ComposerImageAttachmentInput;
 }
 
 interface PublishQuoteComposerInput extends Omit<PublishQuoteInput, 'content'> {
     content: ComposerContentInput;
+    image?: ComposerImageAttachmentInput;
 }
 
 interface PublishReplyMutationContext {
@@ -176,7 +188,7 @@ function buildFollowingFeedQueryInput(input: {
 function normalizeComposerInput(input: ComposerContentInput): {
     visibleContent: string;
     serializedContent: string;
-    mentionTags: string[][];
+    tags: string[][];
 } {
     const draft = typeof input === 'string' ? createMentionDraft(input) : input;
     const serialized = serializeMentionDraft(draft);
@@ -184,8 +196,38 @@ function normalizeComposerInput(input: ComposerContentInput): {
     return {
         visibleContent: sanitizeContent(draft.text),
         serializedContent: sanitizeContent(serialized.content),
-        mentionTags: serialized.tags,
+        tags: serialized.tags,
     };
+}
+
+function normalizePublishComposerInput(input: ComposerContentInput | PublishPostComposerInput): {
+    visibleContent: string;
+    serializedContent: string;
+    tags: string[][];
+} {
+    const composerInput = isPublishPostComposerInput(input) ? input.content : input;
+    const image = isPublishPostComposerInput(input) ? input.image : undefined;
+    const normalized = normalizeComposerInput(composerInput);
+    const visibleContent = appendImageUrl(normalized.visibleContent, image?.url);
+    const serializedContent = appendImageUrl(normalized.serializedContent, image?.url);
+
+    return {
+        visibleContent,
+        serializedContent,
+        tags: mergeUniqueTags(normalized.tags, image?.tags ?? []),
+    };
+}
+
+function isPublishPostComposerInput(input: ComposerContentInput | PublishPostComposerInput): input is PublishPostComposerInput {
+    return typeof input === 'object' && input !== null && 'content' in input;
+}
+
+function appendImageUrl(content: string, url: string | undefined): string {
+    if (!url) {
+        return content;
+    }
+
+    return content.length > 0 ? `${content}\n${url}` : url;
 }
 
 function mergeUniqueTags(...tagCollections: string[][][]): string[][] {
@@ -1084,8 +1126,8 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
         await threadQuery.fetchNextPage();
     }, [activeThreadRootEventId, threadQuery]);
 
-    const publishPost = useCallback(async (content: ComposerContentInput): Promise<boolean> => {
-        const normalized = normalizeComposerInput(content);
+    const publishPost = useCallback(async (content: ComposerContentInput | PublishPostComposerInput): Promise<boolean> => {
+        const normalized = normalizePublishComposerInput(content);
         if (!options.ownerPubkey || !options.canWrite || !options.writeGateway || normalized.visibleContent.length === 0) {
             return false;
         }
@@ -1094,7 +1136,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
             await publishPostMutation.mutateAsync({
                 visibleContent: normalized.visibleContent,
                 content: normalized.serializedContent,
-                tags: normalized.mentionTags,
+                tags: normalized.tags,
             });
             return true;
         } catch {
@@ -1103,7 +1145,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
     }, [options.canWrite, options.ownerPubkey, options.writeGateway, publishPostMutation]);
 
     const publishReply = useCallback(async (input: PublishReplyComposerInput): Promise<boolean> => {
-        const normalized = normalizeComposerInput(input.content);
+        const normalized = normalizePublishComposerInput({ content: input.content, ...(input.image ? { image: input.image } : {}) });
         if (!options.ownerPubkey || !options.canWrite || !options.writeGateway || normalized.visibleContent.length === 0 || !activeThreadRootEventId) {
             return false;
         }
@@ -1112,7 +1154,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
             ...input,
             content: normalized.visibleContent,
         };
-        const tags = mergeUniqueTags(buildReplyTags(normalizedInput, activeThread), normalized.mentionTags);
+        const tags = mergeUniqueTags(buildReplyTags(normalizedInput, activeThread), normalized.tags);
 
         try {
             await publishReplyMutation.mutateAsync({
@@ -1133,7 +1175,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
             return false;
         }
 
-        const normalized = normalizeComposerInput(input.content);
+        const normalized = normalizePublishComposerInput({ content: input.content, ...(input.image ? { image: input.image } : {}) });
         const normalizedInput = {
             ...input,
             content: normalized.visibleContent,
@@ -1143,7 +1185,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
             content: normalized.serializedContent,
         });
         const visibleContent = buildQuoteContent(normalizedInput);
-        const tags = mergeUniqueTags(buildQuoteTags(normalizedInput), normalized.mentionTags);
+        const tags = mergeUniqueTags(buildQuoteTags(normalizedInput), normalized.tags);
 
         try {
             await publishQuoteMutation.mutateAsync({

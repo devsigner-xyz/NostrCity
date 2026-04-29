@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { CopyIcon, ImageIcon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { CopyIcon } from 'lucide-react';
 import type { AgoraFeedLayout } from '../../nostr/ui-settings';
 import type { NostrEvent, NostrProfile } from '../../nostr/types';
 import type { SocialEngagementMetrics, SocialFeedItem, ViewerReactionByEventId, ViewerReplyByEventId, ViewerZapByEventId } from '../../nostr/social-feed-service';
 import type { SearchUsersResult } from '../query/user-search.query';
 import { createMentionDraft, type MentionDraft } from '../mention-serialization';
 import { MentionTextarea } from './MentionTextarea';
+import {
+    ComposerImageAttachmentButton,
+    ComposerImageAttachmentPreview,
+    type ComposerImageAttachmentValue,
+} from './ComposerImageAttachment';
 import type { FollowingFeedThreadView } from '../query/following-feed.selectors';
 import { fromEmbeddedRepost, fromFeedItem, fromThreadItem } from './note-card-adapters';
 import type { NoteCardModel } from './note-card-model';
@@ -83,6 +88,9 @@ export interface FollowingFeedViewProps {
         targetPubkey?: string;
         rootEventId?: string;
         content: MentionDraft;
+        image?: {
+            file: File;
+        };
     }) => Promise<boolean>;
     onSearchUsers: (query: string) => Promise<SearchUsersResult>;
     ownerPubkey?: string | undefined;
@@ -218,12 +226,15 @@ export function FollowingFeedContent({
 }: FollowingFeedContentProps) {
     const { t } = useI18n();
     const [replyDraft, setReplyDraft] = useState<MentionDraft>(createMentionDraft(''));
+    const [replyImage, setReplyImage] = useState<ComposerImageAttachmentValue | null>(null);
+    const replyImageInputRef = useRef<HTMLInputElement | null>(null);
     const [replyTargetEventId, setReplyTargetEventId] = useState<string | null>(null);
     const [replyTargetPubkey, setReplyTargetPubkey] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         if (!activeThread) {
             setReplyDraft(createMentionDraft(''));
+            setReplyImage(null);
             setReplyTargetEventId(null);
             setReplyTargetPubkey(undefined);
             return;
@@ -638,21 +649,25 @@ export function FollowingFeedContent({
                                                 event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
                                             }}
                                         />
+                                        <ComposerImageAttachmentPreview
+                                            value={replyImage}
+                                            onChange={setReplyImage}
+                                            onEdit={() => replyImageInputRef.current?.click()}
+                                            compact
+                                            disabled={replyDisabled}
+                                        />
                                         <div className="nostr-following-feed-compose-actions mt-3 flex items-center justify-between gap-2">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="icon"
-                                                aria-label={t('feed.attachImageSoon')}
-                                                disabled
-                                            >
-                                                <ImageIcon aria-hidden="true" />
-                                            </Button>
+                                            <ComposerImageAttachmentButton
+                                                value={replyImage}
+                                                onChange={setReplyImage}
+                                                inputRef={replyImageInputRef}
+                                                disabled={replyDisabled}
+                                            />
                                             <Button
                                                 type="button"
                                                 size="sm"
                                                 className="nostr-following-feed-publish"
-                                                disabled={replyDisabled || replyDraft.text.trim().length === 0}
+                                                disabled={replyDisabled || (replyDraft.text.trim().length === 0 && !replyImage)}
                                                 onClick={async () => {
                                                     if (!replyTargetEventId) {
                                                         return;
@@ -663,10 +678,12 @@ export function FollowingFeedContent({
                                                         content: replyDraft,
                                                         ...(replyTargetPubkey ? { targetPubkey: replyTargetPubkey } : {}),
                                                         ...(activeThread.root?.id ? { rootEventId: activeThread.root.id } : {}),
+                                                        ...(replyImage ? { image: { file: replyImage.file } } : {}),
                                                     };
                                                     const submitted = await onPublishReply(replyInput);
                                                     if (submitted) {
                                                         setReplyDraft(createMentionDraft(''));
+                                                        setReplyImage(null);
                                                     }
                                                 }}
                                             >

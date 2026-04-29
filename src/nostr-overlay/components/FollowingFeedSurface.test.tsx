@@ -33,6 +33,8 @@ let mounted: RenderResult[] = [];
 
 beforeAll(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    URL.createObjectURL = vi.fn(() => 'blob:inline-preview');
+    URL.revokeObjectURL = vi.fn();
 });
 
 afterEach(async () => {
@@ -908,14 +910,15 @@ describe('FollowingFeedSurface', () => {
 
         const textarea = rendered.container.querySelector('.nostr-following-feed-reply-box textarea') as HTMLTextAreaElement;
         const actionsRow = rendered.container.querySelector('.nostr-following-feed-reply-box .nostr-following-feed-compose-actions') as HTMLElement;
-        const imageButton = actionsRow.querySelector('button[aria-label="Adjuntar imagen (proximamente)"]') as HTMLButtonElement;
+        const imageButton = actionsRow.querySelector('button[aria-label="Adjuntar imagen"]') as HTMLButtonElement;
         const actionButtons = Array.from(actionsRow.querySelectorAll('button'));
         expect(textarea).toBeDefined();
         expect(actionsRow).toBeDefined();
         expect(imageButton).toBeDefined();
-        expect(imageButton.disabled).toBe(true);
+        expect(imageButton.disabled).toBe(false);
         expect(imageButton.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
         expect(actionButtons[0]).toBe(imageButton);
+        expect(actionsRow.querySelector('input[type="file"]')?.getAttribute('accept')).toBe('image/jpeg,image/png,image/webp,image/avif');
         expect(textarea.getAttribute('aria-describedby')).toBeNull();
         expect(textarea.getAttribute('rows')).toBe('3');
         expect(rendered.container.querySelector('.nostr-following-feed-reply-target')).toBeNull();
@@ -935,12 +938,17 @@ describe('FollowingFeedSurface', () => {
         expect(sendButton).toBeDefined();
         expect(actionButtons[actionButtons.length - 1]).toBe(sendButton);
 
+        const imageInput = actionsRow.querySelector('input[type="file"]') as HTMLInputElement;
+        const image = new File(['inline-image'], 'reply.png', { type: 'image/png' });
         await act(async () => {
-            imageButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            imageButton.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+            Object.defineProperty(imageInput, 'files', {
+                configurable: true,
+                value: [image],
+            });
+            imageInput.dispatchEvent(new Event('change', { bubbles: true }));
         });
 
-        expect(onPublishReply).not.toHaveBeenCalled();
+        expect(rendered.container.querySelector('img[src="blob:inline-preview"]')).not.toBeNull();
 
         await act(async () => {
             sendButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -954,6 +962,7 @@ describe('FollowingFeedSurface', () => {
                 text: 'respuesta surface',
                 mentions: [],
             },
+            image: { file: image },
         });
 
         const replyReactionButton = rendered.container.querySelector('button[aria-label="Reaccionar (7)"]') as HTMLButtonElement;
@@ -1592,7 +1601,7 @@ describe('FollowingFeedSurface', () => {
         });
 
         const copyItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((item) =>
-            (item.textContent || '').trim() === 'Copiar'
+            (item.textContent || '').trim() === 'Copiar ID de evento'
         ) as HTMLElement;
 
         await act(async () => {
@@ -1800,7 +1809,7 @@ describe('FollowingFeedSurface', () => {
             feedCopyMenuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
         const feedCopyItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((item) =>
-            (item.textContent || '').trim() === 'Copiar'
+            (item.textContent || '').trim() === 'Copiar ID de evento'
         ) as HTMLElement;
         await act(async () => {
             feedCopyItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -1882,7 +1891,7 @@ describe('FollowingFeedSurface', () => {
             rootCopyMenuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
         const rootCopyItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((item) =>
-            (item.textContent || '').trim() === 'Copiar'
+            (item.textContent || '').trim() === 'Copiar ID de evento'
         ) as HTMLElement;
         await act(async () => {
             rootCopyItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -1893,7 +1902,7 @@ describe('FollowingFeedSurface', () => {
             replyCopyMenuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
         const replyCopyItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((item) =>
-            (item.textContent || '').trim() === 'Copiar'
+            (item.textContent || '').trim() === 'Copiar ID de evento'
         ) as HTMLElement;
         await act(async () => {
             replyCopyItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));

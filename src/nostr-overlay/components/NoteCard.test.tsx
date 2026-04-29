@@ -407,7 +407,7 @@ describe('NoteCard', () => {
         });
 
         expect(Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).some((item) =>
-            (item.textContent || '').trim() === 'Copy'
+            (item.textContent || '').trim() === 'Copy event ID'
         )).toBe(true);
         expect(Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).some((item) =>
             (item.textContent || '').trim() === 'View detail'
@@ -690,7 +690,7 @@ describe('NoteCard', () => {
         });
 
         const copyItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((item) =>
-            (item.textContent || '').trim() === 'Copiar'
+            (item.textContent || '').trim() === 'Copiar ID de evento'
         ) as HTMLElement;
 
         await act(async () => {
