@@ -7,6 +7,7 @@ import type { NostrProfile } from '../../nostr/types';
 import { profileHasZapEndpoint } from '../../nostr/zaps';
 import { ListLoadingFooter } from './ListLoadingFooter';
 import { PersonContextMenuItems } from './PersonContextMenuItems';
+import { UserBotBadge } from './UserBotBadge';
 import { VerifiedUserAvatar } from './VerifiedUserAvatar';
 import { useI18n } from '@/i18n/useI18n';
 import { Button } from '@/components/ui/button';
@@ -315,6 +316,7 @@ export function PeopleListTab({
                         <ItemContent className="min-w-0">
                             <ItemTitle className="nostr-identity-row">
                                 <span className="truncate">{display}</span>
+                                <UserBotBadge bot={profile?.bot} />
                             </ItemTitle>
                             <ItemDescription className="truncate">{npubLabel}</ItemDescription>
                         </ItemContent>
@@ -333,6 +335,7 @@ export function PeopleListTab({
                         <ItemContent className="min-w-0">
                             <ItemTitle className="nostr-identity-row">
                                 <span className="truncate">{display}</span>
+                                <UserBotBadge bot={profile?.bot} />
                             </ItemTitle>
                             <ItemDescription className="truncate">{npubLabel}</ItemDescription>
                         </ItemContent>

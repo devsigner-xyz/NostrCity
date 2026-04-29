@@ -118,6 +118,20 @@ describe('ProfileEditorPage', () => {
         await act(async () => rendered.root.unmount());
     });
 
+    test('stacks editor preview and form until the extra-large breakpoint', async () => {
+        window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
+        const rendered = await renderPage();
+
+        const preview = rendered.container.querySelector('[data-testid="profile-editor-preview"]') as HTMLElement;
+        const layout = preview.closest('.grid') as HTMLElement;
+
+        expect(layout).not.toBeNull();
+        expect(layout.className).toContain('xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)]');
+        expect(layout.className).not.toContain('lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)]');
+
+        await act(async () => rendered.root.unmount());
+    });
+
     test('renders preview using the occupant detail layout with only filled profile fields', async () => {
         window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
         const sparseProfile = buildProfile({

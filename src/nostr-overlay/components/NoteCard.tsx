@@ -5,6 +5,7 @@ import { LONG_FORM_ARTICLE_KIND } from '../../nostr/articles';
 import { profileHasZapEndpoint } from '../../nostr/zaps';
 import { ArticlePreviewCard } from './ArticlePreviewCard';
 import { RichNostrContent } from './RichNostrContent';
+import { UserBotBadge } from './UserBotBadge';
 import { fromResolvedReferenceEvent } from './note-card-adapters';
 import type { NoteActionState, NoteCardModel } from './note-card-model';
 import { shortId } from './note-card-model';
@@ -141,7 +142,10 @@ function NoteHeaderItem({ note, profile, t }: NoteHeaderItemProps) {
             </ItemMedia>
 
             <ItemContent className="min-w-0">
-                <ItemTitle>{authorName}</ItemTitle>
+                <ItemTitle className="nostr-identity-row">
+                    <span className="truncate">{authorName}</span>
+                    <UserBotBadge bot={profile?.bot} />
+                </ItemTitle>
                 <ItemDescription>
                     {note.kindLabel ? <span>{note.kindLabel} · </span> : null}
                     <time dateTime={publishedAt.iso}>{publishedAt.label}</time>

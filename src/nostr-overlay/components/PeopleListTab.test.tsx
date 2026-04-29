@@ -117,6 +117,33 @@ describe('PeopleListTab', () => {
         expect(onSelectPerson).toHaveBeenCalledWith(alice);
     });
 
+    test('shows bot badge beside bot user names only', async () => {
+        const alice = makePubkey(1);
+        const bob = makePubkey(2);
+        const profiles: Record<string, NostrProfile> = {
+            [alice]: { pubkey: alice, displayName: 'Alice Bot', bot: true },
+            [bob]: { pubkey: bob, displayName: 'Bob', bot: false },
+        };
+
+        const rendered = await renderElement(
+            <PeopleListTab
+                people={[alice, bob]}
+                profiles={profiles}
+                emptyText="No hay personas"
+                loading={false}
+                onSelectPerson={() => {}}
+            />
+        );
+        mounted.push(rendered);
+
+        const items = Array.from(rendered.container.querySelectorAll('[data-slot="item"]')) as HTMLElement[];
+        const aliceItem = items.find((item) => (item.textContent || '').includes('Alice Bot'));
+        const bobItem = items.find((item) => (item.textContent || '').includes('Bob'));
+
+        expect(aliceItem?.querySelector('[data-slot="badge"]')?.textContent || '').toBe('Bot');
+        expect(bobItem?.querySelector('[data-slot="badge"]')).toBeNull();
+    });
+
     test('shows loading text and supports search input with clear action', async () => {
         const onSearchQueryChange = vi.fn();
         const rendered = await renderElement(

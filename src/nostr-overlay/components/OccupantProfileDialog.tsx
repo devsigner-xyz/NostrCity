@@ -29,6 +29,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } f
 import type { I18nContextValue } from '@/i18n/I18nProvider';
 import { useI18n } from '@/i18n/useI18n';
 import { PersonContextMenuItems } from './PersonContextMenuItems';
+import { UserBotBadge } from './UserBotBadge';
 import { VerifiedUserAvatar } from './VerifiedUserAvatar';
 import { toast } from 'sonner';
 import type { SocialEngagementMetrics, ViewerReactionByEventId, ViewerReplyByEventId, ViewerZapByEventId } from '../../nostr/social-feed-service';
@@ -492,7 +493,6 @@ export function OccupantProfileDialog({
             : []),
         ...(profile?.lud16 ? [{ label: 'LUD16', value: profile.lud16 }] : []),
         ...(profile?.lud06 ? [{ label: 'LUD06', value: profile.lud06 }] : []),
-        ...(typeof profile?.bot === 'boolean' ? [{ label: t('profile.info.bot'), value: profile.bot ? t('profile.info.yes') : t('profile.info.no') }] : []),
         ...(profile?.externalIdentities?.length
             ? [{
                 label: t('profile.info.externalIdentities'),
@@ -543,6 +543,7 @@ export function OccupantProfileDialog({
                 <ItemContent className="min-w-0">
                     <ItemTitle>
                         <span className="truncate">{personDisplay}</span>
+                        <UserBotBadge bot={personProfile?.bot} />
                     </ItemTitle>
                     <ItemDescription className="truncate">{personNpubLabel}</ItemDescription>
                 </ItemContent>
@@ -708,6 +709,7 @@ export function OccupantProfileDialog({
                                         <div className="flex min-w-0 flex-col gap-0.5">
                                             <p className="nostr-dialog-name nostr-identity-row inline-flex max-w-full items-center gap-2 text-base font-semibold leading-tight text-foreground">
                                                 <span className="truncate">{resolveName(pubkey, profile)}</span>
+                                                <UserBotBadge bot={profile?.bot} />
                                             </p>
                                             <div className="nostr-dialog-pubkey-row flex min-w-0 items-center leading-tight">
                                                 <button

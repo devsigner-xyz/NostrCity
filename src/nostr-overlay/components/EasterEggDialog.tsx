@@ -10,6 +10,9 @@ interface EasterEggDialogProps {
 
 export function EasterEggDialog({ entry, buildingIndex, onClose }: EasterEggDialogProps) {
     const { t } = useI18n();
+    const textWithSource = entry.kind === 'text'
+        ? `${entry.text}\n\n${t('easterEgg.source')}: ${entry.sourceUrl}`
+        : '';
 
     return (
         <Dialog open onOpenChange={(open) => {
@@ -27,7 +30,6 @@ export function EasterEggDialog({ entry, buildingIndex, onClose }: EasterEggDial
                 </DialogDescription>
                 <div className="nostr-easter-egg-body">
                     <header className="nostr-easter-egg-header">
-                        <p className="nostr-easter-egg-chip">{t('easterEgg.building', { index: String(buildingIndex + 1) })}</p>
                         <h3>{entry.title}</h3>
                     </header>
 
@@ -40,9 +42,6 @@ export function EasterEggDialog({ entry, buildingIndex, onClose }: EasterEggDial
                                 <a href={entry.pdfPath} target="_blank" rel="noopener noreferrer" className="nostr-easter-egg-action">
                                     {t('easterEgg.openExpand')}
                                 </a>
-                                <a href={entry.sourceUrl} target="_blank" rel="noopener noreferrer" className="nostr-easter-egg-action">
-                                    {t('easterEgg.source')}
-                                </a>
                             </div>
                             <iframe
                                 src={entry.pdfPath}
@@ -51,14 +50,7 @@ export function EasterEggDialog({ entry, buildingIndex, onClose }: EasterEggDial
                             />
                         </>
                     ) : (
-                        <>
-                            <div className="nostr-easter-egg-actions">
-                                <a href={entry.sourceUrl} target="_blank" rel="noopener noreferrer" className="nostr-easter-egg-action">
-                                    {t('easterEgg.source')}
-                                </a>
-                            </div>
-                            <pre className="nostr-easter-egg-text">{entry.text}</pre>
-                        </>
+                        <pre className="nostr-easter-egg-text">{textWithSource}</pre>
                     )}
                 </div>
             </DialogContent>

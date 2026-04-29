@@ -13,6 +13,21 @@ interface RenderResult {
 
 const mounted: RenderResult[] = [];
 
+function readOverlayStyles(): string {
+    return readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
+}
+
+function getCssRule(styles: string, selector: string): string {
+    const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = styles.match(new RegExp(`${escapedSelector}\\s*\\{(?<body>[^}]*)\\}`, 's'));
+    return match?.groups?.body ?? '';
+}
+
+function getActionStateRule(styles: string): string {
+    const match = styles.match(/\.nostr-easter-egg-action:hover,\s*\.nostr-easter-egg-action:focus-visible\s*\{(?<body>[^}]*)\}/s);
+    return match?.groups?.body ?? '';
+}
+
 beforeAll(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 });
@@ -44,9 +59,35 @@ async function renderDialog(element: ReactElement): Promise<RenderResult> {
 
 describe('EasterEggDialog', () => {
     test('defines a max-width at least as wide as occupant profile dialogs', () => {
-        const styles = readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
+        const styles = readOverlayStyles();
 
         expect(styles).toMatch(/\.nostr-easter-egg-dialog\s*\{[^}]*max-width:\s*min\(1040px,\s*calc\(100vw - 32px\)\)/s);
+    });
+
+    test('uses theme tokens for dialog-specific colors', () => {
+        const styles = readOverlayStyles();
+        const selectors = [
+            '.nostr-easter-egg-dialog',
+            '.nostr-easter-egg-header h3',
+            '.nostr-easter-egg-action',
+            '.nostr-easter-egg-pdf',
+            '.nostr-easter-egg-text',
+        ];
+
+        for (const selector of selectors) {
+            const rule = getCssRule(styles, selector);
+            expect(rule, selector).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
+        }
+
+        expect(getCssRule(styles, '.nostr-easter-egg-dialog')).toContain('var(--background)');
+        expect(getCssRule(styles, '.nostr-easter-egg-dialog')).toContain('var(--foreground)');
+        expect(getCssRule(styles, '.nostr-easter-egg-action')).toContain('var(--card)');
+        expect(getCssRule(styles, '.nostr-easter-egg-text')).toContain('var(--card)');
+
+        const actionStateRule = getActionStateRule(styles);
+        expect(actionStateRule, '.nostr-easter-egg-action:hover').not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
+        expect(actionStateRule).toContain('var(--muted)');
+        expect(actionStateRule).toContain('var(--foreground)');
     });
 
     test('renders pdf controls and iframe for bitcoin whitepaper', async () => {
@@ -70,6 +111,9 @@ describe('EasterEggDialog', () => {
         expect(iframe.getAttribute('src')).toBe('/easter-eggs/bitcoin.pdf');
         expect(rendered.container.textContent || '').toContain('Descargar PDF');
         expect(rendered.container.textContent || '').toContain('Abrir / Ampliar');
+        expect(rendered.container.querySelector('.nostr-easter-egg-source')).toBeNull();
+        expect(rendered.container.textContent || '').not.toContain('Fuente: https://bitcoin.org/bitcoin.pdf');
+        expect(rendered.container.textContent || '').not.toContain('Edificio #2');
     });
 
     test('renders plain text for non-pdf entries', async () => {
@@ -90,6 +134,9 @@ describe('EasterEggDialog', () => {
         const textBlock = rendered.container.querySelector('pre.nostr-easter-egg-text') as HTMLPreElement;
         expect(textBlock).toBeDefined();
         expect(textBlock.textContent || '').toContain('barbed wire fences');
+        expect(textBlock.textContent || '').toContain('Fuente: https://nakamotoinstitute.org/library/crypto-anarchist-manifesto/');
+        expect(rendered.container.querySelector('.nostr-easter-egg-source')).toBeNull();
+        expect(rendered.container.textContent || '').not.toContain('Edificio #1');
     });
 
     test('renders english chrome and actions when ui language is en', async () => {
@@ -100,21 +147,19 @@ describe('EasterEggDialog', () => {
                 buildingIndex={0}
                 onClose={vi.fn()}
                 entry={{
-                    id: 'bitcoin_whitepaper',
-                    kind: 'pdf',
-                    title: 'Bitcoin: A Peer-to-Peer Electronic Cash System',
-                    sourceUrl: 'https://bitcoin.org/bitcoin.pdf',
-                    pdfPath: '/easter-eggs/bitcoin.pdf',
-                    downloadFileName: 'bitcoin.pdf',
+                    id: 'crypto_anarchist_manifesto',
+                    kind: 'text',
+                    title: 'The Crypto Anarchist Manifesto',
+                    sourceUrl: 'https://nakamotoinstitute.org/library/crypto-anarchist-manifesto/',
+                    text: 'Arise, you have nothing to lose but your barbed wire fences.',
                 }}
             />
         );
 
         const text = rendered.container.textContent || '';
-        expect(text).toContain('Building #1');
-        expect(text).toContain('Download PDF');
-        expect(text).toContain('Open / Expand');
-        expect(text).toContain('Source');
+        const textBlock = rendered.container.querySelector('pre.nostr-easter-egg-text') as HTMLPreElement;
+        expect(textBlock.textContent || '').toContain('Source: https://nakamotoinstitute.org/library/crypto-anarchist-manifesto/');
+        expect(text).not.toContain('Building #1');
         const closeButton = rendered.container.querySelector('button.absolute.top-2.right-2') as HTMLButtonElement | null;
         expect(closeButton).not.toBeNull();
         expect(closeButton?.className).not.toContain('nostr-dialog-close');

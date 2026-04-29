@@ -193,7 +193,7 @@ export function ProfileEditorPage({
             {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{error}</p> : null}
             <div className="sr-only" role="status" aria-live="polite">{status}</div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)]">
                 <Card>
                     <CardHeader>
                         <CardTitle>{t('profileEditor.previewTitle')}</CardTitle>

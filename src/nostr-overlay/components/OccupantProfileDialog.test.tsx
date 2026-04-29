@@ -171,6 +171,7 @@ describe('OccupantProfileDialog', () => {
         expect(separator.getAttribute('data-orientation')).toBe('horizontal');
         expect((header.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true);
         expect((separator.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true);
+        expect(overlayStyles).toMatch(/\.nostr-profile-dialog-sticky-shell \.nostr-profile-dialog-separator\s*\{[^}]*margin-inline:\s*-0\.85rem;[^}]*width:\s*calc\(100% \+ 1\.7rem\)/s);
     });
 
     test('uses the shared dialog close button styling', async () => {
@@ -269,15 +270,17 @@ describe('OccupantProfileDialog', () => {
         await waitForCondition(() => (document.body.textContent || '').includes('Construyendo sobre Nostr.'));
 
         const text = document.body.textContent || '';
+        const infoText = document.body.querySelector('.nostr-profile-info-list')?.textContent || '';
         expect(text).toContain('NIP-05');
         expect(text).toContain('Descripcion');
         expect(text).toContain('Sitio web');
         expect(text).toContain('LUD16');
         expect(text).toContain('LUD06');
-        expect(text).toContain('Bot');
+        expect(infoText).not.toContain('Bot');
         expect(text).toContain('Identidades externas');
         expect(text).not.toContain('Avatar');
         expect(text).not.toContain('https://example.com/avatar.png');
+        expect(document.body.querySelector('.nostr-dialog-header [data-slot="badge"]')?.textContent || '').toBe('Bot');
 
         expect(document.body.querySelector('.nostr-dialog-avatar-trigger')).toBeNull();
         expect(document.body.querySelector('.nostr-dialog-header [data-slot="avatar"]')).not.toBeNull();
@@ -323,7 +326,7 @@ describe('OccupantProfileDialog', () => {
         expect(text).not.toContain('Relays declarados');
     });
 
-    test('shows explicitly declared negative bot profile metadata', async () => {
+    test('does not show bot badge or info row for explicitly negative bot profile metadata', async () => {
         const rendered = await renderElement(
             <OccupantProfileDialog
                 {...buildProps({
@@ -340,8 +343,34 @@ describe('OccupantProfileDialog', () => {
         await selectTab('Información');
 
         const text = document.body.textContent || '';
-        expect(text).toContain('Bot');
-        expect(text).toContain('No');
+        expect(text).not.toContain('Bot');
+    });
+
+    test('shows bot badge beside network user names', async () => {
+        const botPubkey = 'd'.repeat(64);
+        const rendered = await renderElement(
+            <OccupantProfileDialog
+                {...buildProps({
+                    follows: [botPubkey],
+                    networkProfiles: {
+                        [botPubkey]: {
+                            pubkey: botPubkey,
+                            displayName: 'Relay Helper',
+                            bot: true,
+                        },
+                    },
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        await selectTab('Siguiendo (1)');
+
+        const networkItem = Array.from(document.body.querySelectorAll('.nostr-profile-network-list [data-slot="item"]'))
+            .find((item) => (item.textContent || '').includes('Relay Helper')) as HTMLElement | undefined;
+
+        expect(networkItem).toBeDefined();
+        expect(networkItem?.querySelector('[data-slot="badge"]')?.textContent || '').toBe('Bot');
     });
 
     test('uses shadcn empty loading state with spinner in feed tab', async () => {

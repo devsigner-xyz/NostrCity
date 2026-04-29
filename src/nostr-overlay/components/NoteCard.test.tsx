@@ -160,6 +160,27 @@ describe('NoteCard', () => {
         expect(container.querySelector('button[aria-label="Copiar identificador de nota note-1"]')).toBeNull();
     });
 
+    test('shows bot badge beside bot note author name', async () => {
+        const rendered = await renderElement(
+            <NoteCard
+                note={defaultNoteFixture}
+                profilesByPubkey={{
+                    [defaultNoteFixture.pubkey]: {
+                        pubkey: defaultNoteFixture.pubkey,
+                        displayName: 'Alice Bot',
+                        bot: true,
+                    },
+                }}
+            />,
+        );
+        mounted.push(rendered);
+
+        const title = rendered.container.querySelector('[data-slot="item-title"]') as HTMLElement;
+
+        expect(title.textContent || '').toContain('Alice Bot');
+        expect(title.querySelector('[data-slot="badge"]')?.textContent || '').toBe('Bot');
+    });
+
     test('opens emoji selector before reacting and sends selected emoji', async () => {
         const onToggleReaction = vi.fn(async () => true);
         const onSelectReactionEmoji = vi.fn(async () => true);

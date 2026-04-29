@@ -1,3 +1,4 @@
+import { RefreshCwIcon } from 'lucide-react';
 import type { AgoraFeedLayout } from '../../nostr/ui-settings';
 import { FollowingFeedContent, type FollowingFeedViewProps } from './FollowingFeedContent';
 import { useI18n } from '@/i18n/useI18n';
@@ -12,6 +13,8 @@ interface FollowingFeedSurfaceProps extends FollowingFeedViewProps {
     activeHashtag?: string;
     onClearHashtag?: () => void;
 }
+
+const AGORA_LAYOUT_TOGGLE_ITEM_CLASS = 'data-[state=on]:border-primary! data-[state=on]:bg-primary! data-[state=on]:text-primary-foreground! data-[state=on]:hover:bg-primary/90!';
 
 export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayoutChange, activeHashtag, onClearHashtag, ...feedProps }: FollowingFeedSurfaceProps) {
     const { t } = useI18n();
@@ -30,7 +33,7 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
                     <ToggleGroup
                         type="single"
                         variant="outline"
-                        size="sm"
+                        size="default"
                         value={agoraFeedLayout}
                         onValueChange={(value) => {
                             if (value === 'list' || value === 'masonry') {
@@ -38,10 +41,10 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
                             }
                         }}
                     >
-                        <ToggleGroupItem value="list" aria-label={t('feed.viewList')}>
+                        <ToggleGroupItem value="list" aria-label={t('feed.viewList')} className={AGORA_LAYOUT_TOGGLE_ITEM_CLASS}>
                             {t('settings.ui.agoraLayoutList')}
                         </ToggleGroupItem>
-                        <ToggleGroupItem value="masonry" aria-label={t('feed.viewMasonry')}>
+                        <ToggleGroupItem value="masonry" aria-label={t('feed.viewMasonry')} className={AGORA_LAYOUT_TOGGLE_ITEM_CLASS}>
                             Masonry
                         </ToggleGroupItem>
                     </ToggleGroup>
@@ -56,10 +59,15 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
                 }} disabled={feedProps.isRefreshingFeed}>
                     {feedProps.isRefreshingFeed ? (
                         <>
-                            <Spinner className="size-4" />
+                            <Spinner />
                             {t('feed.refreshing')}
                         </>
-                    ) : t('feed.refresh')}
+                    ) : (
+                        <>
+                            <RefreshCwIcon data-icon="inline-start" aria-hidden="true" />
+                            {t('feed.refresh')}
+                        </>
+                    )}
                 </Button>
                 {activeHashtag && onClearHashtag ? (
                     <Button type="button" variant="outline" size="sm" onClick={onClearHashtag}>

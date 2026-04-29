@@ -161,11 +161,24 @@ describe('FollowingFeedSurface', () => {
         expect(toggleGroup).not.toBeNull();
         expect(toggleGroup?.textContent).toContain('Lista');
         expect(toggleGroup?.textContent).toContain('Masonry');
+        expect(toggleGroup?.getAttribute('data-size')).toBe('default');
+
+        const refreshButton = Array.from(rendered.container.querySelectorAll('[data-slot="button"]')).find((button) =>
+            (button.textContent || '').includes('Actualizar')
+        ) as HTMLButtonElement | undefined;
+        expect(refreshButton?.getAttribute('data-size')).toBe('sm');
+        expect(refreshButton?.querySelector('svg[data-icon="inline-start"]')).not.toBeNull();
 
         const masonryButton = Array.from(rendered.container.querySelectorAll('[data-slot="toggle-group-item"]')).find((item) =>
             (item.textContent || '').trim() === 'Masonry'
         ) as HTMLButtonElement | undefined;
         expect(masonryButton).toBeDefined();
+        expect(masonryButton?.getAttribute('data-size')).toBe('default');
+
+        const activeStateClass = masonryButton?.className || '';
+        expect(activeStateClass).toContain('data-[state=on]:bg-primary');
+        expect(activeStateClass).toContain('data-[state=on]:text-primary-foreground');
+        expect(activeStateClass).not.toMatch(/dark:[^\s]*data-\[state=on\]|data-\[state=on\]:dark:/);
 
         await act(async () => {
             masonryButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

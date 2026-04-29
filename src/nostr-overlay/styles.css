@@ -794,6 +794,8 @@
     width: min(1040px, calc(100vw - 32px)) !important;
     max-width: min(1040px, calc(100vw - 32px)) !important;
     max-height: min(88vh, 980px);
+    background: color-mix(in oklab, var(--muted) 30%, var(--background));
+    color: var(--foreground);
     padding: 0.9rem;
 }
 
@@ -817,22 +819,8 @@
 
 .nostr-easter-egg-header h3 {
     margin: 0;
-    color: #1f3340;
+    color: var(--foreground);
     font-size: 1.04rem;
-}
-
-.nostr-easter-egg-chip {
-    margin: 0;
-    display: inline-flex;
-    align-items: center;
-    width: fit-content;
-    border: 1px solid rgba(190, 175, 222, 0.9);
-    border-radius: 999px;
-    background: rgba(243, 238, 255, 0.96);
-    color: #5a3f90;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.14rem 0.45rem;
 }
 
 .nostr-easter-egg-actions {
@@ -844,21 +832,27 @@
 
 .nostr-easter-egg-action {
     text-decoration: none;
-    border: 1px solid rgba(184, 198, 208, 0.92);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    background: rgba(248, 251, 253, 0.98);
-    color: #294653;
+    background: color-mix(in oklab, var(--card) 96%, transparent);
+    color: var(--foreground);
     font-size: 0.78rem;
     font-weight: 600;
     padding: 0.34rem 0.55rem;
 }
 
+.nostr-easter-egg-action:hover,
+.nostr-easter-egg-action:focus-visible {
+    background: var(--muted);
+    color: var(--foreground);
+}
+
 .nostr-easter-egg-pdf {
     width: 100%;
     min-height: 64vh;
-    border: 1px solid rgba(207, 216, 223, 0.96);
+    border: 1px solid var(--border);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 1);
+    background: var(--background);
 }
 
 .nostr-easter-egg-text {
@@ -866,10 +860,10 @@
     white-space: pre-wrap;
     line-height: 1.5;
     font-size: 0.84rem;
-    color: #1f3441;
-    border: 1px solid rgba(207, 216, 223, 0.96);
+    color: var(--foreground);
+    border: 1px solid var(--border);
     border-radius: 10px;
-    background: rgba(251, 253, 255, 0.98);
+    background: color-mix(in oklab, var(--card) 96%, transparent);
     padding: 0.65rem;
     max-height: 64vh;
     overflow: auto;
@@ -2263,6 +2257,7 @@
 
 .nostr-profile-dialog-sticky-shell .nostr-profile-dialog-separator {
     margin-inline: -0.85rem;
+    width: calc(100% + 1.7rem);
 }
 
 .nostr-profile-tab-panel {
