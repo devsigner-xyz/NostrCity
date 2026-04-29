@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -31,6 +33,16 @@ async function renderElement() {
 }
 
 let mounted: RenderResult[] = [];
+
+function readOverlayStyles(): string {
+    return readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
+}
+
+function getCssRule(styles: string, selector: string): string {
+    const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = styles.match(new RegExp(`${escapedSelector}\\s*\\{(?<body>[^}]*)\\}`, 's'));
+    return match?.groups?.body ?? '';
+}
 
 beforeAll(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -68,5 +80,20 @@ describe('MapDisplayToggleControls', () => {
         const toggleGroup = rendered.container.querySelector('[data-slot="toggle-group"]');
 
         expect(toggleGroup?.getAttribute('data-spacing')).toBe('1');
+    });
+
+    test('uses primary theme tokens for active layer toggles', () => {
+        const styles = readOverlayStyles();
+
+        const activeRule = getCssRule(styles, '.nostr-map-display-toggle-button[data-state="on"]');
+
+        expect(activeRule).toContain('background: var(--primary)');
+        expect(activeRule).toContain('color: var(--primary-foreground)');
+    });
+
+    test('does not override layer toggle states with dark-mode color rules', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).not.toMatch(/\.dark \.nostr-map-display-toggle-button(?:\[data-state="on"\])?\s*\{/);
     });
 });

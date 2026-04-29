@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -22,6 +24,16 @@ async function renderElement(props: Partial<ComponentProps<typeof MapZoomControl
 }
 
 let mounted: RenderResult[] = [];
+
+function readOverlayStyles(): string {
+    return readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
+}
+
+function getCssRule(styles: string, selector: string): string {
+    const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = styles.match(new RegExp(`${escapedSelector}\\s*\\{(?<body>[^}]*)\\}`, 's'));
+    return match?.groups?.body ?? '';
+}
 
 beforeAll(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -78,5 +90,23 @@ describe('MapZoomControls', () => {
         });
 
         expect(onThemeChange).toHaveBeenCalledWith('dark');
+    });
+
+    test('keeps zoom buttons fully rounded inside the button group', () => {
+        const styles = readOverlayStyles();
+
+        const buttonRule = getCssRule(styles, '.nostr-map-zoom-button');
+
+        expect(buttonRule).toContain('border-radius: 999px !important');
+    });
+
+    test('does not render zoom controls as a segmented shadcn button group', async () => {
+        const rendered = await renderElement();
+        mounted.push(rendered);
+
+        const zoomGroup = rendered.container.querySelector('.nostr-map-zoom-group');
+
+        expect(zoomGroup?.getAttribute('role')).toBe('group');
+        expect(zoomGroup?.getAttribute('data-slot')).not.toBe('button-group');
     });
 });

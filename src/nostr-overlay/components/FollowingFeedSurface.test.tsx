@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -32,6 +34,10 @@ async function renderElement(element: ReactElement): Promise<RenderResult> {
 }
 
 let mounted: RenderResult[] = [];
+
+function readOverlayStyles(): string {
+    return readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
+}
 
 beforeAll(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -162,6 +168,8 @@ describe('FollowingFeedSurface', () => {
         expect(toggleGroup?.textContent).toContain('Lista');
         expect(toggleGroup?.textContent).toContain('Masonry');
         expect(toggleGroup?.getAttribute('data-size')).toBe('default');
+        expect(toggleGroup?.className).toContain('hidden');
+        expect(toggleGroup?.className).toContain('xl:flex');
 
         const refreshButton = Array.from(rendered.container.querySelectorAll('[data-slot="button"]')).find((button) =>
             (button.textContent || '').includes('Actualizar')
@@ -547,6 +555,13 @@ describe('FollowingFeedSurface', () => {
         const noteShell = itemsWrapper.querySelector('.nostr-following-feed-note-shell') as HTMLDivElement;
         expect(noteShell).toBeDefined();
         expect(noteShell.querySelector('[data-slot="card"]')).not.toBeNull();
+    });
+
+    test('uses the xl breakpoint before switching masonry to two columns', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/@media \(min-width:\s*1280px\)\s*\{\s*\.nostr-following-feed-list-layout-masonry\s*\{\s*column-count:\s*2;/s);
+        expect(styles).not.toMatch(/@media \(min-width:\s*900px\)\s*\{\s*\.nostr-following-feed-list-layout-masonry\s*\{/s);
     });
 
     test('keeps the loading footer outside the masonry items wrapper', async () => {

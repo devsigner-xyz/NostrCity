@@ -35,6 +35,7 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
                         variant="outline"
                         size="default"
                         value={agoraFeedLayout}
+                        className="hidden xl:flex"
                         onValueChange={(value) => {
                             if (value === 'list' || value === 'masonry') {
                                 onAgoraFeedLayoutChange(value);

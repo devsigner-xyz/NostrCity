@@ -3,7 +3,7 @@ import { MoonIcon, RefreshCcwIcon, SunIcon } from 'lucide-react';
 import type { MapBridge } from '../map-bridge';
 import { useI18n } from '@/i18n/useI18n';
 import { Button } from '@/components/ui/button';
-import { ButtonGroup, ButtonGroupText } from '@/components/ui/button-group';
+import { ButtonGroupText } from '@/components/ui/button-group';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 type MapQuickTheme = 'light' | 'dark';
@@ -109,7 +109,7 @@ export function MapZoomControls({
                 </ToggleGroupItem>
             </ToggleGroup>
 
-            <ButtonGroup className="nostr-map-zoom-group">
+            <div role="group" className="nostr-map-zoom-group">
                 <Button type="button" variant="outline" size="icon-sm" className="nostr-map-zoom-button nostr-map-zoom-button-left" aria-label={t('mapZoom.out')} onClick={onZoomOut}>
                     -
                 </Button>
@@ -119,7 +119,7 @@ export function MapZoomControls({
                 <Button type="button" variant="outline" size="icon-sm" className="nostr-map-zoom-button nostr-map-zoom-button-right" aria-label={t('mapZoom.in')} onClick={onZoomIn}>
                     +
                 </Button>
-            </ButtonGroup>
+            </div>
 
             <Button
                 type="button"

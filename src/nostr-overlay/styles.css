@@ -188,6 +188,8 @@
 }
 
 .nostr-map-zoom-group {
+    display: inline-flex;
+    align-items: center;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: color-mix(in oklab, var(--background) 92%, transparent);
@@ -202,7 +204,7 @@
     width: 30px;
     height: 30px;
     border-left-width: 1px;
-    border-radius: 999px;
+    border-radius: 999px !important;
     color: var(--foreground);
     font-size: 1rem;
     font-weight: 700;
@@ -292,14 +294,14 @@
 
 .nostr-map-display-toggle-button[data-state="on"] {
     border-color: transparent;
-    background: var(--muted);
-    color: var(--foreground);
+    background: var(--primary);
+    color: var(--primary-foreground);
 }
 
 .nostr-map-theme-toggle-button[data-state="on"] {
     border-color: transparent;
-    background: var(--muted);
-    color: var(--foreground);
+    background: var(--primary);
+    color: var(--primary-foreground);
 }
 
 .dark .nostr-map-zoom-group {
@@ -320,41 +322,6 @@
 .dark .nostr-map-theme-toggle-group {
     background: color-mix(in oklab, var(--background) 92%, transparent);
     box-shadow: 0 14px 28px color-mix(in oklab, black 42%, transparent);
-}
-
-.dark .nostr-map-zoom-button,
-.dark .nostr-map-regenerate-button,
-.dark .nostr-map-display-toggle-button,
-.dark .nostr-map-theme-toggle-button {
-    color: #FCFDFE;
-}
-
-.dark .nostr-map-display-toggle-button,
-.dark .nostr-map-theme-toggle-button {
-    background: transparent;
-    border-color: transparent;
-}
-
-.dark .nostr-map-zoom-button:hover,
-.dark .nostr-map-regenerate-button:hover,
-.dark .nostr-map-display-toggle-button:hover,
-.dark .nostr-map-theme-toggle-button:hover {
-    background: var(--muted);
-    color: var(--foreground);
-}
-
-.dark .nostr-map-display-toggle-button[data-state="on"] {
-    border-color: transparent;
-    background: var(--muted);
-    color: var(--foreground);
-    box-shadow: none;
-}
-
-.dark .nostr-map-theme-toggle-button[data-state="on"] {
-    border-color: transparent;
-    background: var(--muted);
-    color: var(--foreground);
-    box-shadow: none;
 }
 
 .dark .nostr-map-zoom-level {
@@ -2639,7 +2606,7 @@
     }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1280px) {
     .nostr-following-feed-list-layout-masonry {
         column-count: 2;
     }
@@ -2666,6 +2633,8 @@
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-success-foreground: var(--success-foreground);
+    --color-success: var(--success);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -2705,6 +2674,8 @@
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
+    --success: oklch(0.627 0.194 149.214);
+    --success-foreground: oklch(0.985 0 0);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
@@ -2741,6 +2712,8 @@
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
+    --success: oklch(0.722 0.192 149.579);
+    --success-foreground: oklch(0.145 0 0);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);

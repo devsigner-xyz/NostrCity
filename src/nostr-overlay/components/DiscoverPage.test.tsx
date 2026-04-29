@@ -66,4 +66,16 @@ describe('DiscoverPage', () => {
         expect(title?.textContent || '').toContain('Encuentra Bitcoin whitepaper');
         expect(subtitle?.textContent || '').toContain('Bitcoin: A Peer-to-Peer Electronic Cash System');
     });
+
+    test('renders found easter egg badges with the success variant', async () => {
+        const rendered = await renderElement(<DiscoverPage discoveredIds={['bitcoin_whitepaper']} />);
+        mounted.push(rendered);
+
+        const foundBadge = Array.from(rendered.container.querySelectorAll('[data-slot="badge"]')).find((badge) =>
+            (badge.textContent || '').includes('Encontrado')
+        );
+
+        expect(foundBadge).toBeDefined();
+        expect(foundBadge?.getAttribute('data-variant')).toBe('success');
+    });
 });

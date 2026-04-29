@@ -42,7 +42,7 @@ export function DiscoverPage({ discoveredIds }: DiscoverPageProps) {
                                                         {t(mission.subtitleKey)}
                                                     </span>
                                                 </span>
-                                                <Badge variant={discovered ? 'secondary' : 'outline'}>
+                                                <Badge variant={discovered ? 'success' : 'outline'}>
                                                     {discovered ? t('discover.status.found') : t('discover.status.pending')}
                                                 </Badge>
                                             </CardContent>
