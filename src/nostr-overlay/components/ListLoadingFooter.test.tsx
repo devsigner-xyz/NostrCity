@@ -47,4 +47,15 @@ describe('ListLoadingFooter', () => {
 
         expect(rendered.container.textContent || '').toContain('Loading more...');
     });
+
+    test('merges caller layout classes with the default centered footer layout', async () => {
+        const rendered = await renderElement(<ListLoadingFooter loading className="max-w-[600px] justify-self-start" />);
+        mounted.push(rendered);
+
+        const footer = rendered.container.querySelector('.nostr-list-loading-footer');
+        expect(footer?.className).toContain('w-full');
+        expect(footer?.className).toContain('justify-center');
+        expect(footer?.className).toContain('max-w-[600px]');
+        expect(footer?.className).toContain('justify-self-start');
+    });
 });

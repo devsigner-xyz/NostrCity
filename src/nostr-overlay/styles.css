@@ -161,16 +161,17 @@
     display: inline-flex;
     align-items: center;
     gap: 0.55rem;
-    border: 1px solid rgba(170, 188, 198, 0.95);
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 12px 24px rgba(14, 32, 44, 0.2);
+    background: color-mix(in oklab, var(--background) 95%, transparent);
+    color: var(--foreground);
+    box-shadow: 0 12px 24px color-mix(in oklab, var(--foreground) 14%, transparent);
     padding: 0.44rem 0.86rem;
 }
 
 .nostr-map-loader-text {
     margin: 0;
-    color: #254758;
+    color: var(--foreground);
     font-size: 0.86rem;
     font-weight: 600;
 }
@@ -715,7 +716,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.35rem;
-    color: #4a6270;
+    color: var(--muted-foreground);
     font-size: 0.8rem;
     margin: 0.16rem 0.1rem 0.42rem;
 }
@@ -1735,22 +1736,23 @@
 }
 
 .nostr-rich-event-reference {
-    border: 1px solid rgba(23, 43, 77, 0.16);
+    border: 1px solid var(--border);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.92);
+    background: color-mix(in oklab, var(--card) 96%, transparent);
+    color: var(--card-foreground);
     padding: 10px 12px;
     text-align: left;
 }
 
 .nostr-rich-event-reference-button {
     width: 100%;
-    border: 1px solid rgba(23, 43, 77, 0.16);
+    border: 1px solid var(--border);
     cursor: pointer;
 }
 
 .nostr-rich-event-reference-button:hover {
-    border-color: rgba(31, 84, 109, 0.35);
-    background: rgba(247, 251, 255, 0.95);
+    border-color: color-mix(in oklab, var(--primary) 32%, var(--border));
+    background: var(--muted);
 }
 
 .nostr-rich-event-reference-header {
@@ -1765,19 +1767,19 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #315368;
+    color: var(--muted-foreground);
     font-weight: 700;
 }
 
 .nostr-rich-event-reference-author {
     font-size: 12px;
-    color: #1f546d;
+    color: var(--foreground);
     font-weight: 600;
 }
 
 .nostr-rich-event-reference-content {
     margin: 6px 0 8px;
-    color: #172b4d;
+    color: var(--card-foreground);
     font-size: 13px;
     line-height: 1.45;
     white-space: pre-wrap;
@@ -1796,7 +1798,7 @@
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
-    color: rgba(23, 43, 77, 0.72);
+    color: var(--muted-foreground);
     font-size: 11px;
 }
 

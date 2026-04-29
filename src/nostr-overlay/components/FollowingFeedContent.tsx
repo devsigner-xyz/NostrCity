@@ -534,7 +534,11 @@ export function FollowingFeedContent({
                             </div>
                         )}
 
-                        <ListLoadingFooter loading={isLoadingFeed && items.length > 0} label={t('feed.loadingMorePosts')} />
+                        <ListLoadingFooter
+                            loading={isLoadingFeed && items.length > 0}
+                            label={t('feed.loadingMorePosts')}
+                            className="max-w-[600px] justify-self-start"
+                        />
 
                     </div>
                 </>
@@ -683,7 +687,11 @@ export function FollowingFeedContent({
                                     </Empty>
                                 ) : null}
 
-                                <ListLoadingFooter loading={showThreadLoadingFooter} label={t('feed.loadingThreadFooter')} />
+                                <ListLoadingFooter
+                                    loading={showThreadLoadingFooter}
+                                    label={t('feed.loadingThreadFooter')}
+                                    className="max-w-[600px] justify-self-start"
+                                />
                             </>
                         )}
 

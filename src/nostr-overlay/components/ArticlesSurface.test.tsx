@@ -82,6 +82,8 @@ describe('ArticlesSurface', () => {
 
         expect(rendered.container.textContent).toContain('Cargando articulos');
         expect(rendered.container.querySelector('[role="status"]')).not.toBeNull();
+        expect(rendered.container.querySelector('.articles-loading-state')?.className).toContain('max-w-[600px]');
+        expect(rendered.container.querySelector('.articles-loading-state')?.className).toContain('self-start');
     });
 
     test('renders empty state', async () => {
@@ -129,6 +131,8 @@ describe('ArticlesSurface', () => {
         expect(articleList).not.toBeNull();
         expect(articleList?.className).toContain('max-w-[600px]');
         expect(articleList?.className).toContain('w-full');
+        expect(articleList?.className).toContain('self-start');
+        expect(articleList?.className).not.toContain('mx-auto');
     });
 
     test('loads more articles when scrolling near the bottom', async () => {
@@ -165,5 +169,6 @@ describe('ArticlesSurface', () => {
         const footer = rendered.container.querySelector('.nostr-list-loading-footer');
         expect(footer?.textContent).toContain('Cargando articulos');
         expect(footer?.className).toContain('justify-center');
+        expect(footer?.className).toContain('max-w-[600px]');
     });
 });

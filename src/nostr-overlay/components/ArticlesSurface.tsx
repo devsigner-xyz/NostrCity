@@ -74,7 +74,7 @@ export function ArticlesSurface({
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
 
                 {isLoading ? (
-                    <Empty>
+                    <Empty className="articles-loading-state w-full max-w-[600px] self-start">
                         <EmptyHeader>
                             <Spinner />
                             <EmptyTitle>{t('articles.loadingTitle')}</EmptyTitle>
@@ -89,7 +89,7 @@ export function ArticlesSurface({
                         </EmptyHeader>
                     </Empty>
                 ) : (
-                    <div className="mx-auto flex w-full max-w-[600px] flex-col gap-4" data-testid="articles-list">
+                    <div className="flex w-full max-w-[600px] self-start flex-col gap-4" data-testid="articles-list">
                         {items.map((item) => (
                             <ArticlePreviewCard
                                 key={item.id}
@@ -98,7 +98,7 @@ export function ArticlesSurface({
                                 onOpenArticle={onOpenArticle}
                             />
                         ))}
-                        <ListLoadingFooter loading={isLoadingMore} label={t('articles.loadingMore')} />
+                        <ListLoadingFooter loading={isLoadingMore} label={t('articles.loadingMore')} className="max-w-[600px]" />
                     </div>
                 )}
             </div>

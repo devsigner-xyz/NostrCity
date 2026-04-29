@@ -76,3 +76,24 @@ describe('chat visual theme styles', () => {
         expect(styles).toMatch(/\.nostr-chat-message\s*\{[^}]*border:\s*1px\s+solid\s+var\(--border\)[^}]*color:\s*var\(--card-foreground\)[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--card\)\s+96%,\s*transparent\)/s);
     });
 });
+
+describe('loading indicator theme styles', () => {
+    test('uses semantic tokens for incremental list loaders', () => {
+        expect(styles).toMatch(/\.nostr-list-loading-footer\s*\{[^}]*color:\s*var\(--muted-foreground\)/s);
+        expect(styles).not.toMatch(/\.nostr-list-loading-footer\s*\{[^}]*#[0-9a-fA-F]{3,8}/s);
+    });
+
+    test('uses semantic tokens for the map loader surface', () => {
+        expect(styles).toMatch(/\.nostr-map-loader-card\s*\{[^}]*border:\s*1px\s+solid\s+var\(--border\)/s);
+        expect(styles).toMatch(/\.nostr-map-loader-card\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--background\)\s+95%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.nostr-map-loader-card\s*\{[^}]*color:\s*var\(--foreground\)/s);
+        expect(styles).toMatch(/\.nostr-map-loader-text\s*\{[^}]*color:\s*var\(--foreground\)/s);
+    });
+
+    test('uses semantic tokens for rich event reference loaders', () => {
+        expect(styles).toMatch(/\.nostr-rich-event-reference\s*\{[^}]*border:\s*1px\s+solid\s+var\(--border\)/s);
+        expect(styles).toMatch(/\.nostr-rich-event-reference\s*\{[^}]*background:\s*color-mix\(in\s+oklab,\s*var\(--card\)\s+96%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.nostr-rich-event-reference-content\s*\{[^}]*color:\s*var\(--card-foreground\)/s);
+        expect(styles).toMatch(/\.nostr-rich-event-reference-meta\s*\{[^}]*color:\s*var\(--muted-foreground\)/s);
+    });
+});

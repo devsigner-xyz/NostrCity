@@ -567,6 +567,8 @@ describe('FollowingFeedSurface', () => {
         const loadingFooter = Array.from(feedList.children).find((child) => (child.textContent || '').includes('Cargando notas...')) as HTMLDivElement | undefined;
         expect(loadingFooter).toBeDefined();
         expect(itemsWrapper.contains(loadingFooter || null)).toBe(false);
+        expect(loadingFooter?.className).toContain('max-w-[600px]');
+        expect(loadingFooter?.className).toContain('justify-self-start');
     });
 
     test('renders no-follows empty state using Empty component copy', async () => {
