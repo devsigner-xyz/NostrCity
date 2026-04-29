@@ -799,7 +799,7 @@ describe('Nostr overlay App focused safety-net harness', () => {
     test('sends one payment while an auto-resumed zap is pending across rerenders', async () => {
         const ownerPubkey = SAMPLE_AUTH_PUBKEY;
         const alicePubkey = 'a'.repeat(64);
-        const originPath = '/estadisticas';
+        const originPath = '/city-stats';
         const originSearch = '?from=safety-net';
         const originRoute = `${originPath}${originSearch}`;
         const locations: AppLocation[] = [];

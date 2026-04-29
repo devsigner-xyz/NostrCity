@@ -9,10 +9,32 @@ import type { AuthSessionState } from '../../nostr/auth/session';
 interface RenderResult {
     container: HTMLDivElement;
     root: Root;
+    onOpenChat: ReturnType<typeof vi.fn>;
+    onOpenNotifications: ReturnType<typeof vi.fn>;
+    onOpenPublish: ReturnType<typeof vi.fn>;
+    onOpenWallet: ReturnType<typeof vi.fn>;
     onOpenProfileEditor: ReturnType<typeof vi.fn>;
 }
 
-async function renderSidebar({ pathname = '/', open = true, resolvedTheme = 'dark' }: { pathname?: string; open?: boolean; resolvedTheme?: 'light' | 'dark' } = {}): Promise<RenderResult> {
+async function renderSidebar({
+    pathname = '/',
+    open = true,
+    resolvedTheme = 'dark',
+    authSessionOverrides = {},
+    canWrite = true,
+    canAccessDirectMessages = true,
+    canAccessSocialNotifications = true,
+    canAccessFollowingFeed = true,
+}: {
+    pathname?: string;
+    open?: boolean;
+    resolvedTheme?: 'light' | 'dark';
+    authSessionOverrides?: Partial<AuthSessionState>;
+    canWrite?: boolean;
+    canAccessDirectMessages?: boolean;
+    canAccessSocialNotifications?: boolean;
+    canAccessFollowingFeed?: boolean;
+} = {}): Promise<RenderResult> {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -20,7 +42,7 @@ async function renderSidebar({ pathname = '/', open = true, resolvedTheme = 'dar
     const authSession: AuthSessionState = {
         method: 'nip07',
         pubkey: 'f'.repeat(64),
-        readonly: true,
+        readonly: false,
         locked: false,
         createdAt: 1,
         capabilities: {
@@ -28,7 +50,12 @@ async function renderSidebar({ pathname = '/', open = true, resolvedTheme = 'dar
             canEncrypt: true,
             encryptionSchemes: ['nip44'],
         },
+        ...authSessionOverrides,
     };
+    const onOpenChat = vi.fn();
+    const onOpenNotifications = vi.fn();
+    const onOpenPublish = vi.fn();
+    const onOpenWallet = vi.fn();
     const onOpenProfileEditor = vi.fn();
 
     await act(async () => {
@@ -41,23 +68,23 @@ async function renderSidebar({ pathname = '/', open = true, resolvedTheme = 'dar
                     authSession={authSession}
                     ownerPubkey={'f'.repeat(64)}
                     ownerProfile={{ pubkey: 'f'.repeat(64), displayName: 'Nostr City', picture: 'https://example.com/avatar.png' }}
-                    canWrite
-                    canAccessDirectMessages
-                    canAccessSocialNotifications
-                    canAccessFollowingFeed
+                    canWrite={canWrite}
+                    canAccessDirectMessages={canAccessDirectMessages}
+                    canAccessSocialNotifications={canAccessSocialNotifications}
+                    canAccessFollowingFeed={canAccessFollowingFeed}
                     chatHasUnread
                     notificationsHasUnread
                     followingFeedHasUnread
                     onOpenMap={vi.fn()}
                     onOpenCityStats={vi.fn()}
-                    onOpenChat={vi.fn()}
+                    onOpenChat={onOpenChat}
                     onOpenRelays={vi.fn()}
-                    onOpenNotifications={vi.fn()}
+                    onOpenNotifications={onOpenNotifications}
                     onOpenFollowingFeed={vi.fn()}
                     onOpenArticles={vi.fn()}
                     onOpenGlobalSearch={vi.fn()}
-                    onOpenWallet={vi.fn()}
-                    onOpenPublish={vi.fn()}
+                    onOpenWallet={onOpenWallet}
+                    onOpenPublish={onOpenPublish}
                     onOpenSettings={vi.fn()}
                     isUiSettingsOpen={false}
                     onLogout={vi.fn()}
@@ -77,7 +104,7 @@ async function renderSidebar({ pathname = '/', open = true, resolvedTheme = 'dar
         );
     });
 
-    return { container, root, onOpenProfileEditor };
+    return { container, root, onOpenChat, onOpenNotifications, onOpenPublish, onOpenWallet, onOpenProfileEditor };
 }
 
 async function openUserMenu(container: ParentNode): Promise<void> {
@@ -204,6 +231,88 @@ describe('OverlaySidebar', () => {
         });
 
         expect(rendered.onOpenProfileEditor).toHaveBeenCalledTimes(1);
+    });
+
+    test('keeps signing-required sidebar actions visible but disabled in readonly mode', async () => {
+        const rendered = await renderSidebar({
+            pathname: '/',
+            authSessionOverrides: {
+                method: 'npub',
+                readonly: true,
+                capabilities: {
+                    canSign: false,
+                    canEncrypt: false,
+                    encryptionSchemes: [],
+                },
+            },
+            canWrite: false,
+            canAccessDirectMessages: false,
+            canAccessSocialNotifications: false,
+        });
+        mounted.push(rendered);
+
+        const readonlyReason = 'Estás en modo lectura, accede con firma.';
+        const publishButton = rendered.container.querySelector('button[aria-label="Abrir publicar"]') as HTMLButtonElement | null;
+        const chatButton = rendered.container.querySelector('button[aria-label="Abrir chats"]') as HTMLButtonElement | null;
+        const notificationsButton = rendered.container.querySelector('button[aria-label="Abrir notificaciones"]') as HTMLButtonElement | null;
+        const walletButton = rendered.container.querySelector('button[aria-label="Abrir Wallet"]') as HTMLButtonElement | null;
+
+        expect(publishButton).not.toBeNull();
+        expect(chatButton).not.toBeNull();
+        expect(notificationsButton).not.toBeNull();
+        expect(walletButton).not.toBeNull();
+        expect(publishButton?.disabled).toBe(true);
+        expect(chatButton?.disabled).toBe(true);
+        expect(notificationsButton?.disabled).toBe(true);
+        expect(walletButton?.disabled).toBe(true);
+        expect(publishButton?.title).toBe(readonlyReason);
+        expect(chatButton?.title).toBe(readonlyReason);
+        expect(notificationsButton?.title).toBe(readonlyReason);
+        expect(walletButton?.title).toBe(readonlyReason);
+
+        await act(async () => {
+            publishButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            chatButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            notificationsButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            walletButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(rendered.onOpenPublish).not.toHaveBeenCalled();
+        expect(rendered.onOpenChat).not.toHaveBeenCalled();
+        expect(rendered.onOpenNotifications).not.toHaveBeenCalled();
+        expect(rendered.onOpenWallet).not.toHaveBeenCalled();
+    });
+
+    test('disables edit profile from the user menu in readonly mode', async () => {
+        const rendered = await renderSidebar({
+            pathname: '/',
+            authSessionOverrides: {
+                method: 'npub',
+                readonly: true,
+                capabilities: {
+                    canSign: false,
+                    canEncrypt: false,
+                    encryptionSchemes: [],
+                },
+            },
+            canWrite: false,
+        });
+        mounted.push(rendered);
+
+        await openUserMenu(rendered.container);
+        const editProfileAction = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+            (item.textContent || '').trim() === 'Editar perfil'
+        ) as HTMLElement;
+
+        expect(editProfileAction).toBeDefined();
+        expect(editProfileAction.getAttribute('aria-disabled')).toBe('true');
+        expect(editProfileAction.getAttribute('title')).toBe('Estás en modo lectura, accede con firma.');
+
+        await act(async () => {
+            editProfileAction.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(rendered.onOpenProfileEditor).not.toHaveBeenCalled();
     });
 
     test('uses the resolved theme logo in the platform header avatar', async () => {

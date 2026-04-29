@@ -50,7 +50,10 @@ describe('Nip05Identifier', () => {
         );
         mounted.push(rendered);
 
-        const chip = rendered.container.querySelector('.nostr-nip05-chip') as HTMLElement | null;
-        expect(chip?.getAttribute('aria-label')).toBe('NIP-05 verified by DNS: example.com');
+        const identifier = rendered.container.querySelector('.nostr-nip05-text') as HTMLElement | null;
+        expect(identifier?.getAttribute('aria-label')).toBe('NIP-05 verified by DNS: example.com');
+        expect(identifier?.textContent).toBe('example.com');
+        expect(rendered.container.querySelector('.nostr-nip05-chip')).toBeNull();
+        expect(rendered.container.querySelector('.nostr-nip05-check')).toBeNull();
     });
 });

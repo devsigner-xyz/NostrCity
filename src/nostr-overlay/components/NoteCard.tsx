@@ -16,6 +16,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { I18nContextValue } from '@/i18n/I18nProvider';
 import { useI18n } from '@/i18n/useI18n';
 import { sanitizeImageUrl } from '../media/image-url-policy';
@@ -215,6 +216,25 @@ function NoteActionsMenu({ noteId, onCopyNoteId, onViewDetail, t }: NoteActionsM
     );
 }
 
+function ReadonlyActionTooltip({ enabled, label, children }: { enabled: boolean; label: string; children: ReactNode }) {
+    if (!enabled) {
+        return <>{children}</>;
+    }
+
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="inline-flex" title={label}>{children}</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                    {label}
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+}
+
 function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
     const openRepostMenu = (event: ReactMouseEvent<HTMLButtonElement>): void => {
         event.preventDefault();
@@ -241,17 +261,20 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
     };
 
     const canOpenZapMenu = Boolean(actions.canWrite && actions.onZap && actions.zapAmounts && actions.zapAmounts.length > 0);
+    const readonlyReason = t('auth.readOnlySignInRequired');
+    const isReadonly = !actions.canWrite;
     const reactionEmoji = actions.reactionEmoji || DEFAULT_REACTION_EMOJI;
     const reactionButtonLabel = actions.isReactionActive
         ? t('note.actions.removeReaction', { emoji: reactionEmoji, count: String(actions.reactions) })
         : t('note.actions.react', { count: String(actions.reactions) });
-    const reactionButton = (
+    const reactionButtonElement = (
         <Button
             type="button"
             variant="ghost"
             size="sm"
-            disabled={actions.isReactionPending || !actions.canWrite}
+            disabled={actions.isReactionPending || isReadonly}
             aria-label={reactionButtonLabel}
+            title={isReadonly ? readonlyReason : undefined}
             onClick={(event) => {
                 event.stopPropagation();
                 if (actions.isReactionActive || !actions.onSelectReactionEmoji) {
@@ -267,22 +290,29 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
             <span>{actions.reactions}</span>
         </Button>
     );
+    const reactionButton = isReadonly ? (
+        <ReadonlyActionTooltip enabled label={readonlyReason}>
+            {reactionButtonElement}
+        </ReadonlyActionTooltip>
+    ) : reactionButtonElement;
 
     return (
         <ButtonGroup>
-            <Button type="button" variant="ghost" size="sm" aria-label={t('note.actions.reply', { count: String(actions.replies) })} onClick={(event) => {
-                event.stopPropagation();
-                actions.onReply();
-            }}>
-                {actions.isReplyActive ? (
-                    <span data-icon="inline-start" aria-hidden="true">💬</span>
-                ) : (
-                    <MessageCircleIcon data-icon="inline-start" aria-hidden="true" />
-                )}
-                <span>{actions.replies}</span>
-            </Button>
+            <ReadonlyActionTooltip enabled={isReadonly} label={readonlyReason}>
+                <Button type="button" variant="ghost" size="sm" disabled={isReadonly} title={isReadonly ? readonlyReason : undefined} aria-label={t('note.actions.reply', { count: String(actions.replies) })} onClick={(event) => {
+                    event.stopPropagation();
+                    actions.onReply();
+                }}>
+                    {actions.isReplyActive ? (
+                        <span data-icon="inline-start" aria-hidden="true">💬</span>
+                    ) : (
+                        <MessageCircleIcon data-icon="inline-start" aria-hidden="true" />
+                    )}
+                    <span>{actions.replies}</span>
+                </Button>
+            </ReadonlyActionTooltip>
 
-            {!actions.isReactionActive && actions.onSelectReactionEmoji ? (
+            {!actions.isReactionActive && actions.onSelectReactionEmoji && !isReadonly ? (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         {reactionButton}
@@ -306,33 +336,49 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
                 </DropdownMenu>
             ) : reactionButton}
 
-            <ContextMenu>
-                <ContextMenuTrigger asChild>
+            {isReadonly ? (
+                <ReadonlyActionTooltip enabled label={readonlyReason}>
                     <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        disabled={actions.isRepostPending || !actions.canWrite}
+                        disabled
                         aria-label={t('note.actions.repost', { count: String(actions.reposts) })}
-                        onClick={openRepostMenu}
+                        title={readonlyReason}
                     >
                         <Repeat2Icon data-icon="inline-start" aria-hidden="true" />
                         <span>{actions.reposts}</span>
                     </Button>
-                </ContextMenuTrigger>
-                <ContextMenuContent className="w-40">
-                    <ContextMenuGroup>
-                        <ContextMenuItem onSelect={() => {
-                            void actions.onRepost();
-                        }}>
-                            {t('note.actions.repostAction')}
-                        </ContextMenuItem>
-                        <ContextMenuItem onSelect={actions.onQuote}>
-                            {t('note.actions.quoteAction')}
-                        </ContextMenuItem>
-                    </ContextMenuGroup>
-                </ContextMenuContent>
-            </ContextMenu>
+                </ReadonlyActionTooltip>
+            ) : (
+                <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={actions.isRepostPending}
+                            aria-label={t('note.actions.repost', { count: String(actions.reposts) })}
+                            onClick={openRepostMenu}
+                        >
+                            <Repeat2Icon data-icon="inline-start" aria-hidden="true" />
+                            <span>{actions.reposts}</span>
+                        </Button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-40">
+                        <ContextMenuGroup>
+                            <ContextMenuItem onSelect={() => {
+                                void actions.onRepost();
+                            }}>
+                                {t('note.actions.repostAction')}
+                            </ContextMenuItem>
+                            <ContextMenuItem onSelect={actions.onQuote}>
+                                {t('note.actions.quoteAction')}
+                            </ContextMenuItem>
+                        </ContextMenuGroup>
+                    </ContextMenuContent>
+                </ContextMenu>
+            )}
 
             {canOpenZapMenu ? (
                 <ContextMenu>
@@ -369,21 +415,24 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
                     </ContextMenuContent>
                 </ContextMenu>
             ) : (
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={!actions.canWrite || !actions.onZap}
-                    aria-label={t('note.actions.zaps', { count: String(actions.zapSats) })}
-                    onClick={(event) => event.stopPropagation()}
-                >
-                    {actions.isZapActive ? (
-                        <span data-icon="inline-start" aria-hidden="true">⚡</span>
-                    ) : (
-                        <ZapIcon data-icon="inline-start" aria-hidden="true" />
-                    )}
-                    <span>{actions.zapSats}</span>
-                </Button>
+                <ReadonlyActionTooltip enabled={isReadonly} label={readonlyReason}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isReadonly || !actions.onZap}
+                        aria-label={t('note.actions.zaps', { count: String(actions.zapSats) })}
+                        title={isReadonly ? readonlyReason : undefined}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        {actions.isZapActive ? (
+                            <span data-icon="inline-start" aria-hidden="true">⚡</span>
+                        ) : (
+                            <ZapIcon data-icon="inline-start" aria-hidden="true" />
+                        )}
+                        <span>{actions.zapSats}</span>
+                    </Button>
+                </ReadonlyActionTooltip>
             )}
         </ButtonGroup>
     );

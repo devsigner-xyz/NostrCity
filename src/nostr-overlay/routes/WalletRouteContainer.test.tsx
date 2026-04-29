@@ -53,6 +53,7 @@ const walletActivity: WalletActivityState = {
 
 function buildProps(overrides: Partial<WalletRouteContainerProps> = {}): WalletRouteContainerProps {
     return {
+        canWrite: true,
         walletSettings,
         walletActivity,
         walletNwcUriInput: 'nostr+walletconnect://input.example',

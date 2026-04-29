@@ -652,83 +652,85 @@ export function FollowingFeedContent({
                                     })()
                                 ) : null}
 
-                                <Card
-                                    variant="elevated"
-                                    className="nostr-following-feed-reply-box w-full shadow-none"
-                                >
-                                    <CardContent className="px-4 py-4">
-                                        <MentionTextarea
-                                            value={replyDraft}
-                                            aria-label={t('feed.replyComposer')}
-                                            className="nostr-following-feed-textarea"
-                                            placeholder={t('feed.replyPlaceholder')}
-                                            rows={3}
-                                            onSearch={onSearchUsers}
-                                            ownerPubkey={ownerPubkey}
-                                            searchRelaySetKey={searchRelaySetKey}
-                                            onChangeDraft={setReplyDraft}
-                                            onChange={(event) => {
-                                                event.currentTarget.style.height = '0px';
-                                                event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
-                                            }}
-                                        />
-                                        <ComposerImageAttachmentPreview
-                                            value={replyImage}
-                                            onChange={(value) => {
-                                                if (!value) {
-                                                    removeReplyImage();
-                                                }
-                                            }}
-                                            onEdit={() => replyImageInputRef.current?.click()}
-                                            compact
-                                            disabled={replyDisabled}
-                                        />
-                                        <div className="sr-only" role="status" aria-live="polite">
-                                            {replyImageStatus}
-                                        </div>
-                                        {replyImageError ? (
-                                            <p className="mt-2 text-xs text-destructive" role="alert">
-                                                {replyImageError}
-                                            </p>
-                                        ) : null}
-                                        <div className="nostr-following-feed-compose-actions mt-3 flex items-center justify-between gap-2">
-                                            <ComposerImageAttachmentButton
-                                                inputRef={replyImageInputRef}
-                                                disabled={replyDisabled}
-                                                onSelect={selectReplyImage}
-                                                onReject={rejectReplyImage}
+                                {canWrite ? (
+                                    <Card
+                                        variant="elevated"
+                                        className="nostr-following-feed-reply-box w-full shadow-none"
+                                    >
+                                        <CardContent className="px-4 py-4">
+                                            <MentionTextarea
+                                                value={replyDraft}
+                                                aria-label={t('feed.replyComposer')}
+                                                className="nostr-following-feed-textarea"
+                                                placeholder={t('feed.replyPlaceholder')}
+                                                rows={3}
+                                                onSearch={onSearchUsers}
+                                                ownerPubkey={ownerPubkey}
+                                                searchRelaySetKey={searchRelaySetKey}
+                                                onChangeDraft={setReplyDraft}
+                                                onChange={(event) => {
+                                                    event.currentTarget.style.height = '0px';
+                                                    event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
+                                                }}
                                             />
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                className="nostr-following-feed-publish"
-                                                disabled={replyDisabled || (replyDraft.text.trim().length === 0 && !replyImage)}
-                                                onClick={async () => {
-                                                    if (!replyTargetEventId) {
-                                                        return;
-                                                    }
-
-                                                    const replyInput: Parameters<typeof onPublishReply>[0] = {
-                                                        targetEventId: replyTargetEventId,
-                                                        content: replyDraft,
-                                                        ...(replyTargetPubkey ? { targetPubkey: replyTargetPubkey } : {}),
-                                                        ...(activeThread.root?.id ? { rootEventId: activeThread.root.id } : {}),
-                                                        ...(replyImage ? { image: { file: replyImage.file } } : {}),
-                                                    };
-                                                    const submitted = await onPublishReply(replyInput);
-                                                    if (submitted) {
-                                                        setReplyDraft(createMentionDraft(''));
-                                                        clearReplyImage();
-                                                        setReplyImageStatus('');
-                                                        setReplyImageError('');
+                                            <ComposerImageAttachmentPreview
+                                                value={replyImage}
+                                                onChange={(value) => {
+                                                    if (!value) {
+                                                        removeReplyImage();
                                                     }
                                                 }}
-                                            >
-                                                {isPublishingReply ? t('feed.sendingReply') : t('feed.reply')}
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+                                                onEdit={() => replyImageInputRef.current?.click()}
+                                                compact
+                                                disabled={replyDisabled}
+                                            />
+                                            <div className="sr-only" role="status" aria-live="polite">
+                                                {replyImageStatus}
+                                            </div>
+                                            {replyImageError ? (
+                                                <p className="mt-2 text-xs text-destructive" role="alert">
+                                                    {replyImageError}
+                                                </p>
+                                            ) : null}
+                                            <div className="nostr-following-feed-compose-actions mt-3 flex items-center justify-between gap-2">
+                                                <ComposerImageAttachmentButton
+                                                    inputRef={replyImageInputRef}
+                                                    disabled={replyDisabled}
+                                                    onSelect={selectReplyImage}
+                                                    onReject={rejectReplyImage}
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    className="nostr-following-feed-publish"
+                                                    disabled={replyDisabled || (replyDraft.text.trim().length === 0 && !replyImage)}
+                                                    onClick={async () => {
+                                                        if (!replyTargetEventId) {
+                                                            return;
+                                                        }
+
+                                                        const replyInput: Parameters<typeof onPublishReply>[0] = {
+                                                            targetEventId: replyTargetEventId,
+                                                            content: replyDraft,
+                                                            ...(replyTargetPubkey ? { targetPubkey: replyTargetPubkey } : {}),
+                                                            ...(activeThread.root?.id ? { rootEventId: activeThread.root.id } : {}),
+                                                            ...(replyImage ? { image: { file: replyImage.file } } : {}),
+                                                        };
+                                                        const submitted = await onPublishReply(replyInput);
+                                                        if (submitted) {
+                                                            setReplyDraft(createMentionDraft(''));
+                                                            clearReplyImage();
+                                                            setReplyImageStatus('');
+                                                            setReplyImageError('');
+                                                        }
+                                                    }}
+                                                >
+                                                    {isPublishingReply ? t('feed.sendingReply') : t('feed.reply')}
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ) : null}
 
                                 {visibleThreadReplies.map((reply) => renderThreadReplyNode(reply, 1))}
 

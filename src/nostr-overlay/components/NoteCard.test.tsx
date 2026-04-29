@@ -254,10 +254,17 @@ describe('NoteCard', () => {
         const reactionButton = container.querySelector('button[aria-label="Reaccionar (3)"]') as HTMLButtonElement | null;
         const repostButton = container.querySelector('button[aria-label="Repostear (2)"]') as HTMLButtonElement | null;
         const zapButton = container.querySelector('button[aria-label="Sats recibidos: 210"]') as HTMLButtonElement | null;
+        const replyButton = container.querySelector('button[aria-label="Responder (1)"]') as HTMLButtonElement | null;
+        const readonlyReason = 'Estás en modo lectura, accede con firma.';
 
+        expect(replyButton?.disabled).toBe(true);
         expect(reactionButton?.disabled).toBe(true);
         expect(repostButton?.disabled).toBe(true);
         expect(zapButton?.disabled).toBe(true);
+        expect(replyButton?.title).toBe(readonlyReason);
+        expect(reactionButton?.title).toBe(readonlyReason);
+        expect(repostButton?.title).toBe(readonlyReason);
+        expect(zapButton?.title).toBe(readonlyReason);
     });
 
     test('shows active zap with lightning emoji without default button background', async () => {

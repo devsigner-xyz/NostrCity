@@ -4,6 +4,7 @@ import { NotificationsPage } from '../components/NotificationsPage';
 type NotificationsPageProps = ComponentProps<typeof NotificationsPage>;
 
 export interface NotificationsRouteContainerProps {
+    canAccessSocialNotifications: boolean;
     hasUnread: NotificationsPageProps['hasUnread'];
     pendingSnapshot: NotificationsPageProps['newNotifications'];
     items: NotificationsPageProps['recentNotifications'];

@@ -48,14 +48,11 @@ export function Nip05Identifier({ profile, verification, className, mode = 'full
 
     return (
         <span
-            className={`nostr-nip05-chip${verified ? ' is-verified' : ''}${className ? ` ${className}` : ''}`}
+            className={`nostr-nip05-text${className ? ` ${className}` : ''}`}
             title={statusLabel}
             aria-label={statusLabel}
         >
-            <span className="nostr-nip05-text">{display}</span>
-            {verified ? (
-                <span className="nostr-nip05-check" aria-hidden="true">✓</span>
-            ) : null}
+            {display}
         </span>
     );
 }

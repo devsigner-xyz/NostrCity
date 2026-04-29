@@ -167,6 +167,7 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             parkCount: 0,
         },
         notifications: {
+            canAccessSocialNotifications: true,
             hasUnread: false,
             pendingSnapshot: [],
             items: [],
@@ -184,7 +185,7 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             messages: [],
             activeConversationId: null,
             canSendChatMessages: false,
-            canDirectMessages: false,
+            canDirectMessages: true,
             onOpenConversation: noop,
             sendMessage: asyncNoop,
         },
@@ -201,6 +202,7 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             discoveredIds: [],
         },
         wallet: {
+            canWrite: true,
             walletSettings: { activeConnection: null },
             walletActivity: { items: [] },
             walletNwcUriInput: '',
@@ -370,12 +372,83 @@ describe('OverlayRoutes', () => {
         expect(lastLocation(rendered.locations)).toBe('/wallet');
     });
 
-    test('routes authenticated /perfil requests to the profile editor', async () => {
-        const rendered = await renderOverlayRoutes('/perfil');
+    test('redirects readonly direct wallet URLs back to the map', async () => {
+        const baseProps = buildOverlayRoutesProps();
+        const rendered = await renderOverlayRoutes('/wallet', {
+            wallet: {
+                ...baseProps.wallet,
+                canWrite: false,
+            },
+        });
+        mounted.push(rendered);
+
+        await waitFor(() => lastLocation(rendered.locations) === '/');
+
+        expect(rendered.container.querySelector('[data-testid="wallet-route"]')).toBeNull();
+        expect(lastLocation(rendered.locations)).toBe('/');
+    });
+
+    test.each([
+        {
+            path: '/chats',
+            testId: 'chats-route',
+            overrides: (baseProps: OverlayRoutesProps): Partial<OverlayRoutesProps> => ({
+                chats: {
+                    ...baseProps.chats,
+                    canDirectMessages: false,
+                },
+            }),
+        },
+        {
+            path: '/notifications',
+            testId: 'notifications-route',
+            overrides: (baseProps: OverlayRoutesProps): Partial<OverlayRoutesProps> => ({
+                notifications: {
+                    ...baseProps.notifications,
+                    canAccessSocialNotifications: false,
+                },
+            }),
+        },
+        {
+            path: '/profile',
+            testId: 'profile-route',
+            overrides: (baseProps: OverlayRoutesProps): Partial<OverlayRoutesProps> => ({
+                profile: {
+                    ...baseProps.profile,
+                    canWrite: false,
+                },
+            }),
+        },
+    ])('redirects direct $path requests when readonly capabilities block the route', async ({ path, testId, overrides }) => {
+        const baseProps = buildOverlayRoutesProps();
+        const rendered = await renderOverlayRoutes(path, overrides(baseProps));
+        mounted.push(rendered);
+
+        await waitFor(() => lastLocation(rendered.locations) === '/');
+
+        expect(rendered.container.querySelector(`[data-testid="${testId}"]`)).toBeNull();
+        expect(lastLocation(rendered.locations)).toBe('/');
+    });
+
+    test('routes authenticated /profile requests to the profile editor', async () => {
+        const rendered = await renderOverlayRoutes('/profile');
         mounted.push(rendered);
 
         expect(rendered.container.querySelector('[data-testid="profile-route"]')).not.toBeNull();
-        expect(lastLocation(rendered.locations)).toBe('/perfil');
+        expect(lastLocation(rendered.locations)).toBe('/profile');
+    });
+
+    test.each([
+        ['/city-stats', 'city-stats-route'],
+        ['/notifications', 'notifications-route'],
+        ['/discover', 'discover-route'],
+        ['/user-search', 'user-search-route'],
+    ])('routes authenticated %s requests to its page', async (path, testId) => {
+        const rendered = await renderOverlayRoutes(path);
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector(`[data-testid="${testId}"]`)).not.toBeNull();
+        expect(lastLocation(rendered.locations)).toBe(path);
     });
 
     test('preserves search params for legacy settings relay detail redirect', async () => {

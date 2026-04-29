@@ -830,7 +830,7 @@ describe('Nostr overlay App', () => {
         const { bridge } = createMapBridgeStub();
         const rendered = await renderApp(
             <App mapBridge={bridge} services={createBasicOverlayServices()} />,
-            { initialEntries: ['/estadisticas'] }
+            { initialEntries: ['/city-stats'] }
         );
         mounted.push(rendered);
 
@@ -3633,7 +3633,7 @@ describe('Nostr overlay App', () => {
         expect(compactNotificationsButton).not.toBeNull();
     });
 
-    test('orders main sidebar actions as mapa/agora/publicar/chats/relays/notificaciones/buscar/estadisticas/descubre/ajustes', async () => {
+    test('orders main sidebar actions with map/agora/publish/chats/relays/notifications/search/stats/discover/settings', async () => {
         const ownerPubkey = 'f'.repeat(64);
         const socialFeed = createSocialFeedServiceMock();
         const socialNotifications = createSocialNotificationsServiceMock();

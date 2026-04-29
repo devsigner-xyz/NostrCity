@@ -2,6 +2,7 @@ import type { WalletActivityState, WalletSettingsState } from '../../nostr/walle
 import { WalletPage } from '../components/WalletPage';
 
 export interface WalletRouteContainerProps {
+    canWrite: boolean;
     walletSettings: WalletSettingsState;
     walletActivity: WalletActivityState;
     walletNwcUriInput: string;

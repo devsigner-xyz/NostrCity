@@ -8,7 +8,7 @@ const AUDITED_ROUTES = [
         marker: 'Active wallet',
     },
     {
-        path: '/app/#/estadisticas',
+        path: '/app/#/city-stats',
         marker: 'Occupied buildings',
     },
     {
@@ -20,7 +20,7 @@ const AUDITED_ROUTES = [
         marker: 'Relay detail',
     },
     {
-        path: '/app/#/descubre',
+        path: '/app/#/discover',
         marker: 'Discover',
     },
 ] as const;
@@ -40,7 +40,7 @@ test('dark mode does not leave routed surfaces in light mode', async ({ page }) 
         expect(htmlHasDarkClass).toBe(true);
         expect(await visibleSurfaceLuminance(surface)).toBeLessThan(0.35);
 
-        if (route.path === '/app/#/descubre') {
+        if (route.path === '/app/#/discover') {
             const firstSidebarCard = page.locator('[data-slot="item"]').first();
             const firstMissionCard = page.getByTestId('discover-mission-card').first();
             await expect(firstSidebarCard).toBeVisible();
@@ -49,7 +49,7 @@ test('dark mode does not leave routed surfaces in light mode', async ({ page }) 
             expect(await visibleSurfaceLuminance(firstMissionCard)).toBeLessThan(0.35);
         }
 
-        if (route.path === '/app/#/estadisticas') {
+        if (route.path === '/app/#/city-stats') {
             const firstKpiCard = page.getByTestId('city-stats-kpi-card').first();
             const firstChartCard = page.getByTestId('city-stats-chart-card').first();
 
@@ -78,7 +78,7 @@ test('audited dark mode routes keep accessible surface semantics and visible key
 
         expect(accessibilityScan.violations).toEqual([]);
 
-        if (route.path === '/app/#/descubre') {
+        if (route.path === '/app/#/discover') {
             const missionCard = page.getByTestId('discover-mission-card').first();
             await expect(missionCard).toContainText('Pending');
 

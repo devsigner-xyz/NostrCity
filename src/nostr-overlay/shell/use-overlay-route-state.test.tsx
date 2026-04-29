@@ -134,6 +134,12 @@ describe('useOverlayRouteState', () => {
         expect(text(detail.container, 'active-agora-hashtag')).toBe('none');
     });
 
+    test('detects the notifications route using the english path', () => {
+        const { container } = renderRoute('/notifications');
+
+        expect(text(container, 'is-notifications-route')).toBe('true');
+    });
+
     test('returns route state to the map default', () => {
         const { container } = renderRoute('/agora?tag=nostr');
 
@@ -166,7 +172,7 @@ describe('useOverlayRouteState', () => {
         const { container } = renderRoute('/');
 
         click(container, 'open search');
-        expect(text(container, 'pathname')).toBe('/buscar-usuarios');
+        expect(text(container, 'pathname')).toBe('/user-search');
 
         click(container, 'close search');
         expect(text(container, 'pathname')).toBe('/');

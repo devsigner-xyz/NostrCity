@@ -36,6 +36,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     Sidebar,
     SidebarContent,
@@ -106,7 +107,27 @@ function resolveInitials(profile: NostrProfile | undefined, fallback: string): s
     return resolveDisplayName(profile, fallback).slice(0, 2).toUpperCase();
 }
 
+function SigningRequiredTooltip({ enabled, label, children }: { enabled: boolean; label: string; children: ReactNode }) {
+    if (!enabled) {
+        return <>{children}</>;
+    }
+
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="block" title={label}>{children}</span>
+                </TooltipTrigger>
+                <TooltipContent side="right" align="center">
+                    {label}
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+}
+
 function SidebarActionsMenu({
+    isReadonlySession,
     canAccessDirectMessages,
     canAccessSocialNotifications,
     canAccessFollowingFeed,
@@ -131,7 +152,7 @@ function SidebarActionsMenu({
     relaysConnectedCount,
     relaysTotal,
     onOpenMissions,
-}: Omit<OverlaySidebarProps, 'open' | 'onOpenChange' | 'resolvedTheme' | 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout' | 'children'>) {
+}: Omit<OverlaySidebarProps, 'open' | 'onOpenChange' | 'resolvedTheme' | 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout' | 'children'> & { isReadonlySession: boolean }) {
     const { t } = useI18n();
     const { state } = useSidebar();
     const location = useLocation();
@@ -141,6 +162,7 @@ function SidebarActionsMenu({
     const activeSettingsView = useMemo<SettingsRouteView | null>(() => settingsViewFromPathname(activePath), [activePath]);
     const isRelaysRoute = activePath === '/relays' || activePath.startsWith('/relays/');
     const disconnectedRelaysCount = Math.max(0, relaysTotal - relaysConnectedCount);
+    const readonlyReason = t('auth.readOnlySignInRequired');
     const relaysBadgeTitle = t('sidebar.relaysSummary', {
         total: relaysTotal,
         connected: relaysConnectedCount,
@@ -208,38 +230,44 @@ function SidebarActionsMenu({
                     </SidebarMenuItem>
                 ) : null}
 
-                {canWrite ? (
+                {canWrite || isReadonlySession ? (
                     <SidebarMenuItem>
-                        <SidebarMenuButton asChild>
-                            <button
-                                type="button"
-                                aria-label={t('sidebar.openPublish')}
-                                title={t('sidebar.publish')}
-                                onClick={onOpenPublish}
-                            >
-                                <PenSquareIcon />
-                                <span>{t('sidebar.publish')}</span>
-                            </button>
-                        </SidebarMenuButton>
+                        <SigningRequiredTooltip enabled={isReadonlySession} label={readonlyReason}>
+                            <SidebarMenuButton asChild>
+                                <button
+                                    type="button"
+                                    aria-label={t('sidebar.openPublish')}
+                                    title={isReadonlySession ? readonlyReason : t('sidebar.publish')}
+                                    disabled={isReadonlySession}
+                                    onClick={onOpenPublish}
+                                >
+                                    <PenSquareIcon />
+                                    <span>{t('sidebar.publish')}</span>
+                                </button>
+                            </SidebarMenuButton>
+                        </SigningRequiredTooltip>
                     </SidebarMenuItem>
                 ) : null}
 
-                {canAccessDirectMessages ? (
+                {canAccessDirectMessages || isReadonlySession ? (
                     <SidebarMenuItem>
-                        <SidebarMenuButton asChild isActive={activePath === '/chats'}>
-                            <button
-                                type="button"
-                                className="nostr-chat-icon-button relative"
-                                aria-label={t('sidebar.openChats')}
-                                aria-description={chatHasUnread ? t('sidebar.unreadMessages') : undefined}
-                                title={t('sidebar.openChats')}
-                                onClick={onOpenChat}
-                            >
-                                <MessageCircleIcon />
-                                <span>{t('sidebar.chats')}</span>
-                                {chatHasUnread ? <OverlayUnreadIndicator variant="overlay" className="nostr-chat-unread-dot" srLabel={t('sidebar.chatsUnread')} /> : null}
-                            </button>
-                        </SidebarMenuButton>
+                        <SigningRequiredTooltip enabled={isReadonlySession} label={readonlyReason}>
+                            <SidebarMenuButton asChild isActive={activePath === '/chats'}>
+                                <button
+                                    type="button"
+                                    className="nostr-chat-icon-button relative"
+                                    aria-label={t('sidebar.openChats')}
+                                    aria-description={chatHasUnread ? t('sidebar.unreadMessages') : undefined}
+                                    title={isReadonlySession ? readonlyReason : t('sidebar.openChats')}
+                                    disabled={isReadonlySession}
+                                    onClick={onOpenChat}
+                                >
+                                    <MessageCircleIcon />
+                                    <span>{t('sidebar.chats')}</span>
+                                    {chatHasUnread ? <OverlayUnreadIndicator variant="overlay" className="nostr-chat-unread-dot" srLabel={t('sidebar.chatsUnread')} /> : null}
+                                </button>
+                            </SidebarMenuButton>
+                        </SigningRequiredTooltip>
                     </SidebarMenuItem>
                 ) : null}
 
@@ -262,27 +290,30 @@ function SidebarActionsMenu({
                     ) : null}
                 </SidebarMenuItem>
 
-                {canAccessSocialNotifications ? (
+                {canAccessSocialNotifications || isReadonlySession ? (
                     <SidebarMenuItem>
-                        <SidebarMenuButton asChild isActive={activePath === '/notificaciones'}>
-                            <button
-                                type="button"
-                                className="nostr-notifications-icon-button relative"
-                                aria-label={t('sidebar.openNotifications')}
-                                aria-description={notificationsHasUnread ? t('sidebar.unreadPending') : undefined}
-                                title={t('sidebar.notifications')}
-                                onClick={onOpenNotifications}
-                            >
-                                <BellIcon />
-                                <span>{t('sidebar.notifications')}</span>
-                                {notificationsHasUnread ? <OverlayUnreadIndicator variant="overlay" className="nostr-notifications-unread-dot" srLabel={t('sidebar.notificationsUnread')} /> : null}
-                            </button>
-                        </SidebarMenuButton>
+                        <SigningRequiredTooltip enabled={isReadonlySession} label={readonlyReason}>
+                            <SidebarMenuButton asChild isActive={activePath === '/notifications'}>
+                                <button
+                                    type="button"
+                                    className="nostr-notifications-icon-button relative"
+                                    aria-label={t('sidebar.openNotifications')}
+                                    aria-description={notificationsHasUnread ? t('sidebar.unreadPending') : undefined}
+                                    title={isReadonlySession ? readonlyReason : t('sidebar.notifications')}
+                                    disabled={isReadonlySession}
+                                    onClick={onOpenNotifications}
+                                >
+                                    <BellIcon />
+                                    <span>{t('sidebar.notifications')}</span>
+                                    {notificationsHasUnread ? <OverlayUnreadIndicator variant="overlay" className="nostr-notifications-unread-dot" srLabel={t('sidebar.notificationsUnread')} /> : null}
+                                </button>
+                            </SidebarMenuButton>
+                        </SigningRequiredTooltip>
                     </SidebarMenuItem>
                 ) : null}
 
                 <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activePath === '/buscar-usuarios'}>
+                    <SidebarMenuButton asChild isActive={activePath === '/user-search'}>
                         <button
                             type="button"
                             aria-label={t('sidebar.openUserSearch')}
@@ -296,7 +327,7 @@ function SidebarActionsMenu({
                 </SidebarMenuItem>
 
                 <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activePath === '/estadisticas'}>
+                    <SidebarMenuButton asChild isActive={activePath === '/city-stats'}>
                         <button
                             type="button"
                             aria-label={t('sidebar.openCityStats')}
@@ -310,7 +341,7 @@ function SidebarActionsMenu({
                 </SidebarMenuItem>
 
                 <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activePath === '/descubre'}>
+                    <SidebarMenuButton asChild isActive={activePath === '/discover'}>
                         <button
                             type="button"
                             aria-label={t('sidebar.openDiscover')}
@@ -327,17 +358,20 @@ function SidebarActionsMenu({
                 </SidebarMenuItem>
 
                 <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activePath === '/wallet'}>
-                        <button
-                            type="button"
-                            aria-label={t('sidebar.openWallet')}
-                            title={t('sidebar.wallet')}
-                            onClick={onOpenWallet}
-                        >
-                            <WalletIcon />
-                            <span>{t('sidebar.wallet')}</span>
-                        </button>
-                    </SidebarMenuButton>
+                    <SigningRequiredTooltip enabled={isReadonlySession} label={readonlyReason}>
+                        <SidebarMenuButton asChild isActive={activePath === '/wallet'}>
+                            <button
+                                type="button"
+                                aria-label={t('sidebar.openWallet')}
+                                title={isReadonlySession ? readonlyReason : t('sidebar.wallet')}
+                                disabled={isReadonlySession}
+                                onClick={onOpenWallet}
+                            >
+                                <WalletIcon />
+                                <span>{t('sidebar.wallet')}</span>
+                            </button>
+                        </SidebarMenuButton>
+                    </SigningRequiredTooltip>
                 </SidebarMenuItem>
 
                 <SidebarMenuItem>
@@ -479,6 +513,8 @@ function SidebarUserMenu({
     const { t } = useI18n();
     const { isMobile } = useSidebar();
     const resolvedOwnerPubkey = ownerPubkey ?? authSession?.pubkey;
+    const isReadonlySession = Boolean(authSession?.readonly);
+    const readonlyReason = t('auth.readOnlySignInRequired');
 
     if (!resolvedOwnerPubkey) {
         return null;
@@ -535,9 +571,18 @@ function SidebarUserMenu({
                             <UserRoundIcon />
                             {t('sidebar.copyNpub')}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => {
-                            onOpenProfileEditor?.();
-                        }}>
+                        <DropdownMenuItem
+                            disabled={isReadonlySession}
+                            aria-disabled={isReadonlySession ? 'true' : undefined}
+                            title={isReadonlySession ? readonlyReason : undefined}
+                            onSelect={(event) => {
+                                if (isReadonlySession) {
+                                    event.preventDefault();
+                                    return;
+                                }
+                                onOpenProfileEditor?.();
+                            }}
+                        >
                             <UserRoundIcon />
                             {t('sidebar.editProfile')}
                         </DropdownMenuItem>
@@ -643,6 +688,7 @@ export function OverlaySidebar({
                 </SidebarContent>
                 <SidebarFooter className="pt-0">
                     <SidebarActionsMenu
+                        isReadonlySession={Boolean(authSession?.readonly)}
                         canWrite={canWrite}
                         canAccessDirectMessages={canAccessDirectMessages}
                         canAccessSocialNotifications={canAccessSocialNotifications}

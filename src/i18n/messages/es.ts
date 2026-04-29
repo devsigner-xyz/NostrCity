@@ -165,6 +165,7 @@ export const esMessages = {
     'auth.selector.connectBunker': 'Conectar bunker',
     'auth.selector.loading': 'Cargando...',
     'auth.selector.genericError': 'No se pudo completar la accion',
+    'auth.readOnlySignInRequired': 'Estás en modo lectura, accede con firma.',
     'auth.createMethod.aria': 'Selector de alta de Nostr',
     'auth.createMethod.external.title': 'Usar app o extension',
     'auth.createMethod.external.description': 'Conecta una extension o un signer externo.',

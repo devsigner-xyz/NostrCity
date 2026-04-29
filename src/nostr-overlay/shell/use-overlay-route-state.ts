@@ -32,7 +32,7 @@ export function useOverlayRouteState() {
     const isArticlesRoute = location.pathname === '/agora/articles';
     const isArticleDetailRoute = location.pathname.startsWith('/agora/articles/');
     const isChatsRoute = location.pathname === '/chats';
-    const isNotificationsRoute = location.pathname === '/notificaciones';
+    const isNotificationsRoute = location.pathname === '/notifications';
 
     useEffect(() => {
         if (!location.pathname.startsWith('/settings/')) {
@@ -71,7 +71,7 @@ export function useOverlayRouteState() {
     };
 
     const openGlobalUserSearch = (): void => {
-        navigate('/buscar-usuarios');
+        navigate('/user-search');
     };
 
     const closeGlobalUserSearch = (): void => {

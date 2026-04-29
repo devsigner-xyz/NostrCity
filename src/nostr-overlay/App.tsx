@@ -530,7 +530,7 @@ export function App({ mapBridge, services }: AppProps) {
             return;
         }
 
-        navigate('/notificaciones');
+        navigate('/notifications');
     };
 
     const openFollowingFeed = (): void => {
@@ -925,7 +925,7 @@ export function App({ mapBridge, services }: AppProps) {
                     notificationsHasUnread={socialState.hasUnread}
                     followingFeedHasUnread={followingFeedHasUnread}
                     onOpenMap={() => navigate('/')}
-                    onOpenCityStats={() => navigate('/estadisticas')}
+                    onOpenCityStats={() => navigate('/city-stats')}
                     onOpenChat={openChatList}
                     onOpenRelays={openRelaysPage}
                     onOpenNotifications={openNotifications}
@@ -934,7 +934,7 @@ export function App({ mapBridge, services }: AppProps) {
                     onOpenGlobalSearch={openGlobalUserSearch}
                     onOpenWallet={() => navigate('/wallet')}
                     onOpenPublish={openPublishComposer}
-                    onOpenProfileEditor={() => navigate('/perfil')}
+                    onOpenProfileEditor={() => navigate('/profile')}
                     onOpenSettings={openSettingsDestination}
                     isUiSettingsOpen={isUiSettingsDialogOpen}
                     onLogout={handleLogout}
@@ -949,7 +949,7 @@ export function App({ mapBridge, services }: AppProps) {
                     missionsTotal={EASTER_EGG_MISSIONS.length}
                     relaysConnectedCount={relayConnectionSummary.connectedRelays}
                     relaysTotal={relayConnectionSummary.totalRelays}
-                    onOpenMissions={() => navigate('/descubre')}
+                    onOpenMissions={() => navigate('/discover')}
                     follows={overlay.follows}
                     profiles={overlay.profiles}
                     followers={overlay.followers}
@@ -1093,6 +1093,7 @@ export function App({ mapBridge, services }: AppProps) {
                         parkCount: overlay.parkCount,
                     }}
                     notifications={{
+                        canAccessSocialNotifications,
                         hasUnread: socialState.hasUnread,
                         pendingSnapshot: socialState.pendingSnapshot,
                         items: socialState.items,
@@ -1133,6 +1134,7 @@ export function App({ mapBridge, services }: AppProps) {
                         discoveredIds: easterEggProgress.discoveredIds,
                     }}
                     wallet={{
+                        canWrite: overlay.canWrite,
                         walletSettings,
                         walletActivity,
                         walletNwcUriInput,

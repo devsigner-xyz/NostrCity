@@ -1430,8 +1430,9 @@ describe('OccupantProfileDialog', () => {
         expect(verifiedBadge).toBeDefined();
         expect(verifiedBadge.textContent || '').toBe('');
 
-        const infoChip = document.body.querySelector('.nostr-profile-info-list .nostr-nip05-chip') as HTMLElement;
-        expect(infoChip).toBeDefined();
-        expect(infoChip.textContent || '').toContain('alice@example.com');
+        const infoIdentifier = document.body.querySelector('.nostr-profile-info-list .nostr-nip05-text') as HTMLElement;
+        expect(infoIdentifier).toBeDefined();
+        expect(infoIdentifier.textContent || '').toContain('alice@example.com');
+        expect(document.body.querySelector('.nostr-profile-info-list .nostr-nip05-chip')).toBeNull();
     });
 });

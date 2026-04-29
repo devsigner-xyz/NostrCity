@@ -167,6 +167,7 @@ export const enMessages = {
     'auth.selector.connectBunker': 'Connect bunker',
     'auth.selector.loading': 'Loading...',
     'auth.selector.genericError': 'The action could not be completed',
+    'auth.readOnlySignInRequired': 'You are in read-only mode. Sign in with signing access.',
     'auth.createMethod.aria': 'Nostr signup selector',
     'auth.createMethod.external.title': 'Use app or extension',
     'auth.createMethod.external.description': 'Connect an extension or an external signer.',

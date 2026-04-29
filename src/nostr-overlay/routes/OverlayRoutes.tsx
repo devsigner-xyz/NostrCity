@@ -70,15 +70,15 @@ export function OverlayRoutes({
                     <Route path="/agora" element={<AgoraRouteContainer {...agora} />} />
                     <Route path="/agora/articles" element={<ArticlesRouteContainer {...articles} />} />
                     <Route path="/agora/articles/:eventId" element={<ArticleDetailRouteContainer {...articleDetail} />} />
-                    <Route path="/estadisticas" element={<CityStatsRouteContainer {...cityStats} />} />
-                    <Route path="/notificaciones" element={<NotificationsRouteContainer {...notifications} />} />
-                    <Route path="/chats" element={<ChatsRouteContainer {...chats} />} />
+                    <Route path="/city-stats" element={<CityStatsRouteContainer {...cityStats} />} />
+                    <Route path="/notifications" element={notifications.canAccessSocialNotifications ? <NotificationsRouteContainer {...notifications} /> : <Navigate to="/" replace />} />
+                    <Route path="/chats" element={chats.canDirectMessages ? <ChatsRouteContainer {...chats} /> : <Navigate to="/" replace />} />
                     <Route path="/relays" element={<RelaysRoute {...relays} />} />
                     <Route path="/relays/detail" element={<RelayDetailRoute {...relayDetail} />} />
-                    <Route path="/descubre" element={<DiscoverRouteContainer {...discover} />} />
-                    <Route path="/wallet" element={<WalletRouteContainer {...wallet} />} />
-                    <Route path="/perfil" element={<ProfileRouteContainer {...profile} />} />
-                    <Route path="/buscar-usuarios" element={<UserSearchRouteContainer {...userSearch} />} />
+                    <Route path="/discover" element={<DiscoverRouteContainer {...discover} />} />
+                    <Route path="/wallet" element={wallet.canWrite ? <WalletRouteContainer {...wallet} /> : <Navigate to="/" replace />} />
+                    <Route path="/profile" element={profile.canWrite ? <ProfileRouteContainer {...profile} /> : <Navigate to="/" replace />} />
+                    <Route path="/user-search" element={<UserSearchRouteContainer {...userSearch} />} />
                     <Route path="/settings" element={<SettingsRouteContainer {...settings} />}>
                         <Route index element={<Navigate to="zaps" replace />} />
                         <Route path="shortcuts" element={<SettingsShortcutsRoute />} />

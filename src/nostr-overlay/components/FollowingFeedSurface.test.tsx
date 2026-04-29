@@ -1050,6 +1050,62 @@ describe('FollowingFeedSurface', () => {
         expect(rendered.container.querySelector('[aria-label="Sats recibidos: 21"]')).toBeDefined();
     });
 
+    test('hides the thread reply composer for readonly sessions while preserving root and replies', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    canWrite: false,
+                    activeThread: {
+                        rootEventId: 'root-1',
+                        root: {
+                            id: 'root-1',
+                            pubkey: 'b'.repeat(64),
+                            createdAt: 500,
+                            eventKind: 1,
+                            content: 'readonly root',
+                            rawEvent: {
+                                id: 'root-1',
+                                pubkey: 'b'.repeat(64),
+                                kind: 1,
+                                created_at: 500,
+                                tags: [],
+                                content: 'readonly root',
+                            },
+                        },
+                        replies: [
+                            {
+                                id: 'reply-1',
+                                pubkey: 'c'.repeat(64),
+                                createdAt: 510,
+                                eventKind: 1,
+                                content: 'readonly reply',
+                                targetEventId: 'root-1',
+                                rawEvent: {
+                                    id: 'reply-1',
+                                    pubkey: 'c'.repeat(64),
+                                    kind: 1,
+                                    created_at: 510,
+                                    tags: [['e', 'root-1']],
+                                    content: 'readonly reply',
+                                },
+                            },
+                        ],
+                        isLoading: false,
+                        isLoadingMore: false,
+                        error: null,
+                        hasMore: false,
+                    },
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        expect(rendered.container.textContent || '').toContain('readonly root');
+        expect(rendered.container.textContent || '').toContain('readonly reply');
+        expect(rendered.container.querySelector('.nostr-following-feed-reply-box')).toBeNull();
+        expect(rendered.container.querySelector('.nostr-following-feed-reply-box textarea')).toBeNull();
+    });
+
     test('announces invalid thread reply image selection', async () => {
         const rendered = await renderElement(
             <FollowingFeedSurface
