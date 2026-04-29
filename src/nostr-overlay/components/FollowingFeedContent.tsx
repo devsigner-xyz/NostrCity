@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CopyIcon, ImageIcon } from 'lucide-react';
 import type { AgoraFeedLayout } from '../../nostr/ui-settings';
 import type { NostrEvent, NostrProfile } from '../../nostr/types';
-import type { SocialEngagementMetrics, SocialFeedItem, ViewerReactionByEventId } from '../../nostr/social-feed-service';
+import type { SocialEngagementMetrics, SocialFeedItem, ViewerReactionByEventId, ViewerReplyByEventId, ViewerZapByEventId } from '../../nostr/social-feed-service';
 import type { SearchUsersResult } from '../query/user-search.query';
 import { createMentionDraft, type MentionDraft } from '../mention-serialization';
 import { MentionTextarea } from './MentionTextarea';
@@ -66,6 +66,8 @@ export interface FollowingFeedViewProps {
     publishError: string | null;
     reactionByEventId: Record<string, boolean>;
     viewerReactionByEventId?: ViewerReactionByEventId;
+    viewerZapByEventId?: ViewerZapByEventId;
+    viewerReplyByEventId?: ViewerReplyByEventId;
     repostByEventId: Record<string, boolean>;
     pendingReactionByEventId: Record<string, boolean>;
     pendingRepostByEventId: Record<string, boolean>;
@@ -186,6 +188,8 @@ export function FollowingFeedContent({
     publishError,
     reactionByEventId,
     viewerReactionByEventId = {},
+    viewerZapByEventId = {},
+    viewerReplyByEventId = {},
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -312,6 +316,8 @@ export function FollowingFeedContent({
             engagementByEventId,
             reactionByEventId,
             viewerReactionByEventId,
+            viewerZapByEventId,
+            viewerReplyByEventId,
             repostByEventId,
             pendingReactionByEventId,
             pendingRepostByEventId,
@@ -472,6 +478,8 @@ export function FollowingFeedContent({
                                             engagementByEventId,
                                             reactionByEventId,
                                             viewerReactionByEventId,
+                                            viewerZapByEventId,
+                                            viewerReplyByEventId,
                                             repostByEventId,
                                             pendingReactionByEventId,
                                             pendingRepostByEventId,
@@ -499,6 +507,8 @@ export function FollowingFeedContent({
                                         engagementByEventId,
                                         reactionByEventId,
                                         viewerReactionByEventId,
+                                        viewerZapByEventId,
+                                        viewerReplyByEventId,
                                         repostByEventId,
                                         pendingReactionByEventId,
                                         pendingRepostByEventId,
@@ -566,6 +576,8 @@ export function FollowingFeedContent({
                                             engagementByEventId,
                                             reactionByEventId,
                                             viewerReactionByEventId,
+                                            viewerZapByEventId,
+                                            viewerReplyByEventId,
                                             repostByEventId,
                                             pendingReactionByEventId,
                                             pendingRepostByEventId,

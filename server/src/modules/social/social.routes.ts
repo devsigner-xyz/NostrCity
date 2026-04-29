@@ -20,6 +20,12 @@ import {
   viewerReactionsBodySchema,
   viewerReactionsResponseSchema,
   type ViewerReactionsBody,
+  viewerRepliesBodySchema,
+  viewerRepliesResponseSchema,
+  type ViewerRepliesBody,
+  viewerZapsBodySchema,
+  viewerZapsResponseSchema,
+  type ViewerZapsBody,
 } from './social.schemas';
 import { createSocialService, type SocialService } from './social.service';
 
@@ -138,6 +144,40 @@ export const socialRoutes: FastifyPluginAsync<SocialRoutesOptions> = async (
     },
     async (request) => {
       return service.getViewerReactions(request.body);
+    },
+  );
+
+  app.post<{
+    Body: ViewerZapsBody;
+  }>(
+    '/social/viewer-zaps',
+    {
+      schema: {
+        body: viewerZapsBodySchema,
+        response: {
+          200: viewerZapsResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      return service.getViewerZaps(request.body);
+    },
+  );
+
+  app.post<{
+    Body: ViewerRepliesBody;
+  }>(
+    '/social/viewer-replies',
+    {
+      schema: {
+        body: viewerRepliesBodySchema,
+        response: {
+          200: viewerRepliesResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      return service.getViewerReplies(request.body);
     },
   );
 };

@@ -583,4 +583,129 @@ describe('social service pagination', () => {
 
     expect(result.byEventId).toEqual({});
   });
+
+  it('loads viewer zaps from NIP-57 receipt sender tags', async () => {
+    const eventId = 'd'.repeat(64);
+    const receiptId = '8'.repeat(64);
+
+    const pool = {
+      querySync: vi.fn(async (_relays: string[], filter: Record<string, unknown>) => {
+        if (!Array.isArray(filter.kinds) || filter.kinds[0] !== 9735) {
+          return [];
+        }
+
+        return [
+          {
+            id: receiptId,
+            pubkey: FOLLOW,
+            kind: 9735,
+            created_at: 20,
+            tags: [
+              ['e', eventId],
+              ['P', OWNER],
+              ['amount', '21000'],
+            ],
+            content: '',
+          },
+          {
+            id: '9'.repeat(64),
+            pubkey: FOLLOW,
+            kind: 9735,
+            created_at: 30,
+            tags: [
+              ['e', eventId],
+              ['P', FOLLOW],
+              ['amount', '42000'],
+            ],
+            content: '',
+          },
+        ];
+      }),
+    } as unknown as SimplePool;
+
+    const service = createSocialService({
+      pool,
+      bootstrapRelays: ['wss://relay.damus.io'],
+    });
+
+    const result = await service.getViewerZaps({
+      ownerPubkey: OWNER,
+      eventIds: [eventId],
+    });
+
+    expect(result.byEventId).toEqual({
+      [eventId]: {
+        eventId,
+        zapReceiptEventId: receiptId,
+        amountSats: 21,
+        createdAt: 20,
+      },
+    });
+  });
+
+  it('loads latest viewer replies by direct target event id', async () => {
+    const eventId = 'd'.repeat(64);
+    const replyId = '8'.repeat(64);
+
+    const pool = {
+      querySync: vi.fn(async (_relays: string[], filter: Record<string, unknown>) => {
+        if (!Array.isArray(filter.kinds) || filter.kinds[0] !== 1) {
+          return [];
+        }
+
+        return [
+          {
+            id: replyId,
+            pubkey: OWNER,
+            kind: 1,
+            created_at: 20,
+            tags: [['e', eventId, '', 'root'], ['e', eventId, '', 'reply']],
+            content: 'mine',
+          },
+          {
+            id: '9'.repeat(64),
+            pubkey: OWNER,
+            kind: 1,
+            created_at: 30,
+            tags: [['e', eventId, '', 'root'], ['e', 'a'.repeat(64), '', 'reply']],
+            content: 'deep reply',
+          },
+          {
+            id: 'b'.repeat(64),
+            pubkey: OWNER,
+            kind: 1,
+            created_at: 40,
+            tags: [['e', eventId]],
+            content: 'mention, not a reply',
+          },
+          {
+            id: 'c'.repeat(64),
+            pubkey: FOLLOW,
+            kind: 1,
+            created_at: 50,
+            tags: [['e', eventId, '', 'reply']],
+            content: 'other',
+          },
+        ];
+      }),
+    } as unknown as SimplePool;
+
+    const service = createSocialService({
+      pool,
+      bootstrapRelays: ['wss://relay.damus.io'],
+    });
+
+    const result = await service.getViewerReplies({
+      ownerPubkey: OWNER,
+      eventIds: [eventId],
+    });
+
+    expect(result.byEventId).toEqual({
+      [eventId]: {
+        eventId,
+        replyEventId: replyId,
+        createdAt: 20,
+      },
+    });
+  });
 });

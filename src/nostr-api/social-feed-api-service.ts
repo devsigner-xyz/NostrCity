@@ -7,6 +7,8 @@ import {
     type SocialFeedService,
     type SocialThreadPage,
     type ViewerReactionByEventId,
+    type ViewerReplyByEventId,
+    type ViewerZapByEventId,
 } from '../nostr/social-feed-service';
 import type { NostrEvent } from '../nostr/types';
 import { createHttpClient, type HttpClient } from './http-client';
@@ -55,6 +57,27 @@ interface ViewerReactionDto {
 
 interface ViewerReactionsResponseDto {
     byEventId: Record<string, ViewerReactionDto>;
+}
+
+interface ViewerZapDto {
+    eventId: string;
+    zapReceiptEventId: string;
+    amountSats: number;
+    createdAt: number;
+}
+
+interface ViewerZapsResponseDto {
+    byEventId: Record<string, ViewerZapDto>;
+}
+
+interface ViewerReplyDto {
+    eventId: string;
+    replyEventId: string;
+    createdAt: number;
+}
+
+interface ViewerRepliesResponseDto {
+    byEventId: Record<string, ViewerReplyDto>;
 }
 
 interface ArticleDetailResponseDto {
@@ -238,6 +261,36 @@ export function createSocialFeedApiService(options: CreateSocialFeedApiServiceOp
             }
 
             const response = await client.postJson<ViewerReactionsResponseDto>('/social/viewer-reactions', {
+                body: {
+                    ownerPubkey: input.ownerPubkey,
+                    eventIds: input.eventIds,
+                },
+            });
+
+            return response.byEventId;
+        },
+
+        async loadViewerZaps(input): Promise<ViewerZapByEventId> {
+            if (!input.ownerPubkey || !input.eventIds || input.eventIds.length === 0) {
+                return {};
+            }
+
+            const response = await client.postJson<ViewerZapsResponseDto>('/social/viewer-zaps', {
+                body: {
+                    ownerPubkey: input.ownerPubkey,
+                    eventIds: input.eventIds,
+                },
+            });
+
+            return response.byEventId;
+        },
+
+        async loadViewerReplies(input): Promise<ViewerReplyByEventId> {
+            if (!input.ownerPubkey || !input.eventIds || input.eventIds.length === 0) {
+                return {};
+            }
+
+            const response = await client.postJson<ViewerRepliesResponseDto>('/social/viewer-replies', {
                 body: {
                     ownerPubkey: input.ownerPubkey,
                     eventIds: input.eventIds,

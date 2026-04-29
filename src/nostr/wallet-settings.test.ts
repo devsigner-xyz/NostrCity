@@ -6,6 +6,7 @@ import {
     saveWalletSettings,
 } from './wallet-settings';
 
+// TEST_VECTOR_DO_NOT_USE: NWC URIs and secrets in this file are fake fixtures.
 describe('wallet-settings', () => {
     beforeEach(() => {
         window.localStorage.clear();

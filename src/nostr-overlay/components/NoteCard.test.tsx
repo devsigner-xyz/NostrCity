@@ -54,6 +54,8 @@ const defaultNoteFixture: NoteCardModel = {
         canWrite: true,
         isReactionActive: false,
         isRepostActive: false,
+        isZapActive: false,
+        isReplyActive: false,
         isReactionPending: false,
         isRepostPending: false,
         replies: 1,
@@ -209,6 +211,7 @@ describe('NoteCard', () => {
         ) as HTMLButtonElement | undefined;
         expect(reactionButton).toBeDefined();
         expect(reactionButton?.textContent || '').toContain('👏');
+        expect(reactionButton?.getAttribute('data-variant')).toBe('ghost');
 
         await act(async () => {
             reactionButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -216,6 +219,54 @@ describe('NoteCard', () => {
 
         expect(onToggleReaction).toHaveBeenCalledTimes(1);
         expect(document.body.querySelector('[data-slot="dropdown-menu-item"]')).toBeNull();
+    });
+
+    test('disables write actions when rendering as read-only npub session', async () => {
+        const { container } = await renderNoteCard({
+            ...defaultNoteFixture,
+            actions: {
+                ...defaultNoteFixture.actions!,
+                canWrite: false,
+            },
+        });
+
+        const reactionButton = container.querySelector('button[aria-label="Reaccionar (3)"]') as HTMLButtonElement | null;
+        const repostButton = container.querySelector('button[aria-label="Repostear (2)"]') as HTMLButtonElement | null;
+        const zapButton = container.querySelector('button[aria-label="Sats recibidos: 210"]') as HTMLButtonElement | null;
+
+        expect(reactionButton?.disabled).toBe(true);
+        expect(repostButton?.disabled).toBe(true);
+        expect(zapButton?.disabled).toBe(true);
+    });
+
+    test('shows active zap with lightning emoji without default button background', async () => {
+        const { container } = await renderNoteCard({
+            ...defaultNoteFixture,
+            actions: {
+                ...defaultNoteFixture.actions!,
+                isZapActive: true,
+            },
+        });
+
+        const zapButton = container.querySelector('button[aria-label="Sats recibidos: 210"]') as HTMLButtonElement | null;
+        expect(zapButton).not.toBeNull();
+        expect(zapButton?.textContent || '').toContain('⚡');
+        expect(zapButton?.getAttribute('data-variant')).toBe('ghost');
+    });
+
+    test('shows active reply with comment emoji without default button background', async () => {
+        const { container } = await renderNoteCard({
+            ...defaultNoteFixture,
+            actions: {
+                ...defaultNoteFixture.actions!,
+                isReplyActive: true,
+            },
+        });
+
+        const replyButton = container.querySelector('button[aria-label="Responder (1)"]') as HTMLButtonElement | null;
+        expect(replyButton).not.toBeNull();
+        expect(replyButton?.textContent || '').toContain('💬');
+        expect(replyButton?.getAttribute('data-variant')).toBe('ghost');
     });
 
     test('renders long-form article notes with the article preview path', async () => {
@@ -454,7 +505,7 @@ describe('NoteCard', () => {
         expect(preview.referencedNotes?.[0]?.actions).toBeUndefined();
     });
 
-    test('hides only zap submenu when author profile has no lightning metadata', async () => {
+    test('disables only zap action when author profile has no lightning metadata', async () => {
         const rendered = await renderElement(
             <NoteCard
                 note={{
@@ -478,7 +529,7 @@ describe('NoteCard', () => {
         expect(rendered.container.querySelector('button[aria-label="Responder (1)"]')).not.toBeNull();
         expect(rendered.container.querySelector('button[aria-label="Reaccionar (3)"]')).not.toBeNull();
         expect(rendered.container.querySelector('button[aria-label="Repostear (2)"]')).not.toBeNull();
-        expect(rendered.container.querySelector('button[aria-label="Sats recibidos: 210"]')).toBeNull();
+        expect((rendered.container.querySelector('button[aria-label="Sats recibidos: 210"]') as HTMLButtonElement | null)?.disabled).toBe(true);
     });
 
     test('nested depth >= 2 renders compact fallback with open reference button', async () => {

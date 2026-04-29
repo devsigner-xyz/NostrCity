@@ -15,6 +15,8 @@ import {
     toSocialThreadItem,
     type LoadEngagementInput,
     type LoadViewerReactionsInput,
+    type LoadViewerRepliesInput,
+    type LoadViewerZapsInput,
     type LoadFollowingFeedInput,
     type LoadThreadInput,
     type SocialEngagementByEventId,
@@ -24,6 +26,8 @@ import {
     type SocialThreadItem,
     type SocialThreadPage,
     type ViewerReactionByEventId,
+    type ViewerReplyByEventId,
+    type ViewerZapByEventId,
 } from './social-feed-service';
 import type { NostrEvent, NostrFilter } from './types';
 
@@ -36,6 +40,8 @@ const DEFAULT_FEED_LIMIT = 30;
 const DEFAULT_THREAD_LIMIT = 40;
 const DEFAULT_ENGAGEMENT_LIMIT = 120;
 const DEFAULT_VIEWER_REACTIONS_LIMIT = 120;
+const DEFAULT_VIEWER_ZAPS_LIMIT = 120;
+const DEFAULT_VIEWER_REPLIES_LIMIT = 120;
 const DEFAULT_BACKFILL_TIMEOUT_MS = 7_000;
 const QUERY_LIMIT_MULTIPLIER = 3;
 const MIN_QUERY_LIMIT = 24;
@@ -257,6 +263,46 @@ function getTargetByMarkers(event: NostrEvent, targetSet: Set<string>): string |
     return undefined;
 }
 
+function resolveViewerReplyTargetEventId(event: NostrEvent, targetSet: Set<string>): string | undefined {
+    if (event.kind !== 1 || !isReplyEvent(event)) {
+        return undefined;
+    }
+
+    const eTags: Array<{ value: string; marker?: string }> = [];
+    for (const tag of event.tags) {
+        if (!Array.isArray(tag) || tag[0] !== 'e') {
+            continue;
+        }
+
+        const value = tag[1];
+        if (typeof value !== 'string' || value.length === 0) {
+            continue;
+        }
+
+        const marker = typeof tag[3] === 'string' && tag[3].length > 0 ? tag[3] : undefined;
+        eTags.push(marker ? { value, marker } : { value });
+    }
+
+    const replyMarked = eTags.filter((tag) => tag.marker === 'reply');
+    if (replyMarked.length > 0) {
+        return replyMarked.find((tag) => targetSet.has(tag.value))?.value;
+    }
+
+    const rootTarget = eTags.find((tag) => tag.marker === 'root' && targetSet.has(tag.value));
+    if (rootTarget) {
+        return rootTarget.value;
+    }
+
+    for (let index = eTags.length - 1; index >= 0; index -= 1) {
+        const candidate = eTags[index];
+        if (candidate && targetSet.has(candidate.value)) {
+            return candidate.value;
+        }
+    }
+
+    return undefined;
+}
+
 function resolveEngagementTargetEventId(event: NostrEvent, targetSet: Set<string>): string | undefined {
     if (event.kind === 6 || event.kind === 16) {
         const qTags = getTagValues(event, 'q');
@@ -315,6 +361,49 @@ function parseZapMsatsFromDescription(event: NostrEvent): number {
     }
 
     return 0;
+}
+
+function parseZapRequestFromDescription(event: NostrEvent): { pubkey?: string; tags?: string[][] } | null {
+    const descriptionValues = getTagValues(event, 'description');
+    const latest = descriptionValues[descriptionValues.length - 1];
+    if (!latest) {
+        return null;
+    }
+
+    try {
+        const rawDescription = latest.startsWith('%') ? decodeURIComponent(latest) : latest;
+        const parsed = JSON.parse(rawDescription) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return null;
+        }
+
+        const record = parsed as Record<string, unknown>;
+        const pubkey = typeof record.pubkey === 'string' && record.pubkey.length > 0 ? record.pubkey : undefined;
+        const tags = Array.isArray(record.tags)
+            ? record.tags.filter((tag): tag is string[] => Array.isArray(tag) && tag.every((value) => typeof value === 'string'))
+            : undefined;
+
+        return {
+            ...(pubkey ? { pubkey } : {}),
+            ...(tags ? { tags } : {}),
+        };
+    } catch {
+        return null;
+    }
+}
+
+function parseZapSenderPubkey(event: NostrEvent): string | undefined {
+    const senderTagValues = getTagValues(event, 'P');
+    const senderFromTag = senderTagValues[senderTagValues.length - 1];
+    if (senderFromTag) {
+        return senderFromTag;
+    }
+
+    return parseZapRequestFromDescription(event)?.pubkey;
+}
+
+function hasAnonymousZapRequest(event: NostrEvent): boolean {
+    return Boolean(parseZapRequestFromDescription(event)?.tags?.some((tag) => tag[0] === 'anon'));
 }
 
 function parseZapSats(event: NostrEvent): number {
@@ -892,6 +981,98 @@ export function createRuntimeSocialFeedService(
                 }
 
                 return reactionByEventId;
+            });
+        },
+
+        async loadViewerZaps(input: LoadViewerZapsInput): Promise<ViewerZapByEventId> {
+            const ownerPubkey = typeof input.ownerPubkey === 'string' ? input.ownerPubkey.trim() : '';
+            const targetEventIds = normalizeTargetEventIds(input.eventIds);
+            const targetSet = new Set(targetEventIds);
+
+            if (!ownerPubkey || targetEventIds.length === 0) {
+                return {};
+            }
+
+            return withRelayFallback(async (transport) => {
+                const limit = clampLimit(input.limit, Math.max(DEFAULT_VIEWER_ZAPS_LIMIT, targetEventIds.length));
+                const eventIdChunks = chunkEventIds(targetEventIds);
+                const filters: NostrFilter[] = eventIdChunks.map((chunk) => ({
+                    kinds: [9735],
+                    '#e': chunk,
+                    limit,
+                }));
+
+                const events = await fetchBackfillWithTimeout(transport, filters, backfillTimeoutMs);
+                const viewerZapByEventId: ViewerZapByEventId = {};
+
+                for (const event of sortAndDedupe(events as NostrEvent[])) {
+                    if (event.kind !== 9735 || hasAnonymousZapRequest(event)) {
+                        continue;
+                    }
+
+                    const targetEventId = resolveEngagementTargetEventId(event, targetSet);
+                    if (!targetEventId || viewerZapByEventId[targetEventId]) {
+                        continue;
+                    }
+
+                    const senderPubkey = parseZapSenderPubkey(event);
+                    const amountSats = parseZapSats(event);
+                    if (senderPubkey !== ownerPubkey || amountSats <= 0) {
+                        continue;
+                    }
+
+                    viewerZapByEventId[targetEventId] = {
+                        eventId: targetEventId,
+                        zapReceiptEventId: event.id,
+                        amountSats,
+                        createdAt: event.created_at,
+                    };
+                }
+
+                return viewerZapByEventId;
+            });
+        },
+
+        async loadViewerReplies(input: LoadViewerRepliesInput): Promise<ViewerReplyByEventId> {
+            const ownerPubkey = typeof input.ownerPubkey === 'string' ? input.ownerPubkey.trim() : '';
+            const targetEventIds = normalizeTargetEventIds(input.eventIds);
+            const targetSet = new Set(targetEventIds);
+
+            if (!ownerPubkey || targetEventIds.length === 0) {
+                return {};
+            }
+
+            return withRelayFallback(async (transport) => {
+                const limit = clampLimit(input.limit, Math.max(DEFAULT_VIEWER_REPLIES_LIMIT, targetEventIds.length));
+                const eventIdChunks = chunkEventIds(targetEventIds);
+                const filters: NostrFilter[] = eventIdChunks.map((chunk) => ({
+                    authors: [ownerPubkey],
+                    kinds: [1],
+                    '#e': chunk,
+                    limit,
+                }));
+
+                const events = await fetchBackfillWithTimeout(transport, filters, backfillTimeoutMs);
+                const viewerReplyByEventId: ViewerReplyByEventId = {};
+
+                for (const event of sortAndDedupe(events as NostrEvent[])) {
+                    if (event.kind !== 1 || event.pubkey !== ownerPubkey) {
+                        continue;
+                    }
+
+                    const targetEventId = resolveViewerReplyTargetEventId(event, targetSet);
+                    if (!targetEventId || viewerReplyByEventId[targetEventId]) {
+                        continue;
+                    }
+
+                    viewerReplyByEventId[targetEventId] = {
+                        eventId: targetEventId,
+                        replyEventId: event.id,
+                        createdAt: event.created_at,
+                    };
+                }
+
+                return viewerReplyByEventId;
             });
         },
     };

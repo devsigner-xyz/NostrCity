@@ -94,7 +94,7 @@ export const enMessages = {
     'auth.login.restoringSession': 'Restoring session',
     'auth.login.localPassphrase': 'Local account passphrase',
     'auth.login.unlockAccount': 'Unlock account',
-    'auth.login.backToLogin': 'Back to login',
+    'auth.login.backToLogin': 'Back',
     'auth.login.createAccount': 'Create account',
     'auth.login.continueSavedLocal': 'Continue with saved local account',
     'auth.login.unlockSavedLocal': 'Unlock saved local account',

@@ -4,6 +4,8 @@ export interface NoteActionState {
     canWrite: boolean;
     isReactionActive: boolean;
     isRepostActive: boolean;
+    isZapActive: boolean;
+    isReplyActive: boolean;
     isReactionPending: boolean;
     isRepostPending: boolean;
     replies: number;

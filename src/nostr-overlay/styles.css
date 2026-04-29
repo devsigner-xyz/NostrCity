@@ -2214,8 +2214,7 @@
     height: min(82vh, 760px);
     max-height: min(82vh, 760px);
     display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
+    min-height: 0;
     overflow: hidden;
 }
 
@@ -2239,34 +2238,43 @@
     display: block;
 }
 
-.nostr-profile-dialog .nostr-dialog-header,
-.nostr-profile-dialog .nostr-profile-dialog-tabs {
-    padding-inline: 0.85rem;
-}
-
-.nostr-profile-dialog .nostr-profile-dialog-tabs {
-    padding-bottom: 0.85rem;
-}
-
 .nostr-profile-dialog-tabs {
     flex: 1;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
+    height: 100%;
+    gap: 0;
+}
+
+.nostr-profile-dialog-sticky-shell {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
     gap: 0.55rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--popover);
+    background: color-mix(in oklab, var(--popover) 94%, transparent);
+    padding: 0.8rem 0.85rem 0.75rem;
+    backdrop-filter: blur(16px);
+}
+
+.nostr-profile-dialog-sticky-shell .nostr-profile-dialog-separator {
+    margin-inline: -0.85rem;
 }
 
 .nostr-profile-tab-panel {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
+    min-height: min(48vh, 420px);
+    overflow: visible;
+    padding: 0.85rem;
 }
 
 .nostr-profile-tab-panel-scroll {
+    height: 100%;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 0.1rem;
+    position: relative;
 }
 
 .nostr-profile-info,

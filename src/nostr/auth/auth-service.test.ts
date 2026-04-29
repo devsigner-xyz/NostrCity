@@ -82,6 +82,7 @@ describe('createAuthService', () => {
         const storage = createMemoryStorage();
         const auth = createAuthService({ storage });
 
+        // TEST_VECTOR_DO_NOT_USE: public fixture for removed nsec-login coverage.
         await expect(
             auth.startSession('nsec' as any, {
                 credential: 'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5',
@@ -141,6 +142,7 @@ describe('createAuthService', () => {
 
         await auth.startSession('npub', { credential: SAMPLE_NPUB });
 
+        // TEST_VECTOR_DO_NOT_USE: public fixture for removed nsec-login coverage.
         await expect(
             auth.switchMethod('nsec' as any, {
                 credential: 'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5',

@@ -150,6 +150,8 @@ const missingSocialFeedService: SocialFeedService = {
     loadThread: async () => ({ root: null, replies: [], hasMore: false }),
     loadEngagement: async () => ({}),
     loadViewerReactions: async () => ({}),
+    loadViewerZaps: async () => ({}),
+    loadViewerReplies: async () => ({}),
 };
 
 const missingUserSearchApiService: UserSearchApiService = {

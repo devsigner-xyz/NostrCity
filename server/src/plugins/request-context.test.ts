@@ -48,6 +48,7 @@ describe('request context plugin', () => {
       },
       payload: {
         ownerPubkey: 'abcd',
+        // TEST_VECTOR_DO_NOT_USE: fake credential used to verify log redaction.
         credential: 'nsec1super-secret-key',
         passphrase: 'password1234',
         event: {

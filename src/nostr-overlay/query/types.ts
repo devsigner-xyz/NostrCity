@@ -31,6 +31,16 @@ export interface ViewerReactionsQueryInput {
     eventIds: string[];
 }
 
+export interface ViewerZapsQueryInput {
+    ownerPubkey: string;
+    eventIds: string[];
+}
+
+export interface ViewerRepliesQueryInput {
+    ownerPubkey: string;
+    eventIds: string[];
+}
+
 export interface NotificationsQueryInput {
     ownerPubkey: string;
     limit?: number;

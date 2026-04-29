@@ -1,4 +1,4 @@
-import type { SocialEngagementMetrics, SocialFeedItem, SocialThreadItem, ViewerReactionByEventId } from '../../nostr/social-feed-service';
+import type { SocialEngagementMetrics, SocialFeedItem, SocialThreadItem, ViewerReactionByEventId, ViewerReplyByEventId, ViewerZapByEventId } from '../../nostr/social-feed-service';
 import type { NostrPostPreview } from '../../nostr/posts';
 import type { NoteActionState } from './note-card-model';
 
@@ -18,6 +18,8 @@ interface BuildActionStateBaseInput {
     engagementByEventId: Record<string, SocialEngagementMetrics>;
     reactionByEventId: Record<string, boolean>;
     viewerReactionByEventId?: ViewerReactionByEventId;
+    viewerZapByEventId?: ViewerZapByEventId;
+    viewerReplyByEventId?: ViewerReplyByEventId;
     repostByEventId: Record<string, boolean>;
     pendingReactionByEventId: Record<string, boolean>;
     pendingRepostByEventId: Record<string, boolean>;
@@ -28,6 +30,14 @@ interface BuildActionStateBaseInput {
 
 function viewerReactionForEvent(viewerReactionByEventId: ViewerReactionByEventId | undefined, eventId: string) {
     return viewerReactionByEventId?.[eventId];
+}
+
+function viewerZapForEvent(viewerZapByEventId: ViewerZapByEventId | undefined, eventId: string) {
+    return viewerZapByEventId?.[eventId];
+}
+
+function viewerReplyForEvent(viewerReplyByEventId: ViewerReplyByEventId | undefined, eventId: string) {
+    return viewerReplyByEventId?.[eventId];
 }
 
 interface BuildFeedActionStateInput extends BuildActionStateBaseInput {
@@ -83,6 +93,8 @@ export function buildFeedActionState({
     engagementByEventId,
     reactionByEventId,
     viewerReactionByEventId,
+    viewerZapByEventId,
+    viewerReplyByEventId,
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -96,11 +108,15 @@ export function buildFeedActionState({
 }: BuildFeedActionStateInput): NoteActionState {
     const metrics = metricsForEvent(engagementByEventId, item.id);
     const viewerReaction = viewerReactionForEvent(viewerReactionByEventId, item.id);
+    const viewerZap = viewerZapForEvent(viewerZapByEventId, item.id);
+    const viewerReply = viewerReplyForEvent(viewerReplyByEventId, item.id);
 
     return {
         canWrite,
         isReactionActive: Boolean(viewerReaction || reactionByEventId[item.id]),
         isRepostActive: Boolean(repostByEventId[item.id]),
+        isZapActive: Boolean(viewerZap),
+        isReplyActive: Boolean(viewerReply),
         isReactionPending: Boolean(pendingReactionByEventId[item.id]),
         isRepostPending: Boolean(pendingRepostByEventId[item.id]),
         replies: metrics.replies,
@@ -152,6 +168,8 @@ export function buildPreviewActionState({
     engagementByEventId,
     reactionByEventId,
     viewerReactionByEventId,
+    viewerZapByEventId,
+    viewerReplyByEventId,
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -165,11 +183,15 @@ export function buildPreviewActionState({
 }: BuildPreviewActionStateInput): NoteActionState {
     const metrics = metricsForEvent(engagementByEventId, item.id);
     const viewerReaction = viewerReactionForEvent(viewerReactionByEventId, item.id);
+    const viewerZap = viewerZapForEvent(viewerZapByEventId, item.id);
+    const viewerReply = viewerReplyForEvent(viewerReplyByEventId, item.id);
 
     return {
         canWrite,
         isReactionActive: Boolean(viewerReaction || reactionByEventId[item.id]),
         isRepostActive: Boolean(repostByEventId[item.id]),
+        isZapActive: Boolean(viewerZap),
+        isReplyActive: Boolean(viewerReply),
         isReactionPending: Boolean(pendingReactionByEventId[item.id]),
         isRepostPending: Boolean(pendingRepostByEventId[item.id]),
         replies: metrics.replies,
@@ -221,6 +243,8 @@ export function buildRootActionState({
     engagementByEventId,
     reactionByEventId,
     viewerReactionByEventId,
+    viewerZapByEventId,
+    viewerReplyByEventId,
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -235,11 +259,15 @@ export function buildRootActionState({
 }: BuildThreadActionStateInput): NoteActionState {
     const metrics = metricsForEvent(engagementByEventId, item.id);
     const viewerReaction = viewerReactionForEvent(viewerReactionByEventId, item.id);
+    const viewerZap = viewerZapForEvent(viewerZapByEventId, item.id);
+    const viewerReply = viewerReplyForEvent(viewerReplyByEventId, item.id);
 
     return {
         canWrite,
         isReactionActive: Boolean(viewerReaction || reactionByEventId[item.id]),
         isRepostActive: Boolean(repostByEventId[item.id]),
+        isZapActive: Boolean(viewerZap),
+        isReplyActive: Boolean(viewerReply),
         isReactionPending: Boolean(pendingReactionByEventId[item.id]),
         isRepostPending: Boolean(pendingRepostByEventId[item.id]),
         replies: metrics.replies,

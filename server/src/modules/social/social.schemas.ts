@@ -34,6 +34,16 @@ export interface ViewerReactionsBody {
   eventIds: string[];
 }
 
+export interface ViewerZapsBody {
+  ownerPubkey: string;
+  eventIds: string[];
+}
+
+export interface ViewerRepliesBody {
+  ownerPubkey: string;
+  eventIds: string[];
+}
+
 export interface SocialEventDto {
   id: string;
   pubkey: string;
@@ -82,6 +92,27 @@ export interface ViewerReactionDto {
 
 export interface ViewerReactionsResponseDto {
   byEventId: Record<string, ViewerReactionDto>;
+}
+
+export interface ViewerZapDto {
+  eventId: string;
+  zapReceiptEventId: string;
+  amountSats: number;
+  createdAt: number;
+}
+
+export interface ViewerZapsResponseDto {
+  byEventId: Record<string, ViewerZapDto>;
+}
+
+export interface ViewerReplyDto {
+  eventId: string;
+  replyEventId: string;
+  createdAt: number;
+}
+
+export interface ViewerRepliesResponseDto {
+  byEventId: Record<string, ViewerReplyDto>;
 }
 
 const LOWER_HEX_64_PATTERN = '^[0-9a-f]{64}$';
@@ -356,6 +387,9 @@ export const viewerReactionsBodySchema = {
   },
 } as const;
 
+export const viewerZapsBodySchema = viewerReactionsBodySchema;
+export const viewerRepliesBodySchema = viewerReactionsBodySchema;
+
 const viewerReactionSchema = {
   type: 'object',
   additionalProperties: false,
@@ -377,6 +411,59 @@ export const viewerReactionsResponseSchema = {
       type: 'object',
       patternProperties: {
         [LOWER_HEX_64_PATTERN]: viewerReactionSchema,
+      },
+      additionalProperties: false,
+    },
+  },
+} as const;
+
+const viewerZapSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['eventId', 'zapReceiptEventId', 'amountSats', 'createdAt'],
+  properties: {
+    eventId: { type: 'string', pattern: LOWER_HEX_64_PATTERN },
+    zapReceiptEventId: { type: 'string', pattern: LOWER_HEX_64_PATTERN },
+    amountSats: { type: 'integer', minimum: 0 },
+    createdAt: { type: 'integer', minimum: 0 },
+  },
+} as const;
+
+export const viewerZapsResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['byEventId'],
+  properties: {
+    byEventId: {
+      type: 'object',
+      patternProperties: {
+        [LOWER_HEX_64_PATTERN]: viewerZapSchema,
+      },
+      additionalProperties: false,
+    },
+  },
+} as const;
+
+const viewerReplySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['eventId', 'replyEventId', 'createdAt'],
+  properties: {
+    eventId: { type: 'string', pattern: LOWER_HEX_64_PATTERN },
+    replyEventId: { type: 'string', pattern: LOWER_HEX_64_PATTERN },
+    createdAt: { type: 'integer', minimum: 0 },
+  },
+} as const;
+
+export const viewerRepliesResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['byEventId'],
+  properties: {
+    byEventId: {
+      type: 'object',
+      patternProperties: {
+        [LOWER_HEX_64_PATTERN]: viewerReplySchema,
       },
       additionalProperties: false,
     },

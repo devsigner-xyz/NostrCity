@@ -2,7 +2,7 @@ import type { ProviderResolveInput } from '../../nostr/auth/providers/types';
 import type { AuthSessionState, LoginMethod } from '../../nostr/auth/session';
 import type { Nip05ValidationResult } from '../../nostr/nip05';
 import type { RelayType } from '../../nostr/relay-settings';
-import type { SocialEngagementByEventId, ViewerReactionByEventId } from '../../nostr/social-feed-service';
+import type { SocialEngagementByEventId, ViewerReactionByEventId, ViewerReplyByEventId, ViewerZapByEventId } from '../../nostr/social-feed-service';
 import type { NostrEvent, NostrProfile } from '../../nostr/types';
 import type { UiSettingsState } from '../../nostr/ui-settings';
 import type { EasterEggId } from '../../ts/ui/easter_eggs';
@@ -58,6 +58,8 @@ interface OverlayDialogLayerProps {
     canAccessDirectMessages: boolean;
     reactionByEventId: Record<string, boolean>;
     viewerReactionByEventId?: ViewerReactionByEventId;
+    viewerZapByEventId?: ViewerZapByEventId;
+    viewerReplyByEventId?: ViewerReplyByEventId;
     repostByEventId: Record<string, boolean>;
     pendingReactionByEventId: Record<string, boolean>;
     pendingRepostByEventId: Record<string, boolean>;
@@ -129,6 +131,8 @@ export function OverlayDialogLayer({
     canAccessDirectMessages,
     reactionByEventId,
     viewerReactionByEventId,
+    viewerZapByEventId,
+    viewerReplyByEventId,
     repostByEventId,
     pendingReactionByEventId,
     pendingRepostByEventId,
@@ -201,6 +205,8 @@ export function OverlayDialogLayer({
                 canAccessDirectMessages={canAccessDirectMessages}
                 reactionByEventId={reactionByEventId}
                 {...(viewerReactionByEventId ? { viewerReactionByEventId } : {})}
+                {...(viewerZapByEventId ? { viewerZapByEventId } : {})}
+                {...(viewerReplyByEventId ? { viewerReplyByEventId } : {})}
                 repostByEventId={repostByEventId}
                 pendingReactionByEventId={pendingReactionByEventId}
                 pendingRepostByEventId={pendingRepostByEventId}

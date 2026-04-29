@@ -21,12 +21,18 @@ import type {
   ThreadQuery,
   ViewerReactionsBody,
   ViewerReactionsResponseDto,
+  ViewerRepliesBody,
+  ViewerRepliesResponseDto,
+  ViewerZapsBody,
+  ViewerZapsResponseDto,
 } from './social.schemas';
 
 type ThreadRequest = ThreadQuery & ThreadParams;
 type EngagementRequest = EngagementBody;
 type ArticleRequest = ArticleParams;
 type ViewerReactionsRequest = ViewerReactionsBody;
+type ViewerZapsRequest = ViewerZapsBody;
+type ViewerRepliesRequest = ViewerRepliesBody;
 
 type NostrEventLike = {
   id: string;
@@ -148,6 +154,51 @@ const findTargetEventId = (
   return undefined;
 };
 
+const findDirectReplyTargetEventId = (
+  tags: string[][],
+  candidateEventIds: Set<string>,
+): string | undefined => {
+  const eTags = tags
+    .filter(
+      (tag) =>
+        Array.isArray(tag) &&
+        tag[0] === 'e' &&
+        typeof tag[1] === 'string' &&
+        tag[1].length > 0,
+    )
+    .map((tag) => ({ value: tag[1]!, marker: tag[3] }));
+
+  const replyTags = eTags.filter((tag) => tag.marker === 'reply');
+  if (replyTags.length > 0) {
+    return replyTags.find((tag) => candidateEventIds.has(tag.value))?.value;
+  }
+
+  const rootTarget = eTags.find((tag) => tag.marker === 'root' && candidateEventIds.has(tag.value));
+  if (rootTarget) {
+    return rootTarget.value;
+  }
+
+  for (let index = eTags.length - 1; index >= 0; index -= 1) {
+    const tag = eTags[index];
+    if (tag && candidateEventIds.has(tag.value)) {
+      return tag.value;
+    }
+  }
+
+  return undefined;
+};
+
+const isReplyEventTags = (tags: string[][]): boolean => {
+  const eTags = tags.filter((tag) => Array.isArray(tag) && tag[0] === 'e');
+  const aTags = tags.filter((tag) => Array.isArray(tag) && tag[0] === 'a');
+  const hasReplyMarker = [...eTags, ...aTags].some((tag) => tag[3] === 'root' || tag[3] === 'reply');
+  if (hasReplyMarker) {
+    return true;
+  }
+
+  return eTags.filter((tag) => typeof tag[1] === 'string' && tag[1].length > 0).length >= 2;
+};
+
 const findLastTargetEventId = (
   tags: string[][],
   candidateEventIds: Set<string>,
@@ -233,6 +284,47 @@ const parseZapSats = (event: NostrEventLike): number => {
   return 0;
 };
 
+const parseZapRequestFromDescription = (event: NostrEventLike): { pubkey?: string; tags?: string[][] } | null => {
+  const descriptionTag = event.tags.find(
+    (tag) => Array.isArray(tag) && tag[0] === 'description' && typeof tag[1] === 'string',
+  );
+  if (!descriptionTag?.[1]) {
+    return null;
+  }
+
+  try {
+    const rawDescription = descriptionTag[1].startsWith('%') ? decodeURIComponent(descriptionTag[1]) : descriptionTag[1];
+    const parsed = JSON.parse(rawDescription) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+
+    const record = parsed as Record<string, unknown>;
+    const pubkey = typeof record.pubkey === 'string' && record.pubkey.length > 0 ? record.pubkey : undefined;
+    const tags = Array.isArray(record.tags)
+      ? record.tags.filter((tag): tag is string[] => Array.isArray(tag) && tag.every((value) => typeof value === 'string'))
+      : undefined;
+
+    return {
+      ...(pubkey ? { pubkey } : {}),
+      ...(tags ? { tags } : {}),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const parseZapSenderPubkey = (event: NostrEventLike): string | undefined => {
+  const senderTag = event.tags.find(
+    (tag) => Array.isArray(tag) && tag[0] === 'P' && typeof tag[1] === 'string' && tag[1].length > 0,
+  );
+  return senderTag?.[1] ?? parseZapRequestFromDescription(event)?.pubkey;
+};
+
+const hasAnonymousZapRequest = (event: NostrEventLike): boolean => {
+  return Boolean(parseZapRequestFromDescription(event)?.tags?.some((tag) => tag[0] === 'anon'));
+};
+
 const paginateEvents = (
   events: NostrEventLike[],
   limit: number,
@@ -258,6 +350,8 @@ export interface SocialServiceOptions {
   threadGateway?: RelayGateway<ThreadRequest, ThreadResponseDto>;
   engagementGateway?: RelayGateway<EngagementRequest, EngagementResponseDto>;
   viewerReactionsGateway?: RelayGateway<ViewerReactionsRequest, ViewerReactionsResponseDto>;
+  viewerZapsGateway?: RelayGateway<ViewerZapsRequest, ViewerZapsResponseDto>;
+  viewerRepliesGateway?: RelayGateway<ViewerRepliesRequest, ViewerRepliesResponseDto>;
   fetchFollowingFeed?: (
     query: FollowingFeedQuery,
     context: RelayGatewayQueryContext,
@@ -282,6 +376,14 @@ export interface SocialServiceOptions {
     query: ViewerReactionsRequest,
     context: RelayGatewayQueryContext,
   ) => Promise<ViewerReactionsResponseDto>;
+  fetchViewerZaps?: (
+    query: ViewerZapsRequest,
+    context: RelayGatewayQueryContext,
+  ) => Promise<ViewerZapsResponseDto>;
+  fetchViewerReplies?: (
+    query: ViewerRepliesRequest,
+    context: RelayGatewayQueryContext,
+  ) => Promise<ViewerRepliesResponseDto>;
   defaultTimeoutMs?: number;
   bootstrapRelays?: string[];
   pool?: SimplePool;
@@ -294,6 +396,8 @@ export interface SocialService {
   getThread(query: ThreadRequest): Promise<ThreadResponseDto>;
   getEngagement(query: EngagementRequest): Promise<EngagementResponseDto>;
   getViewerReactions(query: ViewerReactionsRequest): Promise<ViewerReactionsResponseDto>;
+  getViewerZaps(query: ViewerZapsRequest): Promise<ViewerZapsResponseDto>;
+  getViewerReplies(query: ViewerRepliesRequest): Promise<ViewerRepliesResponseDto>;
 }
 
 class GatewaySocialService implements SocialService {
@@ -304,6 +408,8 @@ class GatewaySocialService implements SocialService {
     private readonly threadGateway: RelayGateway<ThreadRequest, ThreadResponseDto>,
     private readonly engagementGateway: RelayGateway<EngagementRequest, EngagementResponseDto>,
     private readonly viewerReactionsGateway: RelayGateway<ViewerReactionsRequest, ViewerReactionsResponseDto>,
+    private readonly viewerZapsGateway: RelayGateway<ViewerZapsRequest, ViewerZapsResponseDto>,
+    private readonly viewerRepliesGateway: RelayGateway<ViewerRepliesRequest, ViewerRepliesResponseDto>,
   ) {}
 
   async getFollowingFeed(query: FollowingFeedQuery): Promise<FollowingFeedResponseDto> {
@@ -357,6 +463,30 @@ class GatewaySocialService implements SocialService {
       },
     });
   }
+
+  async getViewerZaps(query: ViewerZapsRequest): Promise<ViewerZapsResponseDto> {
+    const eventIds = [...new Set(query.eventIds)].sort();
+
+    return this.viewerZapsGateway.query({
+      key: `social:viewer-zaps:${query.ownerPubkey}:${eventIds.join(',')}`,
+      params: {
+        ...query,
+        eventIds,
+      },
+    });
+  }
+
+  async getViewerReplies(query: ViewerRepliesRequest): Promise<ViewerRepliesResponseDto> {
+    const eventIds = [...new Set(query.eventIds)].sort();
+
+    return this.viewerRepliesGateway.query({
+      key: `social:viewer-replies:${query.ownerPubkey}:${eventIds.join(',')}`,
+      params: {
+        ...query,
+        eventIds,
+      },
+    });
+  }
 }
 
 const toDefaultEngagementResponse = (eventIds: string[]): EngagementResponseDto => {
@@ -390,6 +520,14 @@ const createPoolFetchers = (options: {
     query: ViewerReactionsRequest,
     context: RelayGatewayQueryContext,
   ) => Promise<ViewerReactionsResponseDto>;
+  fetchViewerZaps: (
+    query: ViewerZapsRequest,
+    context: RelayGatewayQueryContext,
+  ) => Promise<ViewerZapsResponseDto>;
+  fetchViewerReplies: (
+    query: ViewerRepliesRequest,
+    context: RelayGatewayQueryContext,
+  ) => Promise<ViewerRepliesResponseDto>;
   fetchArticlesFeed: (
     query: ArticlesFeedQuery,
     context: RelayGatewayQueryContext,
@@ -773,6 +911,110 @@ const createPoolFetchers = (options: {
     return queryWithFallback(relaySets, queryViewerReactionsOnRelays);
   };
 
+  const fetchViewerZaps = async (
+    query: ViewerZapsRequest,
+    _context: RelayGatewayQueryContext,
+  ): Promise<ViewerZapsResponseDto> => {
+    const relaySets = resolveRelaySets({
+      scopedRelays: [],
+      userRelays: [],
+      bootstrapRelays: options.bootstrapRelays,
+    });
+
+    const queryViewerZapsOnRelays = async (relays: string[]): Promise<ViewerZapsResponseDto> => {
+      if (relays.length === 0) {
+        return { byEventId: {} };
+      }
+
+      const candidateIds = new Set(query.eventIds);
+      const events = await options.pool.querySync(relays, {
+        '#e': query.eventIds,
+        kinds: [9735],
+        limit: ENGAGEMENT_QUERY_LIMIT,
+      });
+      const byEventId: ViewerZapsResponseDto['byEventId'] = {};
+
+      for (const event of dedupeById(events).sort(byCreatedAtDesc)) {
+        if (event.kind !== 9735 || hasAnonymousZapRequest(event)) {
+          continue;
+        }
+
+        const eventId = findLastTargetEventId(event.tags, candidateIds);
+        if (!eventId || byEventId[eventId]) {
+          continue;
+        }
+
+        const senderPubkey = parseZapSenderPubkey(event);
+        const amountSats = parseZapSats(event);
+        if (senderPubkey !== query.ownerPubkey || amountSats <= 0) {
+          continue;
+        }
+
+        byEventId[eventId] = {
+          eventId,
+          zapReceiptEventId: event.id,
+          amountSats,
+          createdAt: event.created_at,
+        };
+      }
+
+      return { byEventId };
+    };
+
+    return queryWithFallback(relaySets, queryViewerZapsOnRelays);
+  };
+
+  const fetchViewerReplies = async (
+    query: ViewerRepliesRequest,
+    _context: RelayGatewayQueryContext,
+  ): Promise<ViewerRepliesResponseDto> => {
+    const relaySets = resolveRelaySets({
+      scopedRelays: [],
+      userRelays: [],
+      bootstrapRelays: options.bootstrapRelays,
+    });
+
+    const queryViewerRepliesOnRelays = async (relays: string[]): Promise<ViewerRepliesResponseDto> => {
+      if (relays.length === 0) {
+        return { byEventId: {} };
+      }
+
+      const candidateIds = new Set(query.eventIds);
+      const events = await options.pool.querySync(relays, {
+        '#e': query.eventIds,
+        authors: [query.ownerPubkey],
+        kinds: [1],
+        limit: ENGAGEMENT_QUERY_LIMIT,
+      });
+      const byEventId: ViewerRepliesResponseDto['byEventId'] = {};
+
+      for (const event of dedupeById(events).sort(byCreatedAtDesc)) {
+        if (event.kind !== 1 || event.pubkey !== query.ownerPubkey) {
+          continue;
+        }
+
+        if (!isReplyEventTags(event.tags)) {
+          continue;
+        }
+
+        const eventId = findDirectReplyTargetEventId(event.tags, candidateIds);
+        if (!eventId || byEventId[eventId]) {
+          continue;
+        }
+
+        byEventId[eventId] = {
+          eventId,
+          replyEventId: event.id,
+          createdAt: event.created_at,
+        };
+      }
+
+      return { byEventId };
+    };
+
+    return queryWithFallback(relaySets, queryViewerRepliesOnRelays);
+  };
+
   return {
     fetchFollowingFeed,
     fetchArticlesFeed,
@@ -780,6 +1022,8 @@ const createPoolFetchers = (options: {
     fetchThread,
     fetchEngagement,
     fetchViewerReactions,
+    fetchViewerZaps,
+    fetchViewerReplies,
   };
 };
 
@@ -857,5 +1101,27 @@ export const createSocialService = (options: SocialServiceOptions = {}): SocialS
       },
     });
 
-  return new GatewaySocialService(feedGateway, articlesFeedGateway, articleGateway, threadGateway, engagementGateway, viewerReactionsGateway);
+  const viewerZapsGateway =
+    options.viewerZapsGateway ??
+    createRelayGateway<ViewerZapsRequest, ViewerZapsResponseDto>({
+      queryFn: options.fetchViewerZaps || fetchers.fetchViewerZaps,
+      defaultTimeoutMs: options.defaultTimeoutMs,
+      cache: {
+        ttlMs: 5_000,
+        maxEntries: 300,
+      },
+    });
+
+  const viewerRepliesGateway =
+    options.viewerRepliesGateway ??
+    createRelayGateway<ViewerRepliesRequest, ViewerRepliesResponseDto>({
+      queryFn: options.fetchViewerReplies || fetchers.fetchViewerReplies,
+      defaultTimeoutMs: options.defaultTimeoutMs,
+      cache: {
+        ttlMs: 5_000,
+        maxEntries: 300,
+      },
+    });
+
+  return new GatewaySocialService(feedGateway, articlesFeedGateway, articleGateway, threadGateway, engagementGateway, viewerReactionsGateway, viewerZapsGateway, viewerRepliesGateway);
 };

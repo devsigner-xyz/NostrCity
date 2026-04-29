@@ -55,6 +55,8 @@ const actionStateFixture = {
     canWrite: true,
     isReactionActive: false,
     isRepostActive: false,
+    isZapActive: false,
+    isReplyActive: false,
     isReactionPending: false,
     isRepostPending: false,
     replies: 1,

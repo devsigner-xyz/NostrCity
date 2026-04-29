@@ -164,7 +164,7 @@ describe('OccupantProfileDialog', () => {
 
         const header = document.body.querySelector('.nostr-dialog-header') as HTMLElement;
         const separator = document.body.querySelector('.nostr-profile-dialog-separator[data-slot="separator"]') as HTMLElement;
-        const tabs = document.body.querySelector('.nostr-profile-dialog-tabs') as HTMLElement;
+        const tabs = document.body.querySelector('[data-slot="tabs-list"]') as HTMLElement;
         expect(header).not.toBeNull();
         expect(separator).not.toBeNull();
         expect(tabs).not.toBeNull();
@@ -183,6 +183,7 @@ describe('OccupantProfileDialog', () => {
         expect(closeButton?.className).toContain('bg-background/95');
         expect(closeButton?.className).toContain('border-border');
         expect(closeButton?.className).toContain('shadow-md');
+        expect(closeButton?.className).toContain('z-10');
         expect(closeButton?.className).not.toContain('nostr-dialog-close');
     });
 
@@ -382,6 +383,46 @@ describe('OccupantProfileDialog', () => {
         const feedEmpty = document.body.querySelector('.nostr-profile-posts-empty[data-slot="empty"]') as HTMLElement;
         expect(feedEmpty).toBeDefined();
         expect(feedEmpty.querySelector('[aria-label="Loading"]')).toBeNull();
+    });
+
+    test('shows comment emoji on profile feed posts replied to by the viewer', async () => {
+        const postId = 'e'.repeat(64);
+        const rendered = await renderElement(
+            <OccupantProfileDialog
+                {...buildProps({
+                    posts: [{
+                        id: postId,
+                        pubkey: 'a'.repeat(64),
+                        createdAt: 1_700_000_000,
+                        content: 'perfil con respuesta propia',
+                    }],
+                    engagementByEventId: {
+                        [postId]: {
+                            replies: 1,
+                            reactions: 0,
+                            reposts: 0,
+                            zaps: 0,
+                            zapSats: 0,
+                        },
+                    },
+                    viewerReplyByEventId: {
+                        [postId]: {
+                            eventId: postId,
+                            replyEventId: 'f'.repeat(64),
+                            createdAt: 1_700_000_100,
+                        },
+                    },
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        await selectTab('Feed');
+        await waitForCondition(() => Boolean(document.body.querySelector('button[aria-label="Responder (1)"]')));
+
+        const replyButton = document.body.querySelector('button[aria-label="Responder (1)"]') as HTMLButtonElement | null;
+        expect(replyButton).not.toBeNull();
+        expect(replyButton?.textContent || '').toContain('💬');
     });
 
     test('uses shadcn empty loading state with spinner in followers/following tabs', async () => {
@@ -783,30 +824,97 @@ describe('OccupantProfileDialog', () => {
         expect(onSelectProfile).toHaveBeenCalledWith('d'.repeat(64));
     });
 
-    test('keeps header and tabs fixed while only tab panels are scrollable', async () => {
+    test('keeps banner in the active scroll area and pins identity with tabs', async () => {
         const rendered = await renderElement(<OccupantProfileDialog {...buildProps()} />);
         mounted.push(rendered);
 
-        const dialogBody = document.body.querySelector('.nostr-profile-dialog-body') as HTMLElement;
-        expect(dialogBody).toBeDefined();
-
+        const scrollPanel = document.body.querySelector('.nostr-profile-tab-panel-scroll') as HTMLElement;
+        const bannerShell = document.body.querySelector('.nostr-profile-dialog-banner-shell') as HTMLElement;
+        const stickyShell = document.body.querySelector('.nostr-profile-dialog-sticky-shell') as HTMLElement;
+        const header = document.body.querySelector('.nostr-dialog-header') as HTMLElement;
         const tabsList = document.body.querySelector('[data-slot="tabs-list"]') as HTMLElement;
+
+        expect(scrollPanel).toBeDefined();
+        expect(scrollPanel.style.scrollbarGutter).toBe('stable');
+        expect(scrollPanel.style.height).toBe('100%');
+        expect(bannerShell).toBeDefined();
+        expect(stickyShell).toBeDefined();
+        expect(header).toBeDefined();
         expect(tabsList).toBeDefined();
+        expect(scrollPanel.contains(bannerShell)).toBe(true);
+        expect(scrollPanel.contains(stickyShell)).toBe(true);
+        expect(stickyShell.contains(header)).toBe(true);
+        expect(stickyShell.contains(tabsList)).toBe(true);
+        expect((bannerShell.compareDocumentPosition(stickyShell) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true);
+        expect(overlayStyles).toMatch(/\.nostr-profile-dialog-sticky-shell\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;[^}]*z-index:\s*2/s);
+        expect(overlayStyles).toMatch(/\.nostr-profile-tab-panel-scroll\s*\{[^}]*overflow-y:\s*auto/s);
 
-        const assertCurrentPanelScrollable = () => {
-            const scrollPanel = document.body.querySelector('.nostr-profile-tab-panel-scroll') as HTMLElement;
-            expect(scrollPanel).toBeDefined();
-            expect(scrollPanel.style.scrollbarGutter).toBe('stable');
-            expect(scrollPanel.style.height).toBe('100%');
-        };
-
-        assertCurrentPanelScrollable();
         await selectTab('Feed');
-        assertCurrentPanelScrollable();
+        expect(document.body.querySelector('.nostr-profile-tab-panel-scroll')).toBe(scrollPanel);
         await selectTab('Seguidores');
-        assertCurrentPanelScrollable();
+        expect(document.body.querySelector('.nostr-profile-tab-panel-scroll')).toBe(scrollPanel);
         await selectTab('Siguiendo');
-        assertCurrentPanelScrollable();
+        expect(document.body.querySelector('.nostr-profile-tab-panel-scroll')).toBe(scrollPanel);
+    });
+
+    test('restores the previous scroll position when returning to a profile tab', async () => {
+        const rendered = await renderElement(<OccupantProfileDialog {...buildProps()} />);
+        mounted.push(rendered);
+
+        const scrollPanel = document.body.querySelector('.nostr-profile-tab-panel-scroll') as HTMLElement;
+        expect(scrollPanel).toBeDefined();
+
+        scrollPanel.scrollTop = 180;
+        await act(async () => {
+            scrollPanel.dispatchEvent(new Event('scroll', { bubbles: true }));
+        });
+
+        await selectTab('Feed');
+        expect(scrollPanel.scrollTop).toBe(0);
+
+        scrollPanel.scrollTop = 260;
+        await act(async () => {
+            scrollPanel.dispatchEvent(new Event('scroll', { bubbles: true }));
+        });
+
+        await selectTab('Información');
+        expect(scrollPanel.scrollTop).toBe(180);
+
+        await selectTab('Feed');
+        expect(scrollPanel.scrollTop).toBe(260);
+    });
+
+    test('resets saved tab scroll when the dialog changes profile', async () => {
+        const rendered = await renderElement(<OccupantProfileDialog {...buildProps()} />);
+        mounted.push(rendered);
+
+        const scrollPanel = document.body.querySelector('.nostr-profile-tab-panel-scroll') as HTMLElement;
+        expect(scrollPanel).toBeDefined();
+
+        scrollPanel.scrollTop = 220;
+        await act(async () => {
+            scrollPanel.dispatchEvent(new Event('scroll', { bubbles: true }));
+        });
+
+        const nextPubkey = 'e'.repeat(64);
+        await act(async () => {
+            rendered.root.render(
+                <OccupantProfileDialog
+                    {...buildProps({
+                        pubkey: nextPubkey,
+                        profile: {
+                            pubkey: nextPubkey,
+                            displayName: 'Erin',
+                        },
+                    })}
+                />
+            );
+        });
+
+        expect(scrollPanel.scrollTop).toBe(0);
+
+        await selectTab('Feed');
+        expect(scrollPanel.scrollTop).toBe(0);
     });
 
     test('renders inline media previews for image and video URLs in feed posts', async () => {

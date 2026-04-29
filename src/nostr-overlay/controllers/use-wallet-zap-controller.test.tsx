@@ -111,6 +111,7 @@ function createNwcFixture(infoEvent?: NostrEvent): {
     client: NostrClient;
     createClient: ReturnType<typeof vi.fn<(relays?: string[]) => NostrClient>>;
 } {
+    // TEST_VECTOR_DO_NOT_USE: deterministic fake NWC keys for controller tests only.
     const walletServiceSecret = '1'.repeat(64);
     const walletServicePubkey = getPublicKey(hexToBytes(walletServiceSecret));
     const clientSecret = '2'.repeat(64);

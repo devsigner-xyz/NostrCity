@@ -57,6 +57,31 @@ describe('social routes', () => {
         ]),
       ),
     }),
+    getViewerZaps: async (query) => ({
+      byEventId: Object.fromEntries(
+        query.eventIds.map((eventId) => [
+          eventId,
+          {
+            eventId,
+            zapReceiptEventId: '8'.repeat(64),
+            amountSats: 21,
+            createdAt: 123,
+          },
+        ]),
+      ),
+    }),
+    getViewerReplies: async (query) => ({
+      byEventId: Object.fromEntries(
+        query.eventIds.map((eventId) => [
+          eventId,
+          {
+            eventId,
+            replyEventId: '9'.repeat(64),
+            createdAt: 123,
+          },
+        ]),
+      ),
+    }),
   };
   const app = buildApp({ socialService });
 
@@ -194,6 +219,51 @@ describe('social routes', () => {
           eventId: VALID_EVENT_ID,
           reactionEventId: '7'.repeat(64),
           emoji: '🔥',
+          createdAt: 123,
+        },
+      },
+    });
+  });
+
+  it('returns viewer zaps envelope for valid body', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/social/viewer-zaps',
+      payload: {
+        ownerPubkey: VALID_PUBKEY,
+        eventIds: [VALID_EVENT_ID],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      byEventId: {
+        [VALID_EVENT_ID]: {
+          eventId: VALID_EVENT_ID,
+          zapReceiptEventId: '8'.repeat(64),
+          amountSats: 21,
+          createdAt: 123,
+        },
+      },
+    });
+  });
+
+  it('returns viewer replies envelope for valid body', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/social/viewer-replies',
+      payload: {
+        ownerPubkey: VALID_PUBKEY,
+        eventIds: [VALID_EVENT_ID],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      byEventId: {
+        [VALID_EVENT_ID]: {
+          eventId: VALID_EVENT_ID,
+          replyEventId: '9'.repeat(64),
           createdAt: 123,
         },
       },

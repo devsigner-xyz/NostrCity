@@ -24,6 +24,8 @@ const service: SocialFeedService = {
     loadThread: async () => ({ root: null, replies: [], hasMore: false }),
     loadEngagement: async () => ({}),
     loadViewerReactions: async () => ({}),
+    loadViewerZaps: async () => ({}),
+    loadViewerReplies: async () => ({}),
 };
 
 function createFeedState(input: Partial<ReturnType<typeof useFollowingFeedController>> = {}): ReturnType<typeof useFollowingFeedController> {
@@ -45,6 +47,8 @@ function createFeedState(input: Partial<ReturnType<typeof useFollowingFeedContro
         isPublishingReply: false,
         reactionByEventId: {},
         viewerReactionByEventId: {},
+        viewerZapByEventId: {},
+        viewerReplyByEventId: {},
         repostByEventId: {},
         pendingReactionByEventId: {},
         pendingRepostByEventId: {},

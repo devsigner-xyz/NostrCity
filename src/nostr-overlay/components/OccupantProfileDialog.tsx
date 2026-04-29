@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type UIEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type UIEvent } from 'react';
 import type { Nip05ValidationResult } from '../../nostr/nip05';
 import { encodeHexToNpub } from '../../nostr/npub';
 import { RELAY_TYPES, type RelaySettingsByType, type RelayType } from '../../nostr/relay-settings';
@@ -31,7 +31,7 @@ import { useI18n } from '@/i18n/useI18n';
 import { PersonContextMenuItems } from './PersonContextMenuItems';
 import { VerifiedUserAvatar } from './VerifiedUserAvatar';
 import { toast } from 'sonner';
-import type { SocialEngagementMetrics, ViewerReactionByEventId } from '../../nostr/social-feed-service';
+import type { SocialEngagementMetrics, ViewerReactionByEventId, ViewerReplyByEventId, ViewerZapByEventId } from '../../nostr/social-feed-service';
 
 interface OccupantProfileDialogProps {
     ownerPubkey?: string;
@@ -67,6 +67,8 @@ interface OccupantProfileDialogProps {
     canWrite?: boolean;
     reactionByEventId?: Record<string, boolean>;
     viewerReactionByEventId?: ViewerReactionByEventId;
+    viewerZapByEventId?: ViewerZapByEventId;
+    viewerReplyByEventId?: ViewerReplyByEventId;
     repostByEventId?: Record<string, boolean>;
     pendingReactionByEventId?: Record<string, boolean>;
     pendingRepostByEventId?: Record<string, boolean>;
@@ -159,6 +161,15 @@ const RELAY_TYPE_LABELS: Record<RelayType, string> = {
     search: 'NIP-50 search',
 };
 
+function createTabScrollTopState(): Record<OccupantProfileTab, number> {
+    return {
+        info: 0,
+        feed: 0,
+        followers: 0,
+        following: 0,
+    };
+}
+
 function buildRelaySuggestionRows(relaySuggestionsByType?: RelaySettingsByType): Array<{ relayUrl: string; relayTypes: RelayType[] }> {
     if (!relaySuggestionsByType) {
         return [];
@@ -210,6 +221,8 @@ export function OccupantProfileDialog({
     canWrite = false,
     reactionByEventId = {},
     viewerReactionByEventId = {},
+    viewerZapByEventId = {},
+    viewerReplyByEventId = {},
     repostByEventId = {},
     pendingReactionByEventId = {},
     pendingRepostByEventId = {},
@@ -232,6 +245,8 @@ export function OccupantProfileDialog({
     onRetryNetwork,
 }: OccupantProfileDialogProps) {
     const { t } = useI18n();
+    const profileScrollRef = useRef<HTMLDivElement | null>(null);
+    const scrollTopByTabRef = useRef<Record<OccupantProfileTab, number>>(createTabScrollTopState());
     const followsTimerRef = useRef<number | null>(null);
     const followersTimerRef = useRef<number | null>(null);
     const [visibleFollowsCount, setVisibleFollowsCount] = useState(() => Math.min(NETWORK_PAGE_SIZE, follows.length));
@@ -318,6 +333,25 @@ export function OccupantProfileDialog({
         };
     }, []);
 
+    useLayoutEffect(() => {
+        scrollTopByTabRef.current = createTabScrollTopState();
+        const scrollPanel = profileScrollRef.current;
+        if (!scrollPanel) {
+            return;
+        }
+
+        scrollPanel.scrollTop = 0;
+    }, [pubkey]);
+
+    useLayoutEffect(() => {
+        const scrollPanel = profileScrollRef.current;
+        if (!scrollPanel) {
+            return;
+        }
+
+        scrollPanel.scrollTop = scrollTopByTabRef.current[activeTab] ?? 0;
+    }, [activeTab]);
+
     const visibleFollows = follows.slice(0, visibleFollowsCount);
     const visibleFollowers = followers.slice(0, visibleFollowersCount);
     const hasMoreFollows = visibleFollowsCount < follows.length;
@@ -351,6 +385,7 @@ export function OccupantProfileDialog({
 
     const handleTabScroll = (tab: OccupantProfileTab, event: UIEvent<HTMLDivElement>): void => {
         const target = event.currentTarget;
+        scrollTopByTabRef.current[tab] = target.scrollTop;
         const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 32;
         if (!nearBottom) {
             return;
@@ -367,6 +402,15 @@ export function OccupantProfileDialog({
         if (tab === 'followers' && hasMoreFollowers) {
             scheduleLoadMoreFollowers();
         }
+    };
+
+    const handleActiveTabChange = (value: string): void => {
+        const scrollPanel = profileScrollRef.current;
+        if (scrollPanel) {
+            scrollTopByTabRef.current[activeTab] = scrollPanel.scrollTop;
+        }
+
+        setActiveTab(value as OccupantProfileTab);
     };
 
     const followProfile = (targetPubkey: string): void => {
@@ -632,7 +676,7 @@ export function OccupantProfileDialog({
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        className="absolute top-2 right-2 border-border bg-background/95 text-foreground shadow-md backdrop-blur supports-[backdrop-filter]:bg-background/80 hover:bg-background dark:bg-background/90 dark:hover:bg-background"
+                        className="absolute top-2 right-2 z-10 border-border bg-background/95 text-foreground shadow-md backdrop-blur supports-[backdrop-filter]:bg-background/80 hover:bg-background dark:bg-background/90 dark:hover:bg-background"
                         aria-label={t('profile.dialog.close')}
                         title={t('profile.dialog.close')}
                     >
@@ -642,94 +686,101 @@ export function OccupantProfileDialog({
                 </DialogClose>
 
                 <div className="nostr-profile-dialog-body">
-                    <div className={`nostr-profile-dialog-banner-shell${profile?.banner ? '' : ' is-placeholder'}`}>
-                        {profile?.banner ? <img className="nostr-profile-dialog-banner" src={profile.banner} alt={t('profile.dialog.bannerAlt')} /> : null}
-                    </div>
-
-                    <div className="nostr-dialog-header flex items-center gap-3">
-                        <VerifiedUserAvatar
-                            picture={profile?.picture}
-                            imageAlt={t('profile.dialog.avatarAlt')}
-                            fallback={resolveInitials(pubkey, profile)}
-                            nip05={profile?.nip05}
-                            verification={verification}
-                            className="border border-border/70 shadow-xs"
-                            fallbackClassName="bg-muted text-muted-foreground"
-                        />
-
-                        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                            <div className="flex min-w-0 flex-col gap-0.5">
-                                <p className="nostr-dialog-name nostr-identity-row inline-flex max-w-full items-center gap-2 text-base font-semibold leading-tight text-foreground">
-                                    <span className="truncate">{resolveName(pubkey, profile)}</span>
-                                </p>
-                                <div className="nostr-dialog-pubkey-row flex min-w-0 items-center leading-tight">
-                                    <button
-                                        type="button"
-                                        className="nostr-dialog-pubkey nostr-dialog-pubkey-copy min-h-6 min-w-0 truncate rounded-sm text-left text-sm leading-tight text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                                        aria-label={t('profile.dialog.copyNpub')}
-                                        title={t('profile.dialog.copyNpub')}
-                                        onClick={() => {
-                                            void copyNpubToClipboard();
-                                        }}
-                                    >
-                                        {npubLabel}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {(canSendMessageToActiveProfile || canFollowActiveProfile) ? (
-                                <div className="flex shrink-0 items-center gap-2">
-                                    {canSendMessageToActiveProfile ? (
-                                        <Button
-                                            type="button"
-                                            size="icon-xs"
-                                            variant="outline"
-                                            aria-label={t('profile.sendMessageTo', { displayName })}
-                                            title={t('profile.sendMessageTo', { displayName })}
-                                            onClick={() => {
-                                                void onSendMessage?.(pubkey);
-                                            }}
-                                        >
-                                            <MessageCircleIcon data-icon="inline-start" />
-                                        </Button>
-                                    ) : null}
-
-                                    {canFollowActiveProfile ? (
-                                        <Button
-                                            type="button"
-                                            size="xs"
-                                            variant="outline"
-                                            className="shrink-0"
-                                            disabled={activeProfileFollowState.isDisabled}
-                                            aria-label={activeProfileFollowState.ariaLabel}
-                                            onClick={() => followProfile(pubkey)}
-                                        >
-                                            {activeProfileFollowState.label}
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            ) : null}
-                        </div>
-                    </div>
-
-                    <Separator className="nostr-profile-dialog-separator" />
-
                     <Tabs
                         value={activeTab}
-                        onValueChange={(value) => setActiveTab(value as OccupantProfileTab)}
+                        onValueChange={handleActiveTabChange}
                         className="nostr-profile-dialog-tabs"
                         aria-label={t('profile.dialog.tabs')}
                     >
-                        <TabsList variant="line" className="grid h-auto w-full grid-cols-4" aria-label={t('profile.dialog.tabs')}>
-                            <TabsTrigger value="info">{t('profile.dialog.tabInfo')}</TabsTrigger>
-                            <TabsTrigger value="feed">{t('profile.dialog.tabFeed')}</TabsTrigger>
-                            <TabsTrigger value="following">{t('profile.dialog.tabFollowing', { count: String(follows.length) })}</TabsTrigger>
-                            <TabsTrigger value="followers">{t('profile.dialog.tabFollowers', { count: String(followers.length) })}</TabsTrigger>
-                        </TabsList>
+                        <div
+                            ref={profileScrollRef}
+                            className="nostr-profile-tab-panel-scroll"
+                            style={{ scrollbarGutter: 'stable', height: '100%' }}
+                            onScroll={(event) => handleTabScroll(activeTab, event)}
+                        >
+                            <div className={`nostr-profile-dialog-banner-shell${profile?.banner ? '' : ' is-placeholder'}`}>
+                                {profile?.banner ? <img className="nostr-profile-dialog-banner" src={profile.banner} alt={t('profile.dialog.bannerAlt')} /> : null}
+                            </div>
+
+                            <div className="nostr-profile-dialog-sticky-shell">
+                                <div className="nostr-dialog-header flex items-center gap-3">
+                                    <VerifiedUserAvatar
+                                        picture={profile?.picture}
+                                        imageAlt={t('profile.dialog.avatarAlt')}
+                                        fallback={resolveInitials(pubkey, profile)}
+                                        nip05={profile?.nip05}
+                                        verification={verification}
+                                        className="border border-border/70 shadow-xs"
+                                        fallbackClassName="bg-muted text-muted-foreground"
+                                    />
+
+                                    <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                                        <div className="flex min-w-0 flex-col gap-0.5">
+                                            <p className="nostr-dialog-name nostr-identity-row inline-flex max-w-full items-center gap-2 text-base font-semibold leading-tight text-foreground">
+                                                <span className="truncate">{resolveName(pubkey, profile)}</span>
+                                            </p>
+                                            <div className="nostr-dialog-pubkey-row flex min-w-0 items-center leading-tight">
+                                                <button
+                                                    type="button"
+                                                    className="nostr-dialog-pubkey nostr-dialog-pubkey-copy min-h-6 min-w-0 truncate rounded-sm text-left text-sm leading-tight text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                                    aria-label={t('profile.dialog.copyNpub')}
+                                                    title={t('profile.dialog.copyNpub')}
+                                                    onClick={() => {
+                                                        void copyNpubToClipboard();
+                                                    }}
+                                                >
+                                                    {npubLabel}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {(canSendMessageToActiveProfile || canFollowActiveProfile) ? (
+                                            <div className="flex shrink-0 items-center gap-2">
+                                                {canSendMessageToActiveProfile ? (
+                                                    <Button
+                                                        type="button"
+                                                        size="icon-xs"
+                                                        variant="outline"
+                                                        aria-label={t('profile.sendMessageTo', { displayName })}
+                                                        title={t('profile.sendMessageTo', { displayName })}
+                                                        onClick={() => {
+                                                            void onSendMessage?.(pubkey);
+                                                        }}
+                                                    >
+                                                        <MessageCircleIcon data-icon="inline-start" />
+                                                    </Button>
+                                                ) : null}
+
+                                                {canFollowActiveProfile ? (
+                                                    <Button
+                                                        type="button"
+                                                        size="xs"
+                                                        variant="outline"
+                                                        className="shrink-0"
+                                                        disabled={activeProfileFollowState.isDisabled}
+                                                        aria-label={activeProfileFollowState.ariaLabel}
+                                                        onClick={() => followProfile(pubkey)}
+                                                    >
+                                                        {activeProfileFollowState.label}
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+
+                                <Separator className="nostr-profile-dialog-separator" />
+
+                                <TabsList variant="line" className="grid h-auto w-full grid-cols-4" aria-label={t('profile.dialog.tabs')}>
+                                    <TabsTrigger value="info">{t('profile.dialog.tabInfo')}</TabsTrigger>
+                                    <TabsTrigger value="feed">{t('profile.dialog.tabFeed')}</TabsTrigger>
+                                    <TabsTrigger value="following">{t('profile.dialog.tabFollowing', { count: String(follows.length) })}</TabsTrigger>
+                                    <TabsTrigger value="followers">{t('profile.dialog.tabFollowers', { count: String(followers.length) })}</TabsTrigger>
+                                </TabsList>
+                            </div>
 
                         <TabsContent value="info" className="nostr-profile-tab-panel">
-                            <div className="nostr-profile-tab-panel-scroll" style={{ scrollbarGutter: 'stable', height: '100%' }}>
-                                <section className="nostr-profile-info">
+                            <section className="nostr-profile-info">
                                     <dl className="nostr-profile-info-list">
                                         {infoRows.map((row) => (
                                             <div key={row.label} className="nostr-profile-info-row">
@@ -795,17 +846,11 @@ export function OccupantProfileDialog({
                                             </ItemGroup>
                                         )}
                                     </section>
-                                </section>
-                            </div>
+                            </section>
                         </TabsContent>
 
                         <TabsContent value="feed" className="nostr-profile-tab-panel">
-                            <div
-                                className="nostr-profile-tab-panel-scroll"
-                                style={{ scrollbarGutter: 'stable', height: '100%' }}
-                                onScroll={(event) => handleTabScroll('feed', event)}
-                            >
-                                <section className="nostr-profile-posts">
+                            <section className="nostr-profile-posts">
                                     {postsError && posts.length === 0 ? renderFeedErrorState() : null}
 
                                     {!postsError && posts.length === 0 && !postsLoading ? (
@@ -828,6 +873,8 @@ export function OccupantProfileDialog({
                                                         engagementByEventId,
                                                         reactionByEventId,
                                                         viewerReactionByEventId,
+                                                        viewerZapByEventId,
+                                                        viewerReplyByEventId,
                                                         repostByEventId,
                                                         pendingReactionByEventId,
                                                         pendingRepostByEventId,
@@ -889,17 +936,11 @@ export function OccupantProfileDialog({
                                             {t('profile.feed.loadMore')}
                                         </Button>
                                     ) : null}
-                                </section>
-                            </div>
+                            </section>
                         </TabsContent>
 
                         <TabsContent value="followers" className="nostr-profile-tab-panel">
-                            <div
-                                className="nostr-profile-tab-panel-scroll"
-                                style={{ scrollbarGutter: 'stable', height: '100%' }}
-                                onScroll={(event) => handleTabScroll('followers', event)}
-                            >
-                                <section className="nostr-profile-network-tab">
+                            <section className="nostr-profile-network-tab">
                                     {networkLoading && followers.length === 0 ? (
                                         <Empty className="nostr-profile-network-empty">
                                             <EmptyHeader>
@@ -936,17 +977,11 @@ export function OccupantProfileDialog({
                                             <ListLoadingFooter loading={followersLoadingMore} />
                                         </>
                                     )}
-                                </section>
-                            </div>
+                            </section>
                         </TabsContent>
 
                         <TabsContent value="following" className="nostr-profile-tab-panel">
-                            <div
-                                className="nostr-profile-tab-panel-scroll"
-                                style={{ scrollbarGutter: 'stable', height: '100%' }}
-                                onScroll={(event) => handleTabScroll('following', event)}
-                            >
-                                <section className="nostr-profile-network-tab">
+                            <section className="nostr-profile-network-tab">
                                     {networkLoading && follows.length === 0 ? (
                                         <Empty className="nostr-profile-network-empty">
                                             <EmptyHeader>
@@ -983,9 +1018,9 @@ export function OccupantProfileDialog({
                                             <ListLoadingFooter loading={followsLoadingMore} />
                                         </>
                                     )}
-                                </section>
-                            </div>
+                            </section>
                         </TabsContent>
+                        </div>
                     </Tabs>
                 </div>
             </DialogContent>

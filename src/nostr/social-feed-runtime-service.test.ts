@@ -669,6 +669,184 @@ describe('social-feed-runtime-service', () => {
         expect(reactions).toEqual({});
     });
 
+    test('loads viewer zaps from NIP-57 receipt P tags by target event id', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const transport = createTransportMock([
+            noteEvent({
+                id: 'viewer-zap',
+                pubkey: FOLLOW_A,
+                kind: 9735,
+                createdAt: 900,
+                tags: [
+                    ['e', 'note-1'],
+                    ['p', FOLLOW_B],
+                    ['P', ownerPubkey],
+                    ['amount', '21000'],
+                    ['description', JSON.stringify({ kind: 9734, pubkey: ownerPubkey, tags: [['amount', '21000'], ['e', 'note-1'], ['p', FOLLOW_B]] })],
+                ],
+            }),
+            noteEvent({
+                id: 'other-viewer-zap',
+                pubkey: FOLLOW_A,
+                kind: 9735,
+                createdAt: 910,
+                tags: [
+                    ['e', 'note-1'],
+                    ['P', FOLLOW_A],
+                    ['amount', '42000'],
+                ],
+            }),
+        ]);
+
+        const service = createRuntimeSocialFeedService({
+            createTransport: () => transport as any,
+            resolveRelays: () => ['wss://relay.one'],
+        });
+
+        const zaps = await (service as any).loadViewerZaps({
+            ownerPubkey,
+            eventIds: ['note-1'],
+        });
+
+        expect(zaps).toEqual({
+            'note-1': {
+                eventId: 'note-1',
+                zapReceiptEventId: 'viewer-zap',
+                amountSats: 21,
+                createdAt: 900,
+            },
+        });
+        const filters = (transport.fetchBackfill as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Array<Record<string, unknown>>;
+        expect(filters[0]).toMatchObject({
+            kinds: [9735],
+            '#e': ['note-1'],
+        });
+        expect(filters[0]).not.toHaveProperty('authors');
+    });
+
+    test('loads viewer zaps from NIP-57 description pubkey fallback', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const transport = createTransportMock([
+            noteEvent({
+                id: 'viewer-zap-description',
+                pubkey: FOLLOW_A,
+                kind: 9735,
+                createdAt: 900,
+                tags: [
+                    ['e', 'note-1'],
+                    ['description', JSON.stringify({ kind: 9734, pubkey: ownerPubkey, tags: [['amount', '128000'], ['e', 'note-1']] })],
+                ],
+            }),
+        ]);
+
+        const service = createRuntimeSocialFeedService({
+            createTransport: () => transport as any,
+            resolveRelays: () => ['wss://relay.one'],
+        });
+
+        const zaps = await (service as any).loadViewerZaps({
+            ownerPubkey,
+            eventIds: ['note-1'],
+        });
+
+        expect(zaps['note-1']).toMatchObject({
+            eventId: 'note-1',
+            zapReceiptEventId: 'viewer-zap-description',
+            amountSats: 128,
+            createdAt: 900,
+        });
+    });
+
+    test('ignores viewer zap receipts from other senders or malformed descriptions', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const transport = createTransportMock([
+            noteEvent({
+                id: 'other-sender-zap',
+                pubkey: FOLLOW_A,
+                kind: 9735,
+                createdAt: 900,
+                tags: [
+                    ['e', 'note-1'],
+                    ['P', FOLLOW_A],
+                    ['amount', '21000'],
+                ],
+            }),
+            noteEvent({
+                id: 'malformed-zap',
+                pubkey: FOLLOW_A,
+                kind: 9735,
+                createdAt: 910,
+                tags: [
+                    ['e', 'note-1'],
+                    ['description', '{bad-json'],
+                ],
+            }),
+        ]);
+
+        const service = createRuntimeSocialFeedService({
+            createTransport: () => transport as any,
+            resolveRelays: () => ['wss://relay.one'],
+        });
+
+        const zaps = await (service as any).loadViewerZaps({
+            ownerPubkey,
+            eventIds: ['note-1'],
+        });
+
+        expect(zaps).toEqual({});
+    });
+
+    test('loads latest viewer replies by direct target event id', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const transport = createTransportMock([
+            noteEvent({
+                id: 'viewer-reply-root',
+                pubkey: ownerPubkey,
+                createdAt: 900,
+                tags: [['e', 'note-1', '', 'root'], ['e', 'note-1', '', 'reply']],
+                content: 'mine',
+            }),
+            noteEvent({
+                id: 'viewer-reply-deep',
+                pubkey: ownerPubkey,
+                createdAt: 910,
+                tags: [['e', 'note-1', '', 'root'], ['e', 'reply-parent', '', 'reply']],
+                content: 'deep reply',
+            }),
+            noteEvent({
+                id: 'other-reply',
+                pubkey: FOLLOW_A,
+                createdAt: 920,
+                tags: [['e', 'note-1', '', 'reply']],
+                content: 'other',
+            }),
+        ]);
+
+        const service = createRuntimeSocialFeedService({
+            createTransport: () => transport as any,
+            resolveRelays: () => ['wss://relay.one'],
+        });
+
+        const replies = await (service as any).loadViewerReplies({
+            ownerPubkey,
+            eventIds: ['note-1'],
+        });
+
+        expect(replies).toEqual({
+            'note-1': {
+                eventId: 'note-1',
+                replyEventId: 'viewer-reply-root',
+                createdAt: 900,
+            },
+        });
+        const filters = (transport.fetchBackfill as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Array<Record<string, unknown>>;
+        expect(filters[0]).toMatchObject({
+            authors: [ownerPubkey],
+            kinds: [1],
+            '#e': ['note-1'],
+        });
+    });
+
     test('dedupes engagement events and ignores unsupported note kinds', async () => {
         const invalid = {
             id: 'invalid',

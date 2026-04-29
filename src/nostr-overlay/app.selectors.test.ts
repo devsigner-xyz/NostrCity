@@ -5,6 +5,7 @@ import type { DirectMessageConversationState } from './query/direct-messages.que
 import {
     addOptimisticZapEntry,
     applyOptimisticZapMetrics,
+    applyLocalViewerZapState,
     pruneCaughtUpOptimisticZapEntries,
     selectChatConversationSummaries,
     selectChatDetailMessages,
@@ -101,6 +102,39 @@ describe('overlay app selectors', () => {
             eventA: { baselineZaps: 0, baselineZapSats: 0, deltaZaps: 1, deltaZapSats: 7 },
         })).toEqual({
             eventA: { replies: 0, reposts: 0, reactions: 0, zaps: 1, zapSats: 7 },
+        });
+    });
+
+    test('applies local viewer zap state while NIP-57 receipt detection has not caught up', () => {
+        expect(applyLocalViewerZapState({}, {
+            eventA: { amountSats: 21, createdAt: 123 },
+        })).toEqual({
+            eventA: {
+                eventId: 'eventA',
+                zapReceiptEventId: 'local-zap:eventA:123',
+                amountSats: 21,
+                createdAt: 123,
+            },
+        });
+    });
+
+    test('preserves relay-detected viewer zap state over local viewer zap state', () => {
+        expect(applyLocalViewerZapState({
+            eventA: {
+                eventId: 'eventA',
+                zapReceiptEventId: 'receipt-a',
+                amountSats: 99,
+                createdAt: 456,
+            },
+        }, {
+            eventA: { amountSats: 21, createdAt: 123 },
+        })).toEqual({
+            eventA: {
+                eventId: 'eventA',
+                zapReceiptEventId: 'receipt-a',
+                amountSats: 99,
+                createdAt: 456,
+            },
         });
     });
 

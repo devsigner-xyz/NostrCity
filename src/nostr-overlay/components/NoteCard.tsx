@@ -242,7 +242,7 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
     const reactionButton = (
         <Button
             type="button"
-            variant={actions.isReactionActive ? 'default' : 'ghost'}
+            variant="ghost"
             size="sm"
             disabled={actions.isReactionPending || !actions.canWrite}
             aria-label={reactionButtonLabel}
@@ -268,7 +268,11 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
                 event.stopPropagation();
                 actions.onReply();
             }}>
-                <MessageCircleIcon data-icon="inline-start" aria-hidden="true" />
+                {actions.isReplyActive ? (
+                    <span data-icon="inline-start" aria-hidden="true">💬</span>
+                ) : (
+                    <MessageCircleIcon data-icon="inline-start" aria-hidden="true" />
+                )}
                 <span>{actions.replies}</span>
             </Button>
 
@@ -300,7 +304,7 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
                 <ContextMenuTrigger asChild>
                     <Button
                         type="button"
-                        variant={actions.isRepostActive ? 'default' : 'ghost'}
+                        variant="ghost"
                         size="sm"
                         disabled={actions.isRepostPending || !actions.canWrite}
                         aria-label={t('note.actions.repost', { count: String(actions.reposts) })}
@@ -334,7 +338,11 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
                             aria-label={t('note.actions.zaps', { count: String(actions.zapSats) })}
                             onClick={openZapMenu}
                         >
-                            <ZapIcon data-icon="inline-start" aria-hidden="true" />
+                            {actions.isZapActive ? (
+                                <span data-icon="inline-start" aria-hidden="true">⚡</span>
+                            ) : (
+                                <ZapIcon data-icon="inline-start" aria-hidden="true" />
+                            )}
                             <span>{actions.zapSats}</span>
                         </Button>
                     </ContextMenuTrigger>
@@ -355,11 +363,20 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
                     </ContextMenuContent>
                 </ContextMenu>
             ) : (
-                <Button asChild variant="ghost" size="sm">
-                    <span aria-label={t('note.actions.zaps', { count: String(actions.zapSats) })}>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={!actions.canWrite || !actions.onZap}
+                    aria-label={t('note.actions.zaps', { count: String(actions.zapSats) })}
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    {actions.isZapActive ? (
+                        <span data-icon="inline-start" aria-hidden="true">⚡</span>
+                    ) : (
                         <ZapIcon data-icon="inline-start" aria-hidden="true" />
-                        <span>{actions.zapSats}</span>
-                    </span>
+                    )}
+                    <span>{actions.zapSats}</span>
                 </Button>
             )}
         </ButtonGroup>

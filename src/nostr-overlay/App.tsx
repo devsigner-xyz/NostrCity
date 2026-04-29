@@ -21,6 +21,7 @@ import { useFollowingFeedEngagementQuery } from './query/following-feed.query';
 import { useActiveProfileQuery } from './query/active-profile.query';
 import {
     addOptimisticZapEntry,
+    applyLocalViewerZapState,
     applyOptimisticZapMetrics,
     pruneCaughtUpOptimisticZapEntries,
     selectChatConversationSummaries,
@@ -35,6 +36,7 @@ import {
     selectVerificationProfilesByPubkey,
     selectVerificationTargetPubkeys,
     selectVerifiedBuildingIndexes,
+    type LocalViewerZapEntry,
     type OptimisticZapEntry,
 } from './app.selectors';
 import type { MentionDraft } from './mention-serialization';
@@ -110,6 +112,7 @@ export function App({ mapBridge, services }: AppProps) {
     const [uiSettings, setUiSettings] = useState<UiSettingsState>(() => loadUiSettings());
     const [zapSettings, setZapSettings] = useState<ZapSettingsState>(() => loadZapSettings());
     const [optimisticZapByEventId, setOptimisticZapByEventId] = useState<Record<string, OptimisticZapEntry>>({});
+    const [localViewerZapByEventId, setLocalViewerZapByEventId] = useState<Record<string, LocalViewerZapEntry>>({});
     const [socialComposeState, setSocialComposeState] = useState<SocialComposeState | null>(null);
     const [isSubmittingSocialCompose, setIsSubmittingSocialCompose] = useState(false);
     const userSearchRelaySetKey = useMemo(
@@ -315,6 +318,14 @@ export function App({ mapBridge, services }: AppProps) {
         () => applyOptimisticZapMetrics(followingFeed.engagementByEventId, optimisticZapByEventId),
         [followingFeed.engagementByEventId, optimisticZapByEventId],
     );
+    const followingFeedViewerZapByEventId = useMemo(
+        () => applyLocalViewerZapState(followingFeed.viewerZapByEventId, localViewerZapByEventId),
+        [followingFeed.viewerZapByEventId, localViewerZapByEventId],
+    );
+    const activeProfileViewerZapByEventId = useMemo(
+        () => applyLocalViewerZapState(followingFeed.viewerZapByEventId, localViewerZapByEventId),
+        [followingFeed.viewerZapByEventId, localViewerZapByEventId],
+    );
     const optimisticZapBaseByEventId = useMemo(() => selectOptimisticZapBaseByEventId({
         activeProfileEngagementByEventId,
         followingFeedEngagementByEventId: followingFeed.engagementByEventId,
@@ -374,6 +385,7 @@ export function App({ mapBridge, services }: AppProps) {
 
     useEffect(() => {
         setEventReferencesById({});
+        setLocalViewerZapByEventId({});
     }, [overlay.ownerPubkey]);
 
     const copyText = async (value: string, successMessage: string): Promise<void> => {
@@ -788,6 +800,15 @@ export function App({ mapBridge, services }: AppProps) {
 
     const recordOptimisticZap = useCallback((input: { eventId?: string; amount: number }) => {
         setOptimisticZapByEventId((current) => addOptimisticZapEntry(current, optimisticZapBaseByEventId, input));
+        if (input.eventId) {
+            setLocalViewerZapByEventId((current) => ({
+                ...current,
+                [input.eventId as string]: {
+                    amountSats: input.amount,
+                    createdAt: Math.floor(Date.now() / 1000),
+                },
+            }));
+        }
     }, [optimisticZapBaseByEventId]);
 
     const walletZapController = useWalletZapController({
@@ -945,6 +966,8 @@ export function App({ mapBridge, services }: AppProps) {
                             publishError: followingFeed.publishError,
                             reactionByEventId: followingFeed.reactionByEventId,
                             viewerReactionByEventId: followingFeed.viewerReactionByEventId,
+                            viewerZapByEventId: followingFeedViewerZapByEventId,
+                            viewerReplyByEventId: followingFeed.viewerReplyByEventId,
                             repostByEventId: followingFeed.repostByEventId,
                             pendingReactionByEventId: followingFeed.pendingReactionByEventId,
                             pendingRepostByEventId: followingFeed.pendingRepostByEventId,
@@ -1109,6 +1132,8 @@ export function App({ mapBridge, services }: AppProps) {
                     canAccessDirectMessages={canAccessDirectMessages}
                     reactionByEventId={followingFeed.reactionByEventId}
                     viewerReactionByEventId={followingFeed.viewerReactionByEventId}
+                    viewerZapByEventId={activeProfileViewerZapByEventId}
+                    viewerReplyByEventId={followingFeed.viewerReplyByEventId}
                     repostByEventId={followingFeed.repostByEventId}
                     pendingReactionByEventId={followingFeed.pendingReactionByEventId}
                     pendingRepostByEventId={followingFeed.pendingRepostByEventId}

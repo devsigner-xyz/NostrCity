@@ -6,6 +6,7 @@ import {
 } from './credentials';
 
 const SAMPLE_NPUB = 'npub1lllllllllllllllllllllllllllllllllllllllllllllllllllsq7lrjw';
+// TEST_VECTOR_DO_NOT_USE: public fixture for unsupported nsec handling.
 const SAMPLE_NSEC = 'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5';
 const SAMPLE_HEX = 'f'.repeat(64);
 
@@ -72,6 +73,7 @@ describe('parseCredential', () => {
 
     test('parses nostrconnect marker as nip46 candidate', () => {
         const clientPubkey = 'b'.repeat(64);
+        // TEST_VECTOR_DO_NOT_USE: fake NIP-46 secret used only for parser coverage.
         const uri = `nostrconnect://${clientPubkey}?relay=wss://relay.example.com&secret=my-secret&perms=sign_event%3A1`;
         const parsed = parseCredential(uri);
 

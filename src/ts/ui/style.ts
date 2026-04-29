@@ -123,7 +123,7 @@ function rgbTripletToString(rgb: [number, number, number]): string {
 
 function resolveEasterEggDebugStroke(colourScheme: ColourScheme, animationTimeMs: number): string {
     const emptyStroke = colourScheme.buildingStroke || colourScheme.bgColour;
-    const occupiedStroke = 'rgb(228,202,120)';
+    const occupiedStroke = colourScheme.occupiedBuildingStroke || 'rgb(228,202,120)';
 
     const emptyRgb = parseRgbTriplet(emptyStroke);
     const occupiedRgb = parseRgbTriplet(occupiedStroke);
@@ -138,7 +138,7 @@ function resolveEasterEggDebugStroke(colourScheme: ColourScheme, animationTimeMs
 
 function resolveEasterEggDebugFill(colourScheme: ColourScheme, animationTimeMs: number): string {
     const emptyFill = colourScheme.buildingColour || colourScheme.bgColour;
-    const occupiedFill = 'rgb(247,240,206)';
+    const occupiedFill = colourScheme.occupiedBuildingColour || 'rgb(247,240,206)';
 
     const emptyRgb = parseRgbTriplet(emptyFill);
     const occupiedRgb = parseRgbTriplet(occupiedFill);

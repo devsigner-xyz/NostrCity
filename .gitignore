@@ -3,11 +3,57 @@
 node_modules
 pnpm-debug.log*
 npm-debug.log*
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.asc
+*.gpg
+*.kdbx
+
+# Logs
+logs/
+*.log
+
+# Internal planning / agent material
 /plans
 /context
+.agents/skills/
+docs/superpowers/
+
+# Local tool state
 .playwright-mcp/
 .worktrees/
+.superpowers/
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
+.opencode/bun.lock
+
+# Build / cache artifacts
 /dist
 /server/dist
-.superpowers/
 docs/.vitepress/cache/
+docs/.vitepress/dist/
+.vite/
+*.tsbuildinfo
+
+# Test / coverage artifacts
+test-results/
+playwright-report/
+coverage/
+.nyc_output/
+
+# Local databases / state
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal

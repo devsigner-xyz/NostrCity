@@ -180,6 +180,8 @@ describe('social-feed-service contracts', () => {
             loadThread: SocialFeedService['loadThread'];
             loadEngagement: SocialFeedService['loadEngagement'];
             loadViewerReactions: SocialFeedService['loadViewerReactions'];
+            loadViewerZaps: SocialFeedService['loadViewerZaps'];
+            loadViewerReplies: SocialFeedService['loadViewerReplies'];
             loadHashtagFeed: SocialFeedService['loadHashtagFeed'];
         }>();
     });

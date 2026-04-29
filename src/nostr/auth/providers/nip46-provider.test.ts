@@ -92,6 +92,7 @@ describe('Nip46AuthProvider', () => {
             })(),
         });
 
+        // TEST_VECTOR_DO_NOT_USE: fake NIP-46 session secret for unit tests only.
         const session = await provider.resolveSession({
             bunkerUri: `bunker://${'d'.repeat(64)}?relay=wss://relay.initial.example&secret=session-secret`,
         });
@@ -128,6 +129,7 @@ describe('Nip46AuthProvider', () => {
             })(),
         });
 
+        // TEST_VECTOR_DO_NOT_USE: fake NIP-46 secret mismatch fixture.
         await expect(
             provider.resolveSession({
                 bunkerUri: `nostrconnect://${'c'.repeat(64)}?relay=wss://relay.initial.example&secret=required-secret`,
@@ -187,6 +189,7 @@ describe('Nip46AuthProvider', () => {
             })(),
         });
 
+        // TEST_VECTOR_DO_NOT_USE: fake NIP-46 permission secret for unit tests only.
         await provider.resolveSession({
             bunkerUri: `nostrconnect://${'c'.repeat(64)}?relay=wss://relay.initial.example&secret=required-secret&perms=sign_event%3A1`,
         });
@@ -242,6 +245,7 @@ describe('Nip46AuthProvider', () => {
             })(),
         });
 
+        // TEST_VECTOR_DO_NOT_USE: fake NIP-46 encryption permission secret.
         await provider.resolveSession({
             bunkerUri: `nostrconnect://${'c'.repeat(64)}?relay=wss://relay.initial.example&secret=required-secret&perms=nip44_encrypt%2Cnip44_decrypt`,
         });

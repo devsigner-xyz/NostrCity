@@ -1,5 +1,5 @@
 import type { Nip05ValidationResult } from '../nostr/nip05';
-import type { SocialEngagementByEventId } from '../nostr/social-feed-service';
+import type { SocialEngagementByEventId, ViewerZapByEventId } from '../nostr/social-feed-service';
 import type { NostrProfile } from '../nostr/types';
 import type { UiSettingsState } from '../nostr/ui-settings';
 import { translate } from '@/i18n/translate';
@@ -13,6 +13,11 @@ export interface OptimisticZapEntry {
     baselineZapSats: number;
     deltaZaps: number;
     deltaZapSats: number;
+}
+
+export interface LocalViewerZapEntry {
+    amountSats: number;
+    createdAt: number;
 }
 
 const EMPTY_ENGAGEMENT = {
@@ -70,6 +75,37 @@ export function applyOptimisticZapMetrics(
         baseByEventId,
         deltaByEventId,
     });
+}
+
+export function applyLocalViewerZapState(
+    baseByEventId: ViewerZapByEventId,
+    localByEventId: Record<string, LocalViewerZapEntry>,
+): ViewerZapByEventId {
+    const eventIds = Object.keys(localByEventId);
+    if (eventIds.length === 0) {
+        return baseByEventId;
+    }
+
+    const next: ViewerZapByEventId = { ...baseByEventId };
+    for (const eventId of eventIds) {
+        if (next[eventId]) {
+            continue;
+        }
+
+        const localZap = localByEventId[eventId];
+        if (!localZap) {
+            continue;
+        }
+
+        next[eventId] = {
+            eventId,
+            zapReceiptEventId: `local-zap:${eventId}:${localZap.createdAt}`,
+            amountSats: localZap.amountSats,
+            createdAt: localZap.createdAt,
+        };
+    }
+
+    return next;
 }
 
 export function selectEngagementWithFallback(input: {

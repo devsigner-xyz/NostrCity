@@ -49,6 +49,8 @@ function service(): SocialFeedService {
         loadThread: vi.fn(),
         loadEngagement: vi.fn(),
         loadViewerReactions: vi.fn(),
+        loadViewerZaps: vi.fn(),
+        loadViewerReplies: vi.fn(),
     };
 }
 

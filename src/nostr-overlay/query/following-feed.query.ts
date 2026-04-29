@@ -6,6 +6,8 @@ import type {
     SocialFeedService,
     SocialThreadPage,
     ViewerReactionByEventId,
+    ViewerReplyByEventId,
+    ViewerZapByEventId,
 } from '../../nostr/social-feed-service';
 import { nostrOverlayQueryKeys } from './keys';
 import { createSocialQueryOptions } from './options';
@@ -52,6 +54,20 @@ interface UseFollowingFeedEngagementQueryOptions {
 }
 
 interface UseViewerReactionsQueryOptions {
+    ownerPubkey?: string;
+    eventIds: string[];
+    service: SocialFeedService;
+    enabled: boolean;
+}
+
+interface UseViewerZapsQueryOptions {
+    ownerPubkey?: string;
+    eventIds: string[];
+    service: SocialFeedService;
+    enabled: boolean;
+}
+
+interface UseViewerRepliesQueryOptions {
     ownerPubkey?: string;
     eventIds: string[];
     service: SocialFeedService;
@@ -188,6 +204,28 @@ export function useViewerReactionsQuery(options: UseViewerReactionsQueryOptions)
     return useQuery<ViewerReactionByEventId, Error, ViewerReactionByEventId, ReturnType<typeof nostrOverlayQueryKeys.viewerReactions>>(createSocialQueryOptions({
         queryKey: nostrOverlayQueryKeys.viewerReactions({ ownerPubkey: ownerPubkey || '__anonymous__', eventIds }),
         queryFn: () => options.service.loadViewerReactions({ ownerPubkey, eventIds }),
+        enabled: options.enabled && Boolean(ownerPubkey) && eventIds.length > 0,
+    }));
+}
+
+export function useViewerZapsQuery(options: UseViewerZapsQueryOptions) {
+    const ownerPubkey = options.ownerPubkey?.trim() ?? '';
+    const eventIds = normalizeEngagementEventIds(options.eventIds);
+
+    return useQuery<ViewerZapByEventId, Error, ViewerZapByEventId, ReturnType<typeof nostrOverlayQueryKeys.viewerZaps>>(createSocialQueryOptions({
+        queryKey: nostrOverlayQueryKeys.viewerZaps({ ownerPubkey: ownerPubkey || '__anonymous__', eventIds }),
+        queryFn: () => options.service.loadViewerZaps({ ownerPubkey, eventIds }),
+        enabled: options.enabled && Boolean(ownerPubkey) && eventIds.length > 0,
+    }));
+}
+
+export function useViewerRepliesQuery(options: UseViewerRepliesQueryOptions) {
+    const ownerPubkey = options.ownerPubkey?.trim() ?? '';
+    const eventIds = normalizeEngagementEventIds(options.eventIds);
+
+    return useQuery<ViewerReplyByEventId, Error, ViewerReplyByEventId, ReturnType<typeof nostrOverlayQueryKeys.viewerReplies>>(createSocialQueryOptions({
+        queryKey: nostrOverlayQueryKeys.viewerReplies({ ownerPubkey: ownerPubkey || '__anonymous__', eventIds }),
+        queryFn: () => options.service.loadViewerReplies({ ownerPubkey, eventIds }),
         enabled: options.enabled && Boolean(ownerPubkey) && eventIds.length > 0,
     }));
 }

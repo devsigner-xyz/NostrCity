@@ -8,6 +8,9 @@ import type {
     SocialThreadPage,
     ViewerReaction,
     ViewerReactionByEventId,
+    ViewerReply,
+    ViewerReplyByEventId,
+    ViewerZapByEventId,
 } from '../../nostr/social-feed-service';
 import {
     buildQuoteContent,
@@ -45,6 +48,8 @@ import {
     normalizeEngagementEventIds,
     useThreadInfiniteQuery,
     useViewerReactionsQuery,
+    useViewerRepliesQuery,
+    useViewerZapsQuery,
 } from '../query/following-feed.query';
 import type { FollowingFeedQueryInput } from '../query/types';
 import {
@@ -126,6 +131,7 @@ interface PublishReplyMutationContext {
     tempId: string;
     targetEventId: string;
     threadKey: ReturnType<typeof nostrOverlayQueryKeys.thread>;
+    previousReply: ViewerReply | undefined;
 }
 
 const EMPTY_ENGAGEMENT_METRICS: SocialEngagementMetrics = {
@@ -226,6 +232,8 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
     const [pendingNewCount, setPendingNewCount] = useState(0);
     const [isRefreshingFeed, setIsRefreshingFeed] = useState(false);
     const [viewerReactionByEventId, setViewerReactionByEventId] = useState<ViewerReactionByEventId>({});
+    const [viewerZapByEventId, setViewerZapByEventId] = useState<ViewerZapByEventId>({});
+    const [viewerReplyByEventId, setViewerReplyByEventId] = useState<ViewerReplyByEventId>({});
     const [repostByEventId, setRepostByEventId] = useState<Record<string, boolean>>({});
     const [repostEventIdByTarget, setRepostEventIdByTarget] = useState<Record<string, string>>({});
     const [engagementDeltaByEventId, setEngagementDeltaByEventId] = useState<SocialEngagementByEventId>({});
@@ -348,8 +356,24 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
         enabled: isOpen,
     });
 
+    const viewerZapQuery = useViewerZapsQuery({
+        ...(options.ownerPubkey ? { ownerPubkey: options.ownerPubkey } : {}),
+        eventIds: viewerReactionEventIds,
+        service: options.service,
+        enabled: isOpen,
+    });
+
+    const viewerReplyQuery = useViewerRepliesQuery({
+        ...(options.ownerPubkey ? { ownerPubkey: options.ownerPubkey } : {}),
+        eventIds: viewerReactionEventIds,
+        service: options.service,
+        enabled: isOpen,
+    });
+
     useEffect(() => {
         setViewerReactionByEventId({});
+        setViewerZapByEventId({});
+        setViewerReplyByEventId({});
     }, [options.ownerPubkey]);
 
     useEffect(() => {
@@ -372,6 +396,48 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
             };
         });
     }, [viewerReactionEventIds, viewerReactionQuery.data]);
+
+    useEffect(() => {
+        if (!viewerZapQuery.data) {
+            return;
+        }
+
+        const scopedEventIds = new Set(viewerReactionEventIds);
+        setViewerZapByEventId((current) => {
+            const next: ViewerZapByEventId = {};
+            for (const [eventId, zap] of Object.entries(current)) {
+                if (!scopedEventIds.has(eventId)) {
+                    next[eventId] = zap;
+                }
+            }
+
+            return {
+                ...next,
+                ...viewerZapQuery.data,
+            };
+        });
+    }, [viewerReactionEventIds, viewerZapQuery.data]);
+
+    useEffect(() => {
+        if (!viewerReplyQuery.data) {
+            return;
+        }
+
+        const scopedEventIds = new Set(viewerReactionEventIds);
+        setViewerReplyByEventId((current) => {
+            const next: ViewerReplyByEventId = {};
+            for (const [eventId, reply] of Object.entries(current)) {
+                if (!scopedEventIds.has(eventId)) {
+                    next[eventId] = reply;
+                }
+            }
+
+            return {
+                ...next,
+                ...viewerReplyQuery.data,
+            };
+        });
+    }, [viewerReactionEventIds, viewerReplyQuery.data]);
 
     const reactionByEventId = useMemo(() => {
         const activeByEventId: Record<string, boolean> = {};
@@ -584,6 +650,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
                     tempId: '',
                     targetEventId: variables.input.targetEventId,
                     threadKey,
+                    previousReply: undefined,
                 };
             }
 
@@ -597,14 +664,32 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
                 variables.input.targetEventId
             );
             applyEngagementDelta(variables.input.targetEventId, 'replies', 1);
+            const previousReply = viewerReplyByEventId[variables.input.targetEventId];
+            setViewerReplyByEventId((current) => ({
+                ...current,
+                [variables.input.targetEventId]: {
+                    eventId: variables.input.targetEventId,
+                    replyEventId: tempId,
+                    createdAt: now(),
+                },
+            }));
 
             queryClient.setQueryData<InfiniteData<SocialThreadPage>>(threadKey, (current) => prependReply(current, tempReply));
-            return { tempId, targetEventId: variables.input.targetEventId, threadKey };
+            return { tempId, targetEventId: variables.input.targetEventId, threadKey, previousReply };
         },
         onSuccess: (published, _variables, context) => {
             if (!context?.threadKey || !context.tempId) {
                 return;
             }
+
+            setViewerReplyByEventId((current) => ({
+                ...current,
+                [context.targetEventId]: {
+                    eventId: context.targetEventId,
+                    replyEventId: published.id,
+                    createdAt: published.created_at,
+                },
+            }));
 
             queryClient.setQueryData<InfiniteData<SocialThreadPage>>(context.threadKey as readonly unknown[], (current) => {
                 if (!current || current.pages.length === 0) {
@@ -631,6 +716,15 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
             }
 
             applyEngagementDelta(context.targetEventId, 'replies', -1);
+            setViewerReplyByEventId((current) => {
+                const next = { ...current };
+                if (context.previousReply) {
+                    next[context.targetEventId] = context.previousReply;
+                } else {
+                    delete next[context.targetEventId];
+                }
+                return next;
+            });
             queryClient.setQueryData<InfiniteData<SocialThreadPage>>(context.threadKey as readonly unknown[], (current) => {
                 if (!current || current.pages.length === 0) {
                     return current;
@@ -1137,6 +1231,8 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
         isPublishingReply: publishReplyMutation.isPending,
         reactionByEventId,
         viewerReactionByEventId,
+        viewerZapByEventId,
+        viewerReplyByEventId,
         repostByEventId,
         pendingReactionByEventId,
         pendingRepostByEventId,

@@ -73,7 +73,7 @@ describe('colour schemes defaults', () => {
             frameColour: '#030511',
             frameTextColour: '#F6F8FF',
             occupiedBuildingColour: '#35D7FF',
-            occupiedBuildingStroke: '#8EEAFF',
+            occupiedBuildingStroke: '#8E35FF',
             hoveredBuildingColour: '#D33CFF',
             hoveredBuildingStroke: '#F6F8FF',
             streetLabelColour: '#030511',

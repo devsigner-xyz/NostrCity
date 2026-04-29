@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { parseNip46Uri } from './uri';
 
+// TEST_VECTOR_DO_NOT_USE: fake NIP-46 pubkey/secret URI fixtures only.
 const HEX64 = 'a'.repeat(64);
 
 describe('parseNip46Uri', () => {

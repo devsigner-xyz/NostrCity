@@ -245,6 +245,8 @@ function createSocialFeedServiceMock() {
         loadThread: vi.fn(async () => ({ root: null, replies: [], hasMore: false })),
         loadEngagement: vi.fn(async () => ({})),
         loadViewerReactions: vi.fn(async () => ({})),
+        loadViewerZaps: vi.fn(async () => ({})),
+        loadViewerReplies: vi.fn(async () => ({})),
     };
 
     return {
@@ -3413,6 +3415,7 @@ describe('Nostr overlay App', () => {
         const nwcInput = rendered.container.querySelector('input[aria-label="URI NWC"]') as HTMLInputElement;
         await act(async () => {
             const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+            // TEST_VECTOR_DO_NOT_USE: fake NWC URI used to exercise wallet connect UI.
             valueSetter?.call(nwcInput, `nostr+walletconnect://${walletServicePubkey}?relay=wss://relay.one.example&secret=${'b'.repeat(64)}`);
             nwcInput.dispatchEvent(new Event('input', { bubbles: true }));
             nwcInput.dispatchEvent(new Event('change', { bubbles: true }));

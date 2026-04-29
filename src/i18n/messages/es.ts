@@ -92,7 +92,7 @@ export const esMessages = {
     'auth.login.restoringSession': 'Recuperando sesión',
     'auth.login.localPassphrase': 'Passphrase de la cuenta local',
     'auth.login.unlockAccount': 'Desbloquear cuenta',
-    'auth.login.backToLogin': 'Volver al login',
+    'auth.login.backToLogin': 'Volver',
     'auth.login.createAccount': 'Crear cuenta',
     'auth.login.continueSavedLocal': 'Continuar con cuenta local guardada',
     'auth.login.unlockSavedLocal': 'Desbloquear cuenta local guardada',

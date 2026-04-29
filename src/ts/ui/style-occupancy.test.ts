@@ -50,6 +50,21 @@ describe('resolveBuildingRenderColours', () => {
         expect(coloursLater.stroke).not.toBe(coloursAtStart.stroke);
     });
 
+    test('renders easter egg debug buildings with dark scheme occupied colors', () => {
+        const darkScheme: ColourScheme = {
+            ...baseScheme,
+            buildingColour: '#10164A',
+            buildingStroke: '#8E35FF',
+            occupiedBuildingColour: '#35D7FF',
+            occupiedBuildingStroke: '#8E35FF',
+        };
+
+        expect(resolveBuildingRenderColours('easter_egg_debug', darkScheme, 0)).toEqual({
+            fill: 'rgb(25,66,116)',
+            stroke: 'rgb(142,53,255)',
+        });
+    });
+
     test('returns selected colors for selected buildings', () => {
         const colours = resolveBuildingRenderColours('selected', baseScheme);
         expect(colours).toEqual({

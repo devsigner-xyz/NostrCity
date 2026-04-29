@@ -95,6 +95,53 @@ function buildProps(overrides: Partial<Parameters<typeof FollowingFeedSurface>[0
 }
 
 describe('FollowingFeedSurface', () => {
+    test('shows comment emoji when viewer has replied to a feed note', async () => {
+        const noteId = 'a'.repeat(64);
+        const pubkey = 'b'.repeat(64);
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    items: [{
+                        id: noteId,
+                        pubkey,
+                        createdAt: 100,
+                        content: 'hola',
+                        kind: 'note',
+                        rawEvent: {
+                            id: noteId,
+                            pubkey,
+                            kind: 1,
+                            created_at: 100,
+                            tags: [],
+                            content: 'hola',
+                        },
+                    }],
+                    engagementByEventId: {
+                        [noteId]: {
+                            replies: 2,
+                            reactions: 0,
+                            reposts: 0,
+                            zaps: 0,
+                            zapSats: 0,
+                        },
+                    },
+                    viewerReplyByEventId: {
+                        [noteId]: {
+                            eventId: noteId,
+                            replyEventId: 'c'.repeat(64),
+                            createdAt: 120,
+                        },
+                    },
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const replyButton = rendered.container.querySelector('button[aria-label="Responder (2)"]') as HTMLButtonElement | null;
+        expect(replyButton).not.toBeNull();
+        expect(replyButton?.textContent || '').toContain('💬');
+    });
+
     test('renders layout toggle in feed header and forwards changes', async () => {
         const onAgoraFeedLayoutChange = vi.fn();
         const rendered = await renderElement(
@@ -682,7 +729,7 @@ describe('FollowingFeedSurface', () => {
         expect(onConfigureZapAmounts).toHaveBeenCalledTimes(1);
     });
 
-    test('hides zap menu from note cards when author lacks lightning metadata', async () => {
+    test('disables zap action from note cards when author lacks lightning metadata', async () => {
         const rendered = await renderElement(
             <FollowingFeedSurface
                 {...buildProps({
@@ -723,7 +770,7 @@ describe('FollowingFeedSurface', () => {
         );
         mounted.push(rendered);
 
-        expect(rendered.container.querySelector('button[aria-label="Sats recibidos: 210"]')).toBeNull();
+        expect((rendered.container.querySelector('button[aria-label="Sats recibidos: 210"]') as HTMLButtonElement | null)?.disabled).toBe(true);
     });
 
     test('renders optimistic pending states for reaction and repost actions', async () => {

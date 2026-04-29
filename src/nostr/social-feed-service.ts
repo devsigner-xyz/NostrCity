@@ -77,6 +77,18 @@ export interface LoadViewerReactionsInput {
     limit?: number;
 }
 
+export interface LoadViewerZapsInput {
+    ownerPubkey: string;
+    eventIds: string[];
+    limit?: number;
+}
+
+export interface LoadViewerRepliesInput {
+    ownerPubkey: string;
+    eventIds: string[];
+    limit?: number;
+}
+
 export interface SocialEngagementMetrics {
     replies: number;
     reposts: number;
@@ -96,6 +108,23 @@ export interface ViewerReaction {
 
 export type ViewerReactionByEventId = Record<string, ViewerReaction>;
 
+export interface ViewerZap {
+    eventId: string;
+    zapReceiptEventId: string;
+    amountSats: number;
+    createdAt: number;
+}
+
+export type ViewerZapByEventId = Record<string, ViewerZap>;
+
+export interface ViewerReply {
+    eventId: string;
+    replyEventId: string;
+    createdAt: number;
+}
+
+export type ViewerReplyByEventId = Record<string, ViewerReply>;
+
 export interface SocialFeedService {
     loadFollowingFeed(input: LoadFollowingFeedInput): Promise<SocialFeedPage>;
     loadArticlesFeed(input: LoadArticlesFeedInput): Promise<SocialFeedPage>;
@@ -104,6 +133,8 @@ export interface SocialFeedService {
     loadThread(input: LoadThreadInput): Promise<SocialThreadPage>;
     loadEngagement(input: LoadEngagementInput): Promise<SocialEngagementByEventId>;
     loadViewerReactions(input: LoadViewerReactionsInput): Promise<ViewerReactionByEventId>;
+    loadViewerZaps(input: LoadViewerZapsInput): Promise<ViewerZapByEventId>;
+    loadViewerReplies(input: LoadViewerRepliesInput): Promise<ViewerReplyByEventId>;
 }
 
 function tagValue(tag: string[] | undefined): string | undefined {

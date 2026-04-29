@@ -9,6 +9,7 @@ import {
 import type { NostrEvent } from './types';
 
 const PUBKEY = 'a'.repeat(64);
+// TEST_VECTOR_DO_NOT_USE: deterministic fake NWC secret for unit tests only.
 const SECRET = 'b'.repeat(64);
 
 function createFakeIo() {
