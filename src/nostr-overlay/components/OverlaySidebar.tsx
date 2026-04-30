@@ -55,6 +55,7 @@ import {
     SidebarTrigger,
     useSidebar,
 } from '@/components/ui/sidebar';
+import { MobileOverlayAppBar } from '../shell/MobileOverlayAppBar';
 
 export const OVERLAY_SIDEBAR_EXPANDED_WIDTH = 300;
 export const OVERLAY_SIDEBAR_COLLAPSED_WIDTH = 56;
@@ -96,6 +97,9 @@ interface OverlaySidebarProps {
     relaysConnectedCount: number;
     relaysTotal: number;
     onOpenMissions: () => void;
+    mobileAppBarTitle: string;
+    mobileAppBarShowBack: boolean;
+    onMobileAppBarBack: () => void;
     children: ReactNode;
 }
 
@@ -152,7 +156,7 @@ function SidebarActionsMenu({
     relaysConnectedCount,
     relaysTotal,
     onOpenMissions,
-}: Omit<OverlaySidebarProps, 'open' | 'onOpenChange' | 'resolvedTheme' | 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout' | 'children'> & { isReadonlySession: boolean }) {
+}: Omit<OverlaySidebarProps, 'open' | 'onOpenChange' | 'resolvedTheme' | 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout' | 'mobileAppBarTitle' | 'mobileAppBarShowBack' | 'onMobileAppBarBack' | 'children'> & { isReadonlySession: boolean }) {
     const { t } = useI18n();
     const { state, isMobile, setOpenMobile } = useSidebar();
     const location = useLocation();
@@ -511,23 +515,6 @@ function SidebarCollapsedTrigger() {
     );
 }
 
-function MobileSidebarTrigger() {
-    const { t } = useI18n();
-    const { isMobile, openMobile } = useSidebar();
-
-    if (!isMobile || openMobile) {
-        return null;
-    }
-
-    return (
-        <SidebarTrigger
-            className="nostr-mobile-sidebar-trigger md:hidden"
-            aria-label={t('sidebar.openNavigation')}
-            title={t('sidebar.openNavigation')}
-        />
-    );
-}
-
 function SidebarUserMenu({
     authSession,
     ownerPubkey,
@@ -707,6 +694,9 @@ export function OverlaySidebar({
     relaysConnectedCount,
     relaysTotal,
     onOpenMissions,
+    mobileAppBarTitle,
+    mobileAppBarShowBack,
+    onMobileAppBarBack,
     children,
 }: OverlaySidebarProps) {
     const { t } = useI18n();
@@ -717,7 +707,11 @@ export function OverlaySidebar({
 
     return (
         <SidebarProvider open={open} onOpenChange={onOpenChange} style={providerStyle}>
-            <MobileSidebarTrigger />
+            <MobileOverlayAppBar
+                title={mobileAppBarTitle}
+                showBack={mobileAppBarShowBack}
+                onBack={onMobileAppBarBack}
+            />
             <Sidebar
                 collapsible="icon"
                 mobileTitle={t('sidebar.navigationTitle')}

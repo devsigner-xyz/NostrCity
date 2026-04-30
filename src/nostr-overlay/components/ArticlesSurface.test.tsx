@@ -80,7 +80,7 @@ describe('ArticlesSurface', () => {
         const rendered = await renderElement(surface({ isLoading: true }));
         mounted.push(rendered);
 
-        expect(rendered.container.textContent).toContain('Cargando articulos');
+        expect(rendered.container.textContent).toContain('Cargando artículos');
         expect(rendered.container.querySelector('[role="status"]')).not.toBeNull();
         expect(rendered.container.querySelector('.articles-loading-state')?.className).toContain('max-w-[600px]');
         expect(rendered.container.querySelector('.articles-loading-state')?.className).toContain('self-start');
@@ -90,8 +90,8 @@ describe('ArticlesSurface', () => {
         const rendered = await renderElement(surface());
         mounted.push(rendered);
 
-        expect(rendered.container.textContent).toContain('Sin articulos');
-        expect(rendered.container.textContent).toContain('Todavia no hay articulos');
+        expect(rendered.container.textContent).toContain('Sin artículos');
+        expect(rendered.container.textContent).toContain('Todavía no hay artículos');
     });
 
     test('renders articles and calls actions', async () => {
@@ -109,7 +109,7 @@ describe('ArticlesSurface', () => {
 
         const buttons = Array.from(rendered.container.querySelectorAll('button'));
         const refresh = buttons.find((button) => button.textContent === 'Actualizar');
-        const read = buttons.find((button) => button.textContent === 'Leer articulo');
+        const read = buttons.find((button) => button.textContent === 'Leer artículo');
 
         await act(async () => {
             refresh?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -119,6 +119,17 @@ describe('ArticlesSurface', () => {
         expect(onRefresh).toHaveBeenCalledTimes(1);
         expect(onOpenArticle).toHaveBeenCalledWith('article-1');
         expect(buttons.find((button) => button.textContent === 'Cargar mas')).toBeUndefined();
+    });
+
+    test('uses the shared overlay page header slots for mobile header rules', async () => {
+        const rendered = await renderElement(surface());
+        mounted.push(rendered);
+
+        const header = rendered.container.querySelector('[data-testid="overlay-page-header"]');
+
+        expect(header).not.toBeNull();
+        expect(header?.querySelector('[data-slot="overlay-page-header-copy"]')).not.toBeNull();
+        expect(header?.querySelector('[data-slot="overlay-page-header-actions"] button')?.textContent).toBe('Actualizar');
     });
 
     test('constrains the article list width for readable article previews', async () => {
@@ -167,7 +178,7 @@ describe('ArticlesSurface', () => {
         mounted.push(rendered);
 
         const footer = rendered.container.querySelector('.nostr-list-loading-footer');
-        expect(footer?.textContent).toContain('Cargando articulos');
+        expect(footer?.textContent).toContain('Cargando artículos');
         expect(footer?.className).toContain('justify-center');
         expect(footer?.className).toContain('max-w-[600px]');
     });

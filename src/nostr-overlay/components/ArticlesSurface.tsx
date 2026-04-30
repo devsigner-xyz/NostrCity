@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
 import { OverlaySurface } from './OverlaySurface';
+import { OverlayPageHeader } from './OverlayPageHeader';
 import { ArticlePreviewCard } from './ArticlePreviewCard';
 import { ListLoadingFooter } from './ListLoadingFooter';
 
@@ -61,15 +62,15 @@ export function ArticlesSurface({
                 data-testid="articles-scroll-area"
                 onScroll={(event) => onScroll(event.currentTarget)}
             >
-                <header className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex flex-col gap-1">
-                        <h1 className="text-2xl font-semibold tracking-tight">{t('articles.title')}</h1>
-                        <p className="text-sm text-muted-foreground">{t('articles.subtitle')}</p>
-                    </div>
-                    <Button type="button" variant="outline" size="sm" disabled={isRefreshing} onClick={() => { void onRefresh(); }}>
-                        {isRefreshing ? t('articles.refreshing') : t('articles.refresh')}
-                    </Button>
-                </header>
+                <OverlayPageHeader
+                    title={t('articles.title')}
+                    description={t('articles.subtitle')}
+                    actions={(
+                        <Button type="button" variant="outline" size="sm" disabled={isRefreshing} onClick={() => { void onRefresh(); }}>
+                            {isRefreshing ? t('articles.refreshing') : t('articles.refresh')}
+                        </Button>
+                    )}
+                />
 
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
 

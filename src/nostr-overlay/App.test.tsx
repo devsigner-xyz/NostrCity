@@ -1,7 +1,7 @@
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useLocation } from 'react-router';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { nip19 } from 'nostr-tools';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
@@ -113,7 +113,7 @@ async function loginWithNip07(container: HTMLDivElement): Promise<void> {
     });
 
     const nip07Option = Array.from(document.body.querySelectorAll('[data-slot="select-item"]')).find((item) =>
-        (item.textContent || '').trim() === 'Extension (NIP-07)'
+        (item.textContent || '').trim() === 'Extensión (NIP-07)'
     ) as HTMLElement;
     expect(nip07Option).toBeDefined();
 
@@ -123,7 +123,7 @@ async function loginWithNip07(container: HTMLDivElement): Promise<void> {
     });
 
     const continueButton = Array.from(container.querySelectorAll('button')).find((button) =>
-        (button.textContent || '').includes('Continuar con extension')
+        (button.textContent || '').includes('Continuar con extensión')
     ) as HTMLButtonElement;
     expect(continueButton).toBeDefined();
 
@@ -302,6 +302,11 @@ function QueryProviderProbe() {
     return <span data-testid="query-provider-probe">query provider ready</span>;
 }
 
+function LocationProbe() {
+    const location = useLocation();
+    return <span data-testid="location-probe">{`${location.pathname}${location.search}`}</span>;
+}
+
 async function renderApp(element: ReactElement, options: RenderOptions = {}): Promise<RenderResult> {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -319,6 +324,54 @@ async function renderApp(element: ReactElement, options: RenderOptions = {}): Pr
     });
 
     return { container, root, queryClient };
+}
+
+function setMobileViewport(): void {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('max-width'),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    }));
+}
+
+function persistDmCapableSession(ownerPubkey = SAMPLE_AUTH_PUBKEY): string {
+    window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
+        method: 'nip07',
+        pubkey: ownerPubkey,
+        readonly: false,
+        locked: false,
+        createdAt: Date.now(),
+        capabilities: {
+            canSign: true,
+            canEncrypt: true,
+            encryptionSchemes: ['nip44'],
+        },
+    }));
+
+    return ownerPubkey;
+}
+
+async function renderAuthenticatedMobileApp(pathname: string, services?: Partial<NostrOverlayServices>): Promise<RenderResult> {
+    setMobileViewport();
+    const ownerPubkey = persistDmCapableSession();
+    const { bridge } = createMapBridgeStub();
+
+    return renderApp(
+        <>
+            <App mapBridge={bridge} services={createBasicOverlayServices(ownerPubkey, services)} />
+            <LocationProbe />
+        </>,
+        { initialEntries: [pathname] }
+    );
+}
+
+function getLocationText(container: HTMLDivElement): string {
+    return container.querySelector('[data-testid="location-probe"]')?.textContent || '';
 }
 
 async function waitFor(condition: () => boolean): Promise<void> {
@@ -577,10 +630,11 @@ describe('Nostr overlay App', () => {
         expect(npubInput).not.toBeNull();
         expect(content).not.toContain('Accede o explora');
         expect(content).toContain('npub (solo lectura)');
-        expect(content).toContain('Metodo de acceso');
+        expect(content).toContain('Método de acceso');
         expect(content).toContain('Acceder');
         expect(content).not.toContain('Cargar seguidos');
         expect(rendered.container.querySelector('.nostr-panel-toolbar')).toBeNull();
+        expect(rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]')).toBeNull();
         expect((bridge.setViewportInsetLeft as any).mock.calls.at(-1)?.[0]).toBe(0);
     });
 
@@ -597,7 +651,7 @@ describe('Nostr overlay App', () => {
         expect(content).toContain('Access method');
         expect(content).toContain('npub (read-only)');
         expect(content).toContain('Create account');
-        expect(content).not.toContain('Metodo de acceso');
+        expect(content).not.toContain('Método de acceso');
     });
 
     test('renders the scoped create-account selector copy and footer inside the auth flow', async () => {
@@ -724,6 +778,119 @@ describe('Nostr overlay App', () => {
         expect(rendered.container.querySelector('.nostr-panel-toolbar')).not.toBeNull();
     });
 
+    test('renders the mobile app bar on the map route without a back button', async () => {
+        const rendered = await renderAuthenticatedMobileApp('/');
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') === null);
+        await waitFor(() => rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]') !== null);
+
+        const appBar = rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]');
+
+        expect(appBar?.textContent || '').toContain('Nostr City');
+        expect(appBar?.querySelector('button[aria-label="Abrir navegación"]')).not.toBeNull();
+        expect(appBar?.querySelector('button[aria-label="Volver"]')).toBeNull();
+        expect(getLocationText(rendered.container)).toBe('/');
+    });
+
+    test('uses the mobile app bar stack fallback after navigating from map to Agora', async () => {
+        const rendered = await renderAuthenticatedMobileApp('/');
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]') !== null);
+
+        const menuButton = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement;
+        await act(async () => {
+            menuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => document.body.querySelector('button[aria-label="Abrir Ágora"]') !== null);
+        const agoraButton = document.body.querySelector('button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
+        await act(async () => {
+            agoraButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/agora');
+        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/');
+    });
+
+    test('uses the mobile app bar fallback for a direct Agora entry', async () => {
+        const rendered = await renderAuthenticatedMobileApp('/agora');
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('button[aria-label="Volver"]') !== null);
+        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/');
+    });
+
+    test('uses explicit mobile back navigation for article detail and relay detail routes', async () => {
+        const rendered = await renderAuthenticatedMobileApp(`/agora/articles/${'a'.repeat(64)}`);
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('button[aria-label="Volver"]') !== null);
+        let backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/agora/articles');
+
+        const menuButton = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement;
+        await act(async () => {
+            menuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => document.body.querySelector('button[aria-label="Abrir relays"]') !== null);
+        const relaysButton = document.body.querySelector('button[aria-label="Abrir relays"]') as HTMLButtonElement;
+        await act(async () => {
+            relaysButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => getLocationText(rendered.container) === '/relays');
+
+        await act(async () => {
+            rendered.root.unmount();
+        });
+        rendered.container.remove();
+        mounted = mounted.filter((entry) => entry !== rendered);
+
+        const relayDetailRendered = await renderAuthenticatedMobileApp('/relays/detail?url=wss%3A%2F%2Frelay.example');
+        mounted.push(relayDetailRendered);
+        await waitFor(() => relayDetailRendered.container.querySelector('button[aria-label="Volver"]') !== null);
+        backButton = relayDetailRendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(relayDetailRendered.container) === '/relays');
+    });
+
+    test('uses mobile back to return an active chat conversation to the chat list', async () => {
+        const peerPubkey = 'a'.repeat(64);
+        const rendered = await renderAuthenticatedMobileApp(`/chats?peer=${peerPubkey}`);
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('button[aria-label="Volver"]') !== null);
+        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/chats');
+    });
+
     test('keeps the restoration state visible while a restored session is still loading', async () => {
         const ownerPubkey = 'f'.repeat(64);
         const followsDeferred = createDeferred<{ ownerPubkey: string; follows: string[]; relayHints: string[] }>();
@@ -761,7 +928,7 @@ describe('Nostr overlay App', () => {
         mounted.push(rendered);
 
         await waitFor(() => (rendered.container.textContent || '').includes('Recuperando sesión'));
-        expect(rendered.container.textContent || '').not.toContain('Metodo de acceso');
+        expect(rendered.container.textContent || '').not.toContain('Método de acceso');
         expect(rendered.container.querySelector('input[name="npub"]')).toBeNull();
         expect(rendered.container.textContent || '').toContain('Conectando a relays...');
 
@@ -785,7 +952,7 @@ describe('Nostr overlay App', () => {
         mounted.push(rendered);
 
         await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') !== null);
-        expect(rendered.container.textContent || '').toContain('Metodo de acceso');
+        expect(rendered.container.textContent || '').toContain('Método de acceso');
         expect(rendered.container.textContent || '').not.toContain('Recuperando sesión');
     });
 
@@ -822,7 +989,7 @@ describe('Nostr overlay App', () => {
         );
         mounted.push(rendered);
 
-        await waitFor(() => (rendered.container.textContent || '').includes('Metodo de acceso'));
+        await waitFor(() => (rendered.container.textContent || '').includes('Método de acceso'));
         expect(rendered.container.textContent || '').not.toContain('Recuperando sesión');
         expect(rendered.container.querySelector('input[name="npub"]')).not.toBeNull();
     });
@@ -838,7 +1005,7 @@ describe('Nostr overlay App', () => {
         await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') !== null);
         const content = rendered.container.textContent || '';
 
-        expect(content).toContain('Metodo de acceso');
+        expect(content).toContain('Método de acceso');
         expect(content).not.toContain('Estadisticas de la ciudad');
     });
 
@@ -1302,7 +1469,7 @@ describe('Nostr overlay App', () => {
         const feedList = rendered.container.querySelector('[data-testid="following-feed-list"]') as HTMLDivElement | null;
         expect(feedList).not.toBeNull();
         expect(Array.from(rendered.container.querySelectorAll('button')).some((button) =>
-            (button.textContent || '').includes('Cargar mas')
+            (button.textContent || '').includes('Cargar más')
         )).toBe(false);
 
         Object.defineProperty(feedList, 'scrollHeight', { configurable: true, value: 500 });
@@ -1330,7 +1497,7 @@ describe('Nostr overlay App', () => {
         const threadList = rendered.container.querySelector('[data-testid="following-feed-thread-list"]') as HTMLDivElement | null;
         expect(threadList).not.toBeNull();
         expect(Array.from(rendered.container.querySelectorAll('button')).some((button) =>
-            (button.textContent || '').includes('Cargar mas respuestas')
+            (button.textContent || '').includes('Cargar más respuestas')
         )).toBe(false);
 
         Object.defineProperty(threadList, 'scrollHeight', { configurable: true, value: 500 });
@@ -2374,7 +2541,7 @@ describe('Nostr overlay App', () => {
             mounted.push(rendered);
 
             await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') !== null);
-            expect(rendered.container.textContent || '').toContain('Metodo de acceso');
+            expect(rendered.container.textContent || '').toContain('Método de acceso');
         } finally {
             window.location.hash = previousHash;
         }
@@ -8128,7 +8295,7 @@ describe('Nostr overlay App', () => {
         await waitFor(() => (rendered.container.textContent || '').includes('Primer lote'));
 
         const loadMoreButton = Array.from(rendered.container.querySelectorAll('button')).find(button =>
-            (button.textContent || '').includes('Cargar mas')
+            (button.textContent || '').includes('Cargar más')
         ) as HTMLButtonElement;
         expect(loadMoreButton).toBeDefined();
 
@@ -9204,7 +9371,7 @@ describe('Nostr overlay App', () => {
         });
 
         const extensionMethodOption = Array.from(document.body.querySelectorAll('[data-slot="select-item"]')).find((item) =>
-            (item.textContent || '').includes('Extension (NIP-07)')
+            (item.textContent || '').includes('Extensión (NIP-07)')
         ) as HTMLElement;
         expect(extensionMethodOption).toBeDefined();
 
@@ -9214,7 +9381,7 @@ describe('Nostr overlay App', () => {
         });
 
         const continueButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
-            (button.textContent || '').includes('Continuar con extension')
+            (button.textContent || '').includes('Continuar con extensión')
         ) as HTMLButtonElement;
         expect(continueButton).toBeDefined();
 
@@ -9541,7 +9708,7 @@ describe('Nostr overlay App', () => {
         expect(rendered.queryClient.getQueryData(activeProfilePostsKey)).toBeDefined();
 
         await selectUserMenuAction(rendered.container, 'Cerrar sesión');
-        await waitFor(() => (rendered.container.textContent || '').includes('Metodo de acceso'));
+        await waitFor(() => (rendered.container.textContent || '').includes('Método de acceso'));
 
         expect(rendered.queryClient.getQueryData(followingFeedKey)).toBeUndefined();
         expect(rendered.queryClient.getQueryData(notificationsKey)).toBeUndefined();
@@ -9601,7 +9768,7 @@ describe('Nostr overlay App', () => {
         await waitFor(() => (rendered.container.textContent || '').includes('1/3'));
 
         await selectUserMenuAction(rendered.container, 'Cerrar sesión');
-        await waitFor(() => (rendered.container.textContent || '').includes('Metodo de acceso'));
+        await waitFor(() => (rendered.container.textContent || '').includes('Método de acceso'));
 
         expect(rendered.container.textContent || '').not.toContain('1/3');
         const storedProgressRaw = window.localStorage.getItem(`${EASTER_EGG_PROGRESS_STORAGE_KEY}:user:${ownerPubkey}`);
@@ -9685,14 +9852,14 @@ describe('Nostr overlay App', () => {
         await waitFor(() => (rendered.container.textContent || '').includes('1/3'));
 
         await selectUserMenuAction(rendered.container, 'Cerrar sesión');
-        await waitFor(() => (rendered.container.textContent || '').includes('Metodo de acceso'));
+        await waitFor(() => (rendered.container.textContent || '').includes('Método de acceso'));
 
         await submitNpub(npubB);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner-B'));
         expect(rendered.container.textContent || '').toContain('0/3');
 
         await selectUserMenuAction(rendered.container, 'Cerrar sesión');
-        await waitFor(() => (rendered.container.textContent || '').includes('Metodo de acceso'));
+        await waitFor(() => (rendered.container.textContent || '').includes('Método de acceso'));
 
         await submitNpub(npubA);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner-A'));
@@ -9758,7 +9925,7 @@ describe('Nostr overlay App', () => {
 
         await selectUserMenuAction(rendered.container, 'Cerrar sesión');
 
-        await waitFor(() => (rendered.container.textContent || '').includes('Metodo de acceso'));
+        await waitFor(() => (rendered.container.textContent || '').includes('Método de acceso'));
 
         const content = rendered.container.textContent || '';
         expect(content).not.toContain('Sigues (');

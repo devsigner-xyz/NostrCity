@@ -17,6 +17,7 @@ interface RenderResult {
     onOpenPublish: ReturnType<typeof vi.fn>;
     onOpenWallet: ReturnType<typeof vi.fn>;
     onOpenProfileEditor: ReturnType<typeof vi.fn>;
+    onMobileAppBarBack: ReturnType<typeof vi.fn<() => void>>;
 }
 
 async function renderSidebar({
@@ -28,6 +29,9 @@ async function renderSidebar({
     canAccessDirectMessages = true,
     canAccessSocialNotifications = true,
     canAccessFollowingFeed = true,
+    mobileAppBarTitle = 'Nostr City',
+    mobileAppBarShowBack = pathname !== '/',
+    onMobileAppBarBack = vi.fn<() => void>(),
 }: {
     pathname?: string;
     open?: boolean;
@@ -37,6 +41,9 @@ async function renderSidebar({
     canAccessDirectMessages?: boolean;
     canAccessSocialNotifications?: boolean;
     canAccessFollowingFeed?: boolean;
+    mobileAppBarTitle?: string;
+    mobileAppBarShowBack?: boolean;
+    onMobileAppBarBack?: ReturnType<typeof vi.fn<() => void>>;
 } = {}): Promise<RenderResult> {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -101,6 +108,9 @@ async function renderSidebar({
                     relaysConnectedCount={3}
                     relaysTotal={5}
                     onOpenMissions={vi.fn()}
+                    mobileAppBarTitle={mobileAppBarTitle}
+                    mobileAppBarShowBack={mobileAppBarShowBack}
+                    onMobileAppBarBack={onMobileAppBarBack}
                 >
                     <div>Social content</div>
                 </OverlaySidebar>
@@ -108,7 +118,7 @@ async function renderSidebar({
         );
     });
 
-    return { container, root, onOpenMap, onOpenChat, onOpenNotifications, onOpenPublish, onOpenWallet, onOpenProfileEditor };
+    return { container, root, onOpenMap, onOpenChat, onOpenNotifications, onOpenPublish, onOpenWallet, onOpenProfileEditor, onMobileAppBarBack };
 }
 
 function setMobileViewport(): void {
@@ -116,6 +126,15 @@ function setMobileViewport(): void {
         configurable: true,
         value: 390,
     });
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('max-width'),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    }));
 }
 
 async function openUserMenu(container: ParentNode): Promise<void> {
@@ -354,14 +373,18 @@ describe('OverlaySidebar', () => {
         expect(collapsedSidebar?.querySelector('[data-slot="sidebar-rail"]')).not.toBeNull();
     });
 
-    test('opens mobile sidebar content from a visible map overlay trigger', async () => {
+    test('opens mobile sidebar content from the map app bar menu', async () => {
         setMobileViewport();
         const rendered = await renderSidebar({ open: false });
         mounted.push(rendered);
 
-        const mobileTrigger = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement | null;
+        const appBar = rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]');
+        const mobileTrigger = appBar?.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement | null;
 
+        expect(appBar).not.toBeNull();
+        expect(appBar?.textContent || '').toContain('Nostr City');
         expect(mobileTrigger).not.toBeNull();
+        expect(rendered.container.querySelector('.nostr-mobile-sidebar-trigger')).toBeNull();
         expect(document.body.textContent || '').not.toContain('Social content');
 
         await act(async () => {
@@ -372,12 +395,45 @@ describe('OverlaySidebar', () => {
         expect(document.body.textContent || '').toContain('Navegación de Nostr City');
     });
 
-    test('places the mobile sidebar trigger in the bottom-left map corner', () => {
+    test('styles the mobile app bar instead of the legacy bottom-left trigger', async () => {
+        setMobileViewport();
+        const rendered = await renderSidebar({ open: false });
+        mounted.push(rendered);
+
+        const appBar = rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]');
         const styles = readOverlayStyles();
 
-        expect(styles).toMatch(/\.nostr-mobile-sidebar-trigger\s*\{[\s\S]*bottom:\s*max\(12px, env\(safe-area-inset-bottom\)\)/);
-        expect(styles).toMatch(/\.nostr-mobile-sidebar-trigger\s*\{[\s\S]*left:\s*max\(12px, env\(safe-area-inset-left\)\)/);
-        expect(styles).not.toMatch(/\.nostr-mobile-sidebar-trigger\s*\{[\s\S]*top:\s*max\(12px, env\(safe-area-inset-top\)\)/);
+        expect(appBar).not.toBeNull();
+        expect(appBar?.classList.contains('nostr-mobile-app-bar')).toBe(true);
+        expect(rendered.container.querySelector('.nostr-mobile-sidebar-trigger')).toBeNull();
+        expect(styles).toMatch(/\.nostr-mobile-app-bar\s*\{[^}]*position:\s*fixed;[^}]*top:\s*0;/s);
+        expect(styles).toMatch(/\.nostr-mobile-app-bar\s*\{[^}]*env\(safe-area-inset-top\)/s);
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-mobile-app-bar,[\s\S]*?pointer-events:\s*auto;/);
+        expect(styles).not.toMatch(/\.nostr-mobile-sidebar-trigger\s*\{[^}]*position:\s*fixed;[^}]*bottom:/s);
+        expect(styles).toMatch(/\.nostr-mobile-app-bar-title\s*\{[^}]*font-size:\s*1rem;/s);
+        expect(styles).toMatch(/\.nostr-mobile-app-bar-button\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s);
+    });
+
+    test('renders an internal-route back button and calls the provided callback', async () => {
+        setMobileViewport();
+        const rendered = await renderSidebar({
+            pathname: '/agora',
+            open: false,
+            mobileAppBarTitle: 'Agora',
+            mobileAppBarShowBack: true,
+        });
+        mounted.push(rendered);
+
+        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement | null;
+
+        expect(backButton).not.toBeNull();
+        expect(rendered.container.textContent || '').toContain('Agora');
+
+        await act(async () => {
+            backButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(rendered.onMobileAppBarBack).toHaveBeenCalledTimes(1);
     });
 
     test('closes the mobile sidebar after selecting a navigation action', async () => {

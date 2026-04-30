@@ -27,7 +27,7 @@ export function OverlaySurface({
             <div
                 data-testid={contentTestId}
                 className={cn(
-                    'flex h-full w-full flex-col gap-2.5 overflow-hidden bg-overlay-surface p-3 text-foreground backdrop-blur-sm',
+                    'nostr-overlay-surface-content flex h-full w-full flex-col gap-2.5 overflow-hidden bg-overlay-surface p-3 text-foreground backdrop-blur-sm',
                     contentClassName,
                 )}
             >

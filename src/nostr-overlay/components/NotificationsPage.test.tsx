@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -24,6 +26,10 @@ async function renderElement(element: ReactElement): Promise<RenderResult> {
 }
 
 let mounted: RenderResult[] = [];
+
+function readOverlayStyles(): string {
+    return readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
+}
 
 beforeAll(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -114,6 +120,25 @@ describe('NotificationsPage', () => {
         expect(page).not.toBeNull();
         expect(page?.className).toContain('nostr-routed-surface-panel');
         expect(page?.className).toContain('nostr-page-layout');
+    });
+
+    test('marks routed surface content for mobile app bar offset', async () => {
+        const rendered = await renderElement(
+            <NotificationsPage
+                hasUnread={false}
+                newNotifications={[]}
+                recentNotifications={[]}
+                profilesByPubkey={{}}
+                eventReferencesById={{}}
+            />,
+        );
+        mounted.push(rendered);
+
+        const content = rendered.container.querySelector('[data-testid="overlay-surface-content"]');
+        const styles = readOverlayStyles();
+
+        expect(content?.className).toContain('nostr-overlay-surface-content');
+        expect(styles).toMatch(/\.nostr-overlay-surface-content,\s*\.nostr-following-feed-routed-surface-content\s*\{[^}]*padding-top:\s*calc\(env\(safe-area-inset-top\) \+ 4rem\);/s);
     });
 
     test('renders empty state when there are no notifications in either section', async () => {

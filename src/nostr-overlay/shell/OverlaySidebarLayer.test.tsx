@@ -64,6 +64,9 @@ function createDefaultProps(overrides: Partial<ComponentProps<typeof OverlaySide
         relaysConnectedCount: 3,
         relaysTotal: 5,
         onOpenMissions: vi.fn(),
+        mobileAppBarTitle: 'Nostr City',
+        mobileAppBarShowBack: false,
+        onMobileAppBarBack: vi.fn(),
         follows: [ALICE_PUBKEY],
         profiles: {
             [ALICE_PUBKEY]: { pubkey: ALICE_PUBKEY, displayName: 'Alice' },
@@ -103,6 +106,32 @@ async function renderLayer(props: ComponentProps<typeof OverlaySidebarLayer>): P
     return { container, root };
 }
 
+function setMobileViewport(): void {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('max-width'),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    }));
+}
+
+function setDesktopViewport(): void {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: !query.includes('max-width'),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    }));
+}
+
 async function waitFor(condition: () => boolean): Promise<void> {
     for (let attempt = 0; attempt < 50; attempt += 1) {
         if (condition()) {
@@ -140,6 +169,7 @@ beforeAll(() => {
 });
 
 afterEach(async () => {
+    setDesktopViewport();
     window.localStorage.clear();
     for (const entry of mounted) {
         await act(async () => {
@@ -172,6 +202,30 @@ describe('OverlaySidebarLayer', () => {
         expect(rendered.container.textContent || '').toContain('Owner');
     });
 
+    test('passes mobile app bar title and back action into the sidebar', async () => {
+        setMobileViewport();
+        const onMobileAppBarBack = vi.fn();
+        const rendered = await renderLayer(createDefaultProps({
+            mobileAppBarTitle: 'Agora',
+            mobileAppBarShowBack: true,
+            onMobileAppBarBack,
+        }));
+        mounted.push(rendered);
+
+        const appBar = rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]');
+        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement | null;
+
+        expect(appBar).not.toBeNull();
+        expect(appBar?.textContent || '').toContain('Agora');
+        expect(backButton).not.toBeNull();
+
+        await act(async () => {
+            backButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onMobileAppBarBack).toHaveBeenCalledTimes(1);
+    });
+
     test('routes sidebar action controls to callbacks', async () => {
         const onOpenMap = vi.fn();
         const onOpenCityStats = vi.fn();
@@ -196,15 +250,15 @@ describe('OverlaySidebarLayer', () => {
         mounted.push(rendered);
 
         await clickButton(rendered.container, 'button[aria-label="Abrir mapa"]');
-        await clickButton(rendered.container, 'button[aria-label="Abrir estadisticas de la ciudad"]');
+        await clickButton(rendered.container, 'button[aria-label="Abrir estadísticas de la ciudad"]');
         await clickButton(rendered.container, 'button[aria-label="Abrir chats"]');
         await clickButton(rendered.container, 'button[aria-label="Abrir relays"]');
-        await clickButton(rendered.container, 'button[aria-label="Abrir articulos"]');
+        await clickButton(rendered.container, 'button[aria-label="Abrir artículos"]');
         await clickButton(rendered.container, 'button[aria-label="Abrir buscador global de usuarios"]');
         await clickButton(rendered.container, 'button[aria-label="Abrir wallet"]');
         await clickButton(rendered.container, 'button[aria-label="Abrir ajustes"]');
         await clickButton(rendered.container, 'button[aria-label="Abrir ajustes de interfaz"]');
-        const userMenuButton = rendered.container.querySelector('button[aria-label="Abrir menu de usuario"]') as HTMLButtonElement;
+        const userMenuButton = rendered.container.querySelector('button[aria-label="Abrir menú de usuario"]') as HTMLButtonElement;
         expect(userMenuButton).toBeDefined();
         await openDropdownTrigger(userMenuButton);
         await waitFor(() => Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).some((item) =>

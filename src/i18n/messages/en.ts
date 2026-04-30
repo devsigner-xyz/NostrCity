@@ -629,6 +629,8 @@ export const enMessages = {
     'relaysRoute.aria': 'Relays',
     'relaysRoute.title': 'Relays',
     'relaysRoute.description': 'Relay configuration and connection status.',
+    'navigation.back': 'Back',
+    'navigation.mobileHeader': 'Primary navigation',
     'sidebar.relaysSummary': '{{total}} relays, {{connected}} connected, {{disconnected}} offline.',
     'sidebar.openMap': 'Open map',
     'sidebar.map': 'Map',

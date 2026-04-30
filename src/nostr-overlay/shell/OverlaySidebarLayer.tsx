@@ -47,6 +47,9 @@ interface OverlaySidebarLayerProps {
     relaysConnectedCount: number;
     relaysTotal: number;
     onOpenMissions: () => void;
+    mobileAppBarTitle: string;
+    mobileAppBarShowBack: boolean;
+    onMobileAppBarBack: () => void;
     follows: string[];
     profiles: Record<string, NostrProfile>;
     followers: string[];
@@ -101,6 +104,9 @@ export function OverlaySidebarLayer({
     relaysConnectedCount,
     relaysTotal,
     onOpenMissions,
+    mobileAppBarTitle,
+    mobileAppBarShowBack,
+    onMobileAppBarBack,
     follows,
     profiles,
     followers,
@@ -158,6 +164,9 @@ export function OverlaySidebarLayer({
             relaysConnectedCount={relaysConnectedCount}
             relaysTotal={relaysTotal}
             onOpenMissions={onOpenMissions}
+            mobileAppBarTitle={mobileAppBarTitle}
+            mobileAppBarShowBack={mobileAppBarShowBack}
+            onMobileAppBarBack={onMobileAppBarBack}
         >
             <SocialSidebar
                 follows={follows}

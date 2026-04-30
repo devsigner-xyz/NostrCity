@@ -573,7 +573,7 @@ export function FollowingFeedContent({
                 {headerActions || activeThread ? (
                     <div className="nostr-following-feed-header-actions flex items-center gap-2">
                         {headerActions}
-                        {activeThread ? (
+                        {activeThread && !isMobile ? (
                             <Button
                                 type="button"
                                 variant="outline"

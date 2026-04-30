@@ -64,6 +64,12 @@ import {
 import { OverlayDialogLayer } from './shell/OverlayDialogLayer';
 import { OverlayMapInteractionLayer } from './shell/OverlayMapInteractionLayer';
 import { normalizeHashtag, useOverlayRouteState } from './shell/use-overlay-route-state';
+import {
+    resolveMobileAppBarTitle,
+    resolveMobileBackBehavior,
+    shouldShowMobileBack,
+} from './shell/mobile-navigation';
+import { useOverlayNavigationStack } from './shell/use-overlay-navigation-stack';
 import { OverlayRoutes } from './routes/OverlayRoutes';
 import type { NoteCardModel } from './components/note-card-model';
 import { decodeNpubToHex } from '../nostr/npub';
@@ -119,6 +125,11 @@ export function App({ mapBridge, services }: AppProps) {
         openGlobalUserSearch,
         closeGlobalUserSearch,
     } = useOverlayRouteState();
+    const { goBackWithinApp } = useOverlayNavigationStack({
+        location,
+        navigate,
+        fallbackPath: '/',
+    });
     const overlay = useNostrOverlay({ mapBridge, services });
     const activeProfileData = useActiveProfileQuery({
         ...(overlay.activeProfilePubkey ? { pubkey: overlay.activeProfilePubkey } : {}),
@@ -151,6 +162,11 @@ export function App({ mapBridge, services }: AppProps) {
     );
     const loginDisabled = overlay.status !== 'idle' && overlay.status !== 'success' && overlay.status !== 'error';
     const mapLoaderText = selectMapLoaderStageLabel(overlay.mapLoaderStage, uiSettings.language);
+    const mobileAppBarTitle = resolveMobileAppBarTitle({
+        pathname: location.pathname,
+        language: uiSettings.language,
+    });
+    const mobileAppBarShowBack = shouldShowMobileBack(location.pathname);
     const sessionRestorationResolved = overlay.sessionRestorationResolved;
 
     useEffect(() => {
@@ -803,6 +819,31 @@ export function App({ mapBridge, services }: AppProps) {
         navigate('/relays');
     };
 
+    const handleMobileAppBarBack = (): void => {
+        const behavior = resolveMobileBackBehavior({
+            pathname: location.pathname,
+            search: location.search,
+            hasActiveAgoraThread: Boolean(followingFeed.activeThread),
+        });
+
+        if (behavior.type === 'closeAgoraThread') {
+            followingFeed.closeThread();
+            return;
+        }
+
+        if (behavior.type === 'openChatList') {
+            openChatList();
+            return;
+        }
+
+        if (behavior.type === 'navigate') {
+            navigate(behavior.to);
+            return;
+        }
+
+        goBackWithinApp();
+    };
+
     const setStreetLabelsQuickToggle = (enabled: boolean): void => {
         setUiSettings((currentSettings) => saveUiSettings({
             ...currentSettings,
@@ -988,6 +1029,9 @@ export function App({ mapBridge, services }: AppProps) {
                     relaysConnectedCount={relayConnectionSummary.connectedRelays}
                     relaysTotal={relayConnectionSummary.totalRelays}
                     onOpenMissions={() => navigate('/discover')}
+                    mobileAppBarTitle={mobileAppBarTitle}
+                    mobileAppBarShowBack={mobileAppBarShowBack}
+                    onMobileAppBarBack={handleMobileAppBarBack}
                     follows={overlay.follows}
                     profiles={overlay.profiles}
                     followers={overlay.followers}

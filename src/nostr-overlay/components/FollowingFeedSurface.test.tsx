@@ -820,6 +820,55 @@ describe('FollowingFeedSurface', () => {
         expect(rendered.container.querySelector('[data-slot="toggle-group"]')).toBeNull();
     });
 
+    test('mobile thread view lets the global app bar own visible back navigation', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    activeThread: {
+                        rootEventId: 'root-1',
+                        root: {
+                            id: 'root-1',
+                            pubkey: 'b'.repeat(64),
+                            createdAt: 500,
+                            eventKind: 1,
+                            content: 'root',
+                            rawEvent: {
+                                id: 'root-1',
+                                pubkey: 'b'.repeat(64),
+                                kind: 1,
+                                created_at: 500,
+                                tags: [],
+                                content: 'root',
+                            },
+                        },
+                        replies: [],
+                        isLoading: false,
+                        isLoadingMore: false,
+                        error: null,
+                        hasMore: false,
+                    },
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const localBackButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            (button.textContent || '').trim() === 'Volver al Ágora'
+        );
+
+        expect(localBackButton).toBeUndefined();
+    });
+
+    test('scopes mobile route header copy hiding to routed overlay surfaces', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-routed-surface \[data-slot="overlay-page-header-copy"\],\s*\.nostr-following-feed-surface \[data-slot="overlay-page-header-copy"\]\s*\{[^}]*display:\s*none;/s);
+        expect(styles).toMatch(/\.nostr-routed-surface \[data-slot="overlay-page-header"]:not\(:has\(\[data-slot="overlay-page-header-actions"\]\)\),\s*\.nostr-following-feed-surface \[data-slot="overlay-page-header"]:not\(:has\(\[data-slot="overlay-page-header-actions"\]\)\)\s*\{[^}]*display:\s*none;/s);
+        expect(styles).toMatch(/\.nostr-following-feed-header\s*\{[^}]*padding:\s*0;/s);
+        expect(styles).toMatch(/\.nostr-following-feed-header-actions\s*\{[^}]*margin-left:\s*0;[^}]*justify-content:\s*flex-start;/s);
+    });
+
     test('renders note detail header with note id copy action', async () => {
         const onCopyNoteId = vi.fn();
         const rendered = await renderElement(
