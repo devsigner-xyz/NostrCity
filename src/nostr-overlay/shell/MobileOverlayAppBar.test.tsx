@@ -97,11 +97,19 @@ describe('MobileOverlayAppBar', () => {
         mounted.push(rendered);
 
         const appBar = rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]');
+        const logo = rendered.container.querySelector('[data-testid="mobile-overlay-app-bar-logo"]') as HTMLImageElement | null;
+        const title = rendered.container.querySelector('.nostr-mobile-app-bar-title');
+        const menuButton = rendered.container.querySelector('button[aria-label="Abrir navegación"]');
 
         expect(appBar).not.toBeNull();
         expect(appBar?.getAttribute('aria-label')).toBe('Navegación principal');
         expect(appBar?.textContent || '').toContain('Nostr City');
-        expect(rendered.container.querySelector('button[aria-label="Abrir navegación"]')).not.toBeNull();
+        expect(appBar?.classList.contains('nostr-mobile-app-bar-home')).toBe(true);
+        expect(logo).not.toBeNull();
+        expect(logo?.getAttribute('src')).toBe('/icon-light-48x48.png');
+        expect(logo?.getAttribute('alt')).toBe('');
+        expect(title?.classList.contains('nostr-mobile-app-bar-title-center')).toBe(true);
+        expect(menuButton).not.toBeNull();
         expect(rendered.container.querySelector('button[aria-label="Volver"]')).toBeNull();
     });
 
@@ -111,6 +119,8 @@ describe('MobileOverlayAppBar', () => {
         mounted.push(rendered);
 
         expect(rendered.container.querySelector('button[aria-label="Volver"]')).not.toBeNull();
+        expect(rendered.container.querySelector('[data-testid="mobile-overlay-app-bar-logo"]')).toBeNull();
+        expect(rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]')?.classList.contains('nostr-mobile-app-bar-home')).toBe(false);
         expect(rendered.container.textContent || '').toContain('Agora');
     });
 

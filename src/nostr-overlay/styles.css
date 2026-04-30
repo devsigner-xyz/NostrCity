@@ -69,6 +69,26 @@
     gap: 0.35rem;
 }
 
+.nostr-mobile-app-bar-home {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
+.nostr-mobile-app-bar-home .nostr-mobile-app-bar-main {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-column: 1 / 3;
+    gap: 0;
+}
+
+.nostr-mobile-app-bar-logo {
+    width: 32px;
+    height: 32px;
+    align-self: center;
+    justify-self: start;
+    border-radius: 8px;
+}
+
 .nostr-mobile-app-bar-title {
     min-width: 0;
     overflow: hidden;
@@ -77,6 +97,10 @@
     font-size: 1rem;
     font-weight: 650;
     letter-spacing: -0.01em;
+}
+
+.nostr-mobile-app-bar-title-center {
+    text-align: center;
 }
 
 .nostr-mobile-app-bar-button {
