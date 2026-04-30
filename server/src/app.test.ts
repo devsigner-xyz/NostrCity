@@ -144,6 +144,8 @@ describe('buildApp static assets', () => {
         const landingIndex = await staticApp.inject({ method: 'GET', url: '/index.html' });
         const appShell = await staticApp.inject({ method: 'GET', url: '/app/' });
         const appFallback = await staticApp.inject({ method: 'GET', url: '/app/profile/alice' });
+        const overlayRootFallback = await staticApp.inject({ method: 'GET', url: '/notifications' });
+        const overlayNestedFallback = await staticApp.inject({ method: 'GET', url: '/settings/zaps' });
         const docs = await staticApp.inject({ method: 'GET', url: '/docs/' });
         const docsCleanUrl = await staticApp.inject({ method: 'GET', url: '/docs/empezar/primeros-pasos' });
         const docsAsset = await staticApp.inject({ method: 'GET', url: '/docs/assets/style.css' });
@@ -158,6 +160,10 @@ describe('buildApp static assets', () => {
         expect(appShell.body).toContain('App');
         expect(appFallback.statusCode).toBe(200);
         expect(appFallback.body).toContain('App');
+        expect(overlayRootFallback.statusCode).toBe(200);
+        expect(overlayRootFallback.body).toContain('App');
+        expect(overlayNestedFallback.statusCode).toBe(200);
+        expect(overlayNestedFallback.body).toContain('App');
         expect(docs.statusCode).toBe(200);
         expect(docs.body).toContain('Docs');
         expect(docsCleanUrl.statusCode).toBe(200);

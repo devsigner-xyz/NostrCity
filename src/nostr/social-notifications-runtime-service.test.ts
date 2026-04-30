@@ -71,9 +71,9 @@ describe('social-notifications-runtime-service', () => {
             transportPool: createTransportPool(),
         });
 
-        const events = await service.loadInitialSocial({ ownerPubkey: 'c'.repeat(64), limit: 20 });
+        const page = await service.loadInitialSocial({ ownerPubkey: 'c'.repeat(64), limit: 20 });
 
-        expect(events.map((event) => event.id)).toEqual(['event-fallback']);
+        expect(page.items.map((event) => event.id)).toEqual(['event-fallback']);
         expect(createTransport).toHaveBeenCalledTimes(2);
     });
 
@@ -91,16 +91,43 @@ describe('social-notifications-runtime-service', () => {
             transportPool: createTransportPool(),
         });
 
-        const events = await service.loadInitialSocial({ ownerPubkey: 'b'.repeat(64), limit: 20 });
+        const page = await service.loadInitialSocial({ ownerPubkey: 'b'.repeat(64), limit: 20 });
         const unsubscribe = service.subscribeSocial({ ownerPubkey: 'b'.repeat(64) }, () => {
             return;
         });
         unsubscribe();
 
-        expect(events).toEqual([notificationEvent('event-16', 150, 16)]);
+        expect(page.items).toEqual([notificationEvent('event-16', 150, 16)]);
         expect(subscribe).toHaveBeenCalledWith(
             [expect.objectContaining({ kinds: expect.arrayContaining([1, 6, 7, 16, 9735]) })],
             expect.any(Function),
         );
+    });
+
+    test('uses the pagination cursor as an until filter for older notifications', async () => {
+        const fetchBackfill = vi.fn(async () => [notificationEvent('event-old', 90)]);
+        const transport = {
+            publishToRelays: vi.fn(async () => ({ ackedRelays: [], failedRelays: [], timeoutRelays: [] })),
+            subscribe: vi.fn(() => ({ unsubscribe() { return; } })),
+            fetchBackfill,
+        };
+
+        const service = createRuntimeSocialNotificationsService({
+            createTransport: vi.fn(() => transport as any),
+            resolveRelays: () => ['wss://relay.one'],
+            transportPool: createTransportPool(),
+        });
+
+        const page = await service.loadInitialSocial({ ownerPubkey: 'b'.repeat(64), limit: 20, since: 123 });
+
+        expect(page.items.map((event) => event.id)).toEqual(['event-old']);
+        expect(fetchBackfill).toHaveBeenCalledWith([
+            expect.objectContaining({
+                until: 123,
+                limit: 21,
+            }),
+        ]);
+        const firstFilter = (fetchBackfill.mock.calls[0] as unknown as [Array<Record<string, unknown>>])[0][0];
+        expect(firstFilter).not.toHaveProperty('since');
     });
 });

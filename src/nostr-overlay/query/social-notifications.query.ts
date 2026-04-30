@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import {
     getZapSenderPubkey,
     getLastTagValue,
@@ -7,6 +7,7 @@ import {
     getNumericTagValue,
     type SocialNotificationEvent,
     type SocialNotificationItem,
+    type SocialNotificationsPage,
     type SocialNotificationKind,
     type SocialNotificationsService,
 } from '../../nostr/social-notifications-service';
@@ -33,14 +34,23 @@ interface UseSocialNotificationsControllerOptions {
 interface SocialNotificationsControllerState {
     items: SocialNotificationItem[];
     hasUnread: boolean;
+    hasMore: boolean;
     lastReadAt: number;
     isOpen: boolean;
     pendingSnapshot: SocialNotificationItem[];
     isBootstrapping: boolean;
+    isLoadingMore: boolean;
     bootstrapError: string | null;
     open: () => void;
     close: () => void;
+    loadMore: () => Promise<void>;
     retry: () => Promise<void>;
+}
+
+interface SocialNotificationsItemsPage {
+    items: SocialNotificationItem[];
+    hasMore: boolean;
+    nextSince: number | null;
 }
 
 function toSocialNotificationKind(value: number): SocialNotificationKind | null {
@@ -118,6 +128,42 @@ function sortItems(items: SocialNotificationItem[]): SocialNotificationItem[] {
     });
 }
 
+function dedupeItems(items: SocialNotificationItem[]): SocialNotificationItem[] {
+    const byId = new Map<string, SocialNotificationItem>();
+    for (const item of items) {
+        if (!byId.has(item.id)) {
+            byId.set(item.id, item);
+        }
+    }
+
+    return sortItems([...byId.values()]);
+}
+
+function toItemsPage(page: SocialNotificationsPage, ownerPubkey: string): SocialNotificationsItemsPage {
+    const items: SocialNotificationItem[] = [];
+
+    for (const event of page.items) {
+        if (!shouldIncludeEvent(event, ownerPubkey)) {
+            continue;
+        }
+
+        const item = toItem(event);
+        if (item) {
+            items.push(item);
+        }
+    }
+
+    return {
+        items: sortItems(items),
+        hasMore: page.hasMore,
+        nextSince: page.nextSince,
+    };
+}
+
+function flattenPages(data: InfiniteData<SocialNotificationsItemsPage> | undefined): SocialNotificationItem[] {
+    return dedupeItems(data?.pages.flatMap((page) => page.items) ?? []);
+}
+
 function upsertNotificationItem(items: SocialNotificationItem[], nextItem: SocialNotificationItem, maxItems: number): SocialNotificationItem[] {
     if (items.some((item) => item.id === nextItem.id)) {
         return items;
@@ -159,35 +205,28 @@ export function useSocialNotificationsController(
         limit: maxItems,
     }), [maxItems, options.ownerPubkey]);
 
-    const notificationsQuery = useQuery(createSocialQueryOptions({
+    const notificationsQuery = useInfiniteQuery<SocialNotificationsItemsPage, Error>(createSocialQueryOptions({
         queryKey,
-        queryFn: async (): Promise<SocialNotificationItem[]> => {
+        queryFn: async ({ pageParam }: { pageParam: unknown }): Promise<SocialNotificationsItemsPage> => {
             if (!options.ownerPubkey) {
-                return [];
+                return { items: [], hasMore: false, nextSince: null };
             }
 
-            const events = await options.service.loadInitialSocial({
+            const since = typeof pageParam === 'number' ? pageParam : undefined;
+            const input = {
                 ownerPubkey: options.ownerPubkey,
                 limit: maxItems,
-            });
+                ...(since !== undefined ? { since } : {}),
+            };
+            const page = await options.service.loadInitialSocial(input);
 
-            const items: SocialNotificationItem[] = [];
-            for (const event of events) {
-                if (!shouldIncludeEvent(event, options.ownerPubkey)) {
-                    continue;
-                }
-
-                const item = toItem(event);
-                if (!item) {
-                    continue;
-                }
-
-                items.push(item);
-            }
-
-            return sortItems(items).slice(0, maxItems);
+            return toItemsPage(page, options.ownerPubkey);
         },
         enabled: Boolean(options.ownerPubkey),
+        initialPageParam: undefined,
+        getNextPageParam: (lastPage: SocialNotificationsItemsPage) => (
+            lastPage.hasMore && typeof lastPage.nextSince === 'number' ? lastPage.nextSince : undefined
+        ),
     }));
 
     useEffect(() => {
@@ -218,13 +257,29 @@ export function useSocialNotificationsController(
                 return;
             }
 
-            queryClient.setQueryData<SocialNotificationItem[]>(queryKey, (current = []) =>
-                upsertNotificationItem(current, item, maxItems)
-            );
+            queryClient.setQueryData<InfiniteData<SocialNotificationsItemsPage>>(queryKey, (current) => {
+                const firstPage = current?.pages[0] ?? { items: [], hasMore: false, nextSince: null };
+                const nextFirstPage = {
+                    ...firstPage,
+                    items: upsertNotificationItem(firstPage.items, item, maxItems),
+                };
+
+                if (!current) {
+                    return {
+                        pages: [nextFirstPage],
+                        pageParams: [undefined],
+                    };
+                }
+
+                return {
+                    ...current,
+                    pages: [nextFirstPage, ...current.pages.slice(1)],
+                };
+            });
         });
     }, [maxItems, options.ownerPubkey, options.service, queryClient, queryKey]);
 
-    const items = notificationsQuery.data ?? [];
+    const items = useMemo(() => flattenPages(notificationsQuery.data), [notificationsQuery.data]);
     const hasUnread = useMemo(() => computeHasUnread(items, lastReadAt), [items, lastReadAt]);
 
     const open = useCallback(() => {
@@ -243,6 +298,14 @@ export function useSocialNotificationsController(
         setPendingSnapshot([]);
     }, []);
 
+    const loadMore = useCallback(async () => {
+        if (!notificationsQuery.hasNextPage || notificationsQuery.isFetchingNextPage) {
+            return;
+        }
+
+        await notificationsQuery.fetchNextPage();
+    }, [notificationsQuery]);
+
     const retry = useCallback(async () => {
         await notificationsQuery.refetch();
     }, [notificationsQuery]);
@@ -250,10 +313,12 @@ export function useSocialNotificationsController(
     return {
         items,
         hasUnread,
+        hasMore: Boolean(notificationsQuery.hasNextPage),
         lastReadAt,
         isOpen,
         pendingSnapshot,
         isBootstrapping: notificationsQuery.isPending,
+        isLoadingMore: notificationsQuery.isFetchingNextPage,
         bootstrapError: notificationsQuery.error instanceof Error
             ? notificationsQuery.error.message
             : notificationsQuery.error
@@ -261,6 +326,7 @@ export function useSocialNotificationsController(
                 : null,
         open,
         close,
+        loadMore,
         retry,
     };
 }

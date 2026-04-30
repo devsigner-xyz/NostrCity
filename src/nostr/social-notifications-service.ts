@@ -22,6 +22,12 @@ export interface SocialNotificationItem {
     rawEvent: SocialNotificationEvent;
 }
 
+export interface SocialNotificationsPage {
+    items: SocialNotificationEvent[];
+    hasMore: boolean;
+    nextSince: number | null;
+}
+
 export interface SocialNotificationsService {
     subscribeSocial(
         input: { ownerPubkey: string },
@@ -31,7 +37,7 @@ export interface SocialNotificationsService {
         ownerPubkey: string;
         limit?: number;
         since?: number;
-    }): Promise<SocialNotificationEvent[]>;
+    }): Promise<SocialNotificationsPage>;
 }
 
 function isValidPubkey(value: unknown): value is string {

@@ -29,6 +29,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } f
 import type { I18nContextValue } from '@/i18n/I18nProvider';
 import { useI18n } from '@/i18n/useI18n';
 import { PersonContextMenuItems } from './PersonContextMenuItems';
+import { LightningDonationBanner } from './LightningDonationBanner';
 import { UserBotBadge } from './UserBotBadge';
 import { VerifiedUserAvatar } from './VerifiedUserAvatar';
 import { toast } from 'sonner';
@@ -84,6 +85,9 @@ interface OccupantProfileDialogProps {
     onZap?: (input: { eventId: string; eventKind?: number; targetPubkey?: string; amount: number }) => Promise<void> | void;
     zapAmounts?: number[];
     onConfigureZapAmounts?: () => void;
+    donationPubkey?: string;
+    canDonateWithWallet?: boolean;
+    onDonate?: (input: { pubkey: string; amount: number }) => Promise<void> | void;
     onResolveProfiles?: (pubkeys: string[]) => Promise<void> | void;
     onSelectEventReference?: (eventId: string) => void;
     onResolveEventReferences?: (
@@ -238,6 +242,9 @@ export function OccupantProfileDialog({
     onZap,
     zapAmounts = [21, 128, 256],
     onConfigureZapAmounts,
+    donationPubkey,
+    canDonateWithWallet = false,
+    onDonate,
     onResolveProfiles,
     onSelectEventReference,
     onResolveEventReferences,
@@ -267,6 +274,7 @@ export function OccupantProfileDialog({
     const canAddAllRelaySuggestions = typeof onAddAllRelaySuggestions === 'function' && relaySuggestionRows.length > 1;
     const canFollowActiveProfile = typeof onFollowProfile === 'function' && ownerPubkey !== pubkey;
     const canSendMessageToActiveProfile = typeof onSendMessage === 'function' && ownerPubkey !== pubkey;
+    const showDonationBanner = donationPubkey === pubkey;
     const activeProfileFollowState = buildFollowActionState(pubkey, displayName, ownerFollowSet, pendingFollowByPubkey, t);
 
     const npubValue = useMemo(() => {
@@ -773,6 +781,14 @@ export function OccupantProfileDialog({
 
                         <TabsContent value="info" className="nostr-profile-tab-panel">
                             <section className="nostr-profile-info">
+                                    {showDonationBanner ? (
+                                        <LightningDonationBanner
+                                            profile={profile}
+                                            canDonateWithWallet={canDonateWithWallet}
+                                            onDonate={onDonate}
+                                        />
+                                    ) : null}
+
                                     <dl className="nostr-profile-info-list">
                                         {infoRows.map((row) => (
                                             <div key={row.label} className="nostr-profile-info-row">

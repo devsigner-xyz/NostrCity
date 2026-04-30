@@ -1,7 +1,7 @@
 import fastifyStatic from '@fastify/static';
 import { access, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply } from 'fastify';
 
 export interface StaticAssetsOptions {
   rootPath?: string;
@@ -27,6 +27,22 @@ const pathExists = async (path: string): Promise<boolean> => {
 };
 
 const landingCandidates = ['index.html', join('app', 'index.html')];
+const appRoutePatterns = [
+  '/agora',
+  '/agora/*',
+  '/city-stats',
+  '/notifications',
+  '/chats',
+  '/relays',
+  '/relays/*',
+  '/discover',
+  '/wallet',
+  '/profile',
+  '/user-search',
+  '/settings',
+  '/settings/*',
+  '/login',
+];
 
 export const staticAssetsPlugin: FastifyPluginAsync<StaticAssetsOptions> = async (
   app,
@@ -85,7 +101,7 @@ export const staticAssetsPlugin: FastifyPluginAsync<StaticAssetsOptions> = async
     reply.callNotFound();
   });
 
-  app.get('/app/*', async (_request, reply) => {
+  const sendAppShell = async (reply: FastifyReply) => {
     const appShellPath = join(rootPath, 'app', 'index.html');
     if (!(await fileExists(appShellPath))) {
       reply.callNotFound();
@@ -93,5 +109,11 @@ export const staticAssetsPlugin: FastifyPluginAsync<StaticAssetsOptions> = async
     }
 
     return reply.sendFile('app/index.html');
-  });
+  };
+
+  app.get('/app/*', async (_request, reply) => sendAppShell(reply));
+
+  for (const pattern of appRoutePatterns) {
+    app.get(pattern, async (_request, reply) => sendAppShell(reply));
+  }
 };

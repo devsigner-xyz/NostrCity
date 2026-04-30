@@ -76,7 +76,7 @@ function buildZapRequestTags(input: {
     return tags;
 }
 
-function encodeLnurl(url: string): string {
+export function encodeLnurl(url: string): string {
     return bech32.encode('lnurl', bech32.toWords(new TextEncoder().encode(url)), 2000);
 }
 

@@ -212,7 +212,7 @@ describe('OverlaySidebar', () => {
         expect(text).toContain('Agora');
         expect(text).toContain('Chats');
         expect(text).toContain('Relays');
-        expect(text).toContain('Social platform');
+        expect(text).toContain('Visualize nostr');
     });
 
     test('opens the localized profile editor action from the user menu', async () => {

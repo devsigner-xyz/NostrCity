@@ -218,6 +218,7 @@ function createDefaultProps(overrides: Partial<ComponentProps<typeof OverlayDial
         onRequestZapPayment: vi.fn(async () => {}),
         zapAmounts: [21, 128],
         onConfigureZapAmounts: vi.fn(),
+        canDonateWithWallet: false,
         onResolveProfiles: vi.fn(async () => {}),
         onResolveEventReferences: vi.fn(async () => ({})),
         activeEasterEgg: null,

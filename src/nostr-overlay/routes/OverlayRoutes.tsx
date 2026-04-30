@@ -17,6 +17,13 @@ import { ProfileRouteContainer, type ProfileRouteContainerProps } from './Profil
 import { SettingsRouteContainer, type SettingsRouteContainerProps } from './SettingsRouteContainer';
 import { UserSearchRouteContainer, type UserSearchRouteContainerProps } from './UserSearchRouteContainer';
 import { WalletRouteContainer, type WalletRouteContainerProps } from './WalletRouteContainer';
+import type { NostrProfile } from '../../nostr/types';
+
+interface DonationRouteProps {
+    profile?: NostrProfile;
+    canDonateWithWallet: boolean;
+    onDonate: (input: { pubkey: string; amount: number }) => Promise<void> | void;
+}
 
 export interface OverlayRoutesProps {
     showLoginGate: boolean;
@@ -35,6 +42,7 @@ export interface OverlayRoutesProps {
     profile: ProfileRouteContainerProps;
     userSearch: UserSearchRouteContainerProps;
     settings: SettingsRouteContainerProps;
+    donation: DonationRouteProps;
 }
 
 export function OverlayRoutes({
@@ -54,6 +62,7 @@ export function OverlayRoutes({
     profile,
     userSearch,
     settings,
+    donation,
 }: OverlayRoutesProps) {
     return (
         <Routes>
@@ -83,7 +92,7 @@ export function OverlayRoutes({
                         <Route index element={<Navigate to="zaps" replace />} />
                         <Route path="shortcuts" element={<SettingsShortcutsRoute />} />
                         <Route path="zaps" element={<SettingsZapsRoute />} />
-                        <Route path="about" element={<SettingsAboutRoute />} />
+                        <Route path="about" element={<SettingsAboutRoute {...donation} />} />
                         <Route path="advanced" element={<SettingsAdvancedRoute />} />
                         <Route path="*" element={<Navigate to="zaps" replace />} />
                     </Route>

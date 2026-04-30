@@ -1,7 +1,7 @@
 import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter, useLocation } from 'react-router';
+import { MemoryRouter, Outlet, useLocation } from 'react-router';
 import { OverlayRoutes, type OverlayRoutesProps } from './OverlayRoutes';
 
 vi.mock('./AgoraRouteContainer', () => ({
@@ -37,7 +37,11 @@ vi.mock('./ProfileRouteContainer', () => ({
 }));
 
 vi.mock('./SettingsRouteContainer', () => ({
-    SettingsRouteContainer: () => <div data-testid="settings-route" />,
+    SettingsRouteContainer: () => (
+        <div data-testid="settings-route">
+            <Outlet />
+        </div>
+    ),
 }));
 
 vi.mock('./UserSearchRouteContainer', () => ({
@@ -171,10 +175,13 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             hasUnread: false,
             pendingSnapshot: [],
             items: [],
+            hasMore: false,
+            isLoadingMore: false,
             profilesByPubkey: {},
             eventReferencesById: {},
             onResolveProfiles: asyncNoop,
             onResolveEventReferences: async () => ({}),
+            onLoadMore: asyncNoop,
             onOpenThread: asyncNoop,
             onOpenProfile: asyncNoop,
         },
@@ -246,6 +253,15 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             zapSettings: { amounts: [], defaultAmount: 0 },
             onZapSettingsChange: noop,
             onClose: noop,
+        },
+        donation: {
+            profile: {
+                pubkey: 'd'.repeat(64),
+                displayName: 'strhodler',
+                lud16: 'strhodler@getalby.com',
+            },
+            canDonateWithWallet: false,
+            onDonate: asyncNoop,
         },
         ...overrides,
     };
@@ -370,6 +386,13 @@ describe('OverlayRoutes', () => {
 
         expect(rendered.container.querySelector('[data-testid="wallet-route"]')).not.toBeNull();
         expect(lastLocation(rendered.locations)).toBe('/wallet');
+    });
+
+    test('renders donation banner on settings about route', async () => {
+        const rendered = await renderOverlayRoutes('/settings/about');
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('[data-testid="lightning-donation-banner"]')).not.toBeNull();
     });
 
     test('redirects readonly direct wallet URLs back to the map', async () => {

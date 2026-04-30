@@ -66,6 +66,16 @@ export function LoginGateScreen({
                             <img src={loginLogo} alt={t('auth.login.coverAlt')} className="nostr-login-cover h-auto w-auto max-w-full" />
                         </div>
 
+                        {panel === 'login' && !restoringSession && !showUnlockLocalAccount ? (
+                            <div
+                                className="mb-2 rounded-lg border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground"
+                                data-testid="login-desktop-notice"
+                                role="status"
+                            >
+                                {t('auth.login.desktopNotice')}
+                            </div>
+                        ) : null}
+
                         {restoringSession ? (
                             <>
                                 <Empty className="min-h-48 border-0 p-0" role="status" aria-live="polite">

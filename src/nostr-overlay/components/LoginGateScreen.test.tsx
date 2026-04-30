@@ -93,6 +93,33 @@ describe('LoginGateScreen', () => {
         expect(content).toContain('Crear cuenta');
     });
 
+    test('shows a desktop-only notice on the main login view', async () => {
+        const rendered = await renderScreen();
+        mounted.push(rendered);
+
+        const notice = rendered.container.querySelector('[data-testid="login-desktop-notice"]');
+
+        expect(notice).not.toBeNull();
+        expect(notice?.className).toContain('mb-2');
+        expect(notice?.textContent || '').toContain('Por el momento, el cliente está optimizado para la versión de escritorio.');
+    });
+
+    test('hides the desktop-only notice outside the main login view', async () => {
+        const rendered = await renderScreen();
+        mounted.push(rendered);
+
+        const createAccountButton = Array.from(rendered.container.querySelectorAll('button')).find(
+            (button) => (button.textContent || '').includes('Crear cuenta')
+        ) as HTMLButtonElement | undefined;
+        expect(createAccountButton).toBeDefined();
+
+        await act(async () => {
+            createAccountButton?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+        });
+
+        expect(rendered.container.querySelector('[data-testid="login-desktop-notice"]')).toBeNull();
+    });
+
     test('renders the light logo in the default theme', async () => {
         const rendered = await renderScreen();
         mounted.push(rendered);

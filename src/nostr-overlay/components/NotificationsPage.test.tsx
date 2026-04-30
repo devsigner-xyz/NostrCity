@@ -132,6 +132,36 @@ describe('NotificationsPage', () => {
         expect(rendered.container.textContent || '').toContain('No tienes notificaciones pendientes.');
     });
 
+    test('loads more notifications when scrolling near the end', async () => {
+        const loadMore = vi.fn(async () => undefined);
+        const rendered = await renderElement(
+            <NotificationsPage
+                hasUnread={false}
+                newNotifications={[]}
+                recentNotifications={[buildItem()]}
+                profilesByPubkey={{}}
+                eventReferencesById={{}}
+                hasMoreNotifications
+                isLoadingMoreNotifications={false}
+                onLoadMoreNotifications={loadMore}
+            />,
+        );
+        mounted.push(rendered);
+
+        const scrollContainer = rendered.container.querySelector('[data-slot="notifications-scroll"]') as HTMLDivElement | null;
+        expect(scrollContainer).not.toBeNull();
+
+        Object.defineProperty(scrollContainer, 'scrollHeight', { configurable: true, value: 1_000 });
+        Object.defineProperty(scrollContainer, 'clientHeight', { configurable: true, value: 500 });
+        Object.defineProperty(scrollContainer, 'scrollTop', { configurable: true, value: 430 });
+
+        await act(async () => {
+            scrollContainer?.dispatchEvent(new Event('scroll', { bubbles: true }));
+        });
+
+        expect(loadMore).toHaveBeenCalledTimes(1);
+    });
+
     test('renders grouped new and recent notification sections with actor identity and note previews', async () => {
         const targetOne = 'b'.repeat(64);
         const targetTwo = 'd'.repeat(64);
@@ -213,9 +243,9 @@ describe('NotificationsPage', () => {
         const text = rendered.container.textContent || '';
         expect(text).toContain('Nuevas');
         expect(text).toContain('Recientes');
-        expect(text).toContain('Bob y 1 mas zapearon tu nota con 63 sats');
+        expect(text).toContain('Bob y 1 más zapearon tu nota con 63 sats');
         expect(text).toContain('nota target uno');
-        expect(text).toContain('Carol reacciono con ❤️ a tu nota');
+        expect(text).toContain('Carol reaccionó con ❤️ a tu nota');
         expect(text).toContain('nota target dos');
         expect(text).not.toContain('Reaccion');
         expect(text).not.toContain('Zap');
@@ -286,7 +316,7 @@ describe('NotificationsPage', () => {
 
         const text = rendered.container.textContent || '';
         expect(text).toContain('Alice zapeó tu nota con 63 sats');
-        expect(text).not.toContain('Alice y 1 mas zapearon tu nota');
+        expect(text).not.toContain('Alice y 1 más zapearon tu nota');
         expect(text).not.toContain('2 eventos');
     });
 
@@ -376,10 +406,10 @@ describe('NotificationsPage', () => {
 
         const noteButton = rendered.container.querySelector('[data-slot="notification-target-note"]') as HTMLButtonElement | null;
 
-        expect(rendered.container.textContent || '').toContain('Alice te menciono en una nota');
+        expect(rendered.container.textContent || '').toContain('Alice te mencionó en una nota');
         expect(noteButton?.textContent).toBe('nota');
         expect(rendered.container.querySelector('[data-slot="card"]')).toBeNull();
-        expect(rendered.container.textContent || '').not.toContain('La nota original no esta disponible.');
+        expect(rendered.container.textContent || '').not.toContain('La nota original no está disponible.');
 
         await act(async () => {
             noteButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -466,7 +496,7 @@ describe('NotificationsPage', () => {
         const header = rendered.container.querySelector('[data-slot="item-header"]') as HTMLElement | null;
         const noteButton = rendered.container.querySelector('[data-slot="notification-target-note"]') as HTMLButtonElement | null;
 
-        expect(text).toContain('Alice respondio a tu nota');
+        expect(text).toContain('Alice respondió a tu nota');
         expect(text).not.toContain('esta es la respuesta');
         expect(card).toBeNull();
         expect(header?.className).toContain('items-center');
@@ -560,7 +590,7 @@ describe('NotificationsPage', () => {
         const card = rendered.container.querySelector('[data-slot="card"]') as HTMLElement | null;
         const itemContent = rendered.container.querySelector('[data-slot="item-content"]') as HTMLElement | null;
 
-        expect(text).toContain('Alice reacciono con ❤️ a tu nota');
+        expect(text).toContain('Alice reaccionó con ❤️ a tu nota');
         expect(text).toContain('mi nota referenciada');
         expect(card).not.toBeNull();
         expect(itemContent?.contains(card)).toBe(false);
@@ -630,7 +660,7 @@ describe('NotificationsPage', () => {
         });
 
         expect(onResolveEventReferences).toHaveBeenCalledWith(['b'.repeat(64)]);
-        expect(rendered.container.textContent || '').toContain('La nota original no esta disponible.');
+        expect(rendered.container.textContent || '').toContain('La nota original no está disponible.');
     });
 
     test('does not request profiles for anonymous zaps and counts anonymous actors separately', async () => {
@@ -691,7 +721,7 @@ describe('NotificationsPage', () => {
 
         const text = rendered.container.textContent || '';
         expect(onResolveProfiles).not.toHaveBeenCalled();
-        expect(text).toContain('anonimo y 1 mas zapearon tu nota con 63 sats');
+        expect(text).toContain('anónimo y 1 más zapearon tu nota con 63 sats');
     });
 
     test('renders a single actor avatar with a notification type badge', async () => {
@@ -1111,7 +1141,7 @@ describe('NotificationsPage', () => {
         );
         mounted.push(rendered);
 
-        const moreButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => button.textContent === '1 mas') as HTMLButtonElement | undefined;
+        const moreButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => button.textContent === '1 más') as HTMLButtonElement | undefined;
         expect(moreButton).toBeDefined();
 
         await act(async () => {

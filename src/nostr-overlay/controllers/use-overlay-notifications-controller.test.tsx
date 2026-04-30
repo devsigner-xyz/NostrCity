@@ -18,7 +18,7 @@ const mountedRoots: RenderResult[] = [];
 
 const service: SocialNotificationsService = {
     subscribeSocial: () => () => {},
-    loadInitialSocial: async () => [],
+    loadInitialSocial: async () => ({ items: [], hasMore: false, nextSince: null }),
 };
 
 function createNotificationItem(input: Partial<SocialNotificationItem> = {}): SocialNotificationItem {
@@ -44,13 +44,16 @@ function createNotificationsState(input: Partial<ReturnType<typeof useSocialNoti
     return {
         items: [],
         hasUnread: false,
+        hasMore: false,
         lastReadAt: 0,
         isOpen: false,
         pendingSnapshot: [],
         isBootstrapping: false,
+        isLoadingMore: false,
         bootstrapError: null,
         open: vi.fn(),
         close: vi.fn(),
+        loadMore: vi.fn(),
         retry: vi.fn(),
         ...input,
     };

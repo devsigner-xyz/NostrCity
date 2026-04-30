@@ -139,7 +139,7 @@ const missingIdentityApiService: IdentityApiService = {
 
 const missingSocialNotificationsService: SocialNotificationsService = {
     subscribeSocial: () => () => {},
-    loadInitialSocial: async () => [],
+    loadInitialSocial: async () => ({ items: [], hasMore: false, nextSince: null }),
 };
 
 const missingSocialFeedService: SocialFeedService = {

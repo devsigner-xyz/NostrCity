@@ -1,5 +1,6 @@
 import type {
     SocialNotificationEvent,
+    SocialNotificationsPage,
     SocialNotificationsService,
 } from '../nostr/social-notifications-service';
 import { clampApiLimit } from './api-limits';
@@ -183,7 +184,7 @@ export function createSocialNotificationsApiService(
             };
         },
 
-        async loadInitialSocial(input) {
+        async loadInitialSocial(input): Promise<SocialNotificationsPage> {
             const response = await client.getJson<NotificationsResponseDto>('/notifications', {
                 includeAuth: true,
                 query: {
@@ -193,7 +194,11 @@ export function createSocialNotificationsApiService(
                 },
             });
 
-            return response.items.map((item) => mapNotificationEvent(item.rawEvent));
+            return {
+                items: response.items.map((item) => mapNotificationEvent(item.rawEvent)),
+                hasMore: response.hasMore,
+                nextSince: response.nextSince,
+            };
         },
     };
 }

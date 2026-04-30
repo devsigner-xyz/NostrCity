@@ -1,7 +1,19 @@
 import { OverlayPageHeader } from '../OverlayPageHeader';
+import { LightningDonationBanner } from '../LightningDonationBanner';
+import type { NostrProfile } from '../../../nostr/types';
 import { useI18n } from '@/i18n/useI18n';
 
-export function SettingsAboutPage() {
+interface SettingsAboutPageProps {
+    donationProfile?: NostrProfile | undefined;
+    canDonateWithWallet?: boolean;
+    onDonate?: ((input: { pubkey: string; amount: number }) => Promise<void> | void) | undefined;
+}
+
+export function SettingsAboutPage({
+    donationProfile,
+    canDonateWithWallet = false,
+    onDonate,
+}: SettingsAboutPageProps = {}) {
     const { t } = useI18n();
 
     return (
@@ -50,6 +62,12 @@ export function SettingsAboutPage() {
                             </a>
                         </p>
                     </div>
+
+                    <LightningDonationBanner
+                        profile={donationProfile}
+                        canDonateWithWallet={canDonateWithWallet}
+                        onDonate={onDonate}
+                    />
                 </div>
             </div>
         </>

@@ -2,6 +2,7 @@ import { createLazyNdkDmTransport } from './lazy-ndk-client';
 import { hasSameRelaySet, normalizeRelaySet, resolveConservativeSocialRelaySets } from './relay-runtime';
 import type {
     SocialNotificationEvent,
+    SocialNotificationsPage,
     SocialNotificationsService,
 } from './social-notifications-service';
 import type { DmTransport } from './dm-transport';
@@ -86,6 +87,18 @@ function sortAndDedupe(events: SocialNotificationEvent[]): SocialNotificationEve
     });
 }
 
+function paginateEvents(events: SocialNotificationEvent[], limit: number): SocialNotificationsPage {
+    const pageItems = events.slice(0, limit);
+    const hasMore = events.length > limit;
+    const lastItem = pageItems[pageItems.length - 1];
+
+    return {
+        items: pageItems,
+        hasMore,
+        nextSince: hasMore && lastItem ? Math.max(0, lastItem.created_at - 1) : null,
+    };
+}
+
 export function createRuntimeSocialNotificationsService(
     options: CreateRuntimeSocialNotificationsServiceOptions = {}
 ): SocialNotificationsService {
@@ -143,17 +156,17 @@ export function createRuntimeSocialNotificationsService(
                 const filter: NostrFilter = {
                     kinds: [...SOCIAL_NOTIFICATION_KINDS],
                     '#p': [input.ownerPubkey],
-                    limit,
+                    limit: limit + 1,
                 };
                 if (typeof input.since === 'number') {
-                    filter.since = input.since;
+                    filter.until = input.since;
                 }
 
                 const events = await transport.fetchBackfill([
                     filter,
                 ]);
 
-                return sortAndDedupe(events as SocialNotificationEvent[]).slice(0, limit);
+                return paginateEvents(sortAndDedupe(events as SocialNotificationEvent[]), limit);
             });
         },
     };

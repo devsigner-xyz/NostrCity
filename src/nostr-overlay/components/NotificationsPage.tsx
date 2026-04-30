@@ -19,17 +19,26 @@ import { Item, ItemContent, ItemDescription, ItemHeader, ItemMedia, ItemTitle } 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { sanitizeImageUrl } from '../media/image-url-policy';
+import { ListLoadingFooter } from './ListLoadingFooter';
 
 interface NotificationsPageProps {
     hasUnread: boolean;
     newNotifications: SocialNotificationItem[];
     recentNotifications: SocialNotificationItem[];
+    hasMoreNotifications?: boolean;
+    isLoadingMoreNotifications?: boolean;
     profilesByPubkey: Record<string, NostrProfile>;
     eventReferencesById: Record<string, NostrEvent>;
     onResolveProfiles?: (pubkeys: string[]) => Promise<void> | void;
     onResolveEventReferences?: (eventIds: string[]) => Promise<Record<string, NostrEvent> | void> | Record<string, NostrEvent> | void;
+    onLoadMoreNotifications?: () => Promise<void> | void;
     onOpenThread?: (eventId: string) => Promise<void> | void;
     onOpenProfile?: (pubkey: string) => Promise<void> | void;
+}
+
+function shouldLoadMore(container: HTMLDivElement): boolean {
+    const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distanceToBottom < 80;
 }
 
 function resolveDisplayName(pubkey: string, profilesByPubkey: Record<string, NostrProfile>, fallback: string): string {
@@ -502,10 +511,13 @@ export function NotificationsPage({
     hasUnread,
     newNotifications,
     recentNotifications,
+    hasMoreNotifications = false,
+    isLoadingMoreNotifications = false,
     profilesByPubkey,
     eventReferencesById,
     onResolveProfiles,
     onResolveEventReferences,
+    onLoadMoreNotifications,
     onOpenThread,
     onOpenProfile,
 }: NotificationsPageProps) {
@@ -588,6 +600,16 @@ export function NotificationsPage({
 
     const isEmpty = sections.newItems.length === 0 && sections.recentItems.length === 0;
 
+    const onNotificationsScroll = (container: HTMLDivElement | null): void => {
+        if (!container || isLoadingMoreNotifications || !hasMoreNotifications || !onLoadMoreNotifications) {
+            return;
+        }
+
+        if (shouldLoadMore(container)) {
+            void onLoadMoreNotifications();
+        }
+    };
+
     return (
         <OverlaySurface ariaLabel={t('notifications.title')}>
             <div className="nostr-notifications-page nostr-routed-surface-panel nostr-page-layout flex min-h-0 flex-1 flex-col gap-3">
@@ -607,7 +629,11 @@ export function NotificationsPage({
                         </Empty>
                     </div>
                 ) : (
-                    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+                    <div
+                        data-slot="notifications-scroll"
+                        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1"
+                        onScroll={(event) => onNotificationsScroll(event.currentTarget)}
+                    >
                         <NotificationSection
                             title={t('notifications.section.new')}
                             items={sections.newItems}
@@ -631,6 +657,7 @@ export function NotificationsPage({
                             {...(onOpenProfile ? { onOpenProfile } : {})}
                             t={t}
                         />
+                        <ListLoadingFooter loading={isLoadingMoreNotifications} label={t('notifications.loadingMore')} />
                     </div>
                 )}
             </div>
