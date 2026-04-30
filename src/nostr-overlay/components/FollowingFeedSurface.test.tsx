@@ -644,6 +644,41 @@ describe('FollowingFeedSurface', () => {
         expect(refreshIcon?.style.transform).toBe('rotate(140deg)');
     });
 
+    test('mobile pull-to-refresh keeps the affordance visible while settling a cancelled pull', async () => {
+        const onRefreshFeed = vi.fn(async () => {});
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    items: [createFeedNote('note-1')],
+                    onRefreshFeed,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const feedList = rendered.container.querySelector('[data-testid="following-feed-list"]') as HTMLDivElement;
+        const firstNote = rendered.container.querySelector('[data-feed-note-id="note-1"]') as HTMLDivElement;
+        Object.defineProperty(feedList, 'scrollTop', { configurable: true, value: 0 });
+
+        await act(async () => {
+            dispatchTouch(firstNote, 'touchstart', 20);
+            dispatchTouch(firstNote, 'touchmove', 76);
+        });
+
+        const pullAffordance = rendered.container.querySelector('[data-testid="following-feed-pull-to-refresh"]') as HTMLElement | null;
+        expect(pullAffordance?.style.height).toBe('56px');
+
+        await act(async () => {
+            dispatchTouch(firstNote, 'touchend', 76);
+        });
+
+        expect(onRefreshFeed).not.toHaveBeenCalled();
+        expect(pullAffordance?.getAttribute('data-settling')).toBe('true');
+        expect(pullAffordance?.getAttribute('data-active')).toBe('true');
+        expect(pullAffordance?.style.height).toBe('56px');
+    });
+
     test('mobile pull-to-refresh shows a loading spinner in the pull area while refresh is pending', async () => {
         const deferredRefresh = createDeferred<void>();
         const onRefreshFeed = vi.fn(() => deferredRefresh.promise);
@@ -1004,6 +1039,67 @@ describe('FollowingFeedSurface', () => {
         expect(noteShell.querySelector('[data-slot="card"]')).not.toBeNull();
     });
 
+    test('marks feed note action groups for responsive mobile layout', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    items: [createFeedNote('note-1')],
+                    engagementByEventId: {
+                        'note-1': {
+                            replies: 2,
+                            reactions: 3,
+                            reposts: 4,
+                            zaps: 1,
+                            zapSats: 21,
+                        },
+                    },
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const actionGroup = rendered.container.querySelector('.nostr-following-feed-action-group') as HTMLElement | null;
+
+        expect(actionGroup).not.toBeNull();
+        expect(actionGroup?.getAttribute('data-slot')).toBe('button-group');
+    });
+
+    test('keeps mobile feed notes and their action groups within the available width', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-following-feed-note-shell\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*600px;[^}]*min-width:\s*0/s);
+        expect(styles).toMatch(/@media\s*\(max-width:\s*760px\)\s*\{[\s\S]*\.nostr-following-feed-action-group\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/s);
+        expect(styles).toMatch(/@media\s*\(max-width:\s*760px\)\s*\{[\s\S]*\.nostr-following-feed-action-group > \*\s*\{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0/s);
+        expect(styles).toMatch(/@media\s*\(max-width:\s*760px\)\s*\{[\s\S]*\.nostr-following-feed-action-group \[data-slot="button"\]\s*\{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0/s);
+    });
+
+    test('uses semantic token colors for rich note links and mentions', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-rich-inline-link\s*\{[^}]*color:\s*var\(--primary\)/s);
+        expect(styles).toMatch(/\.nostr-rich-hashtag\s*\{[^}]*color:\s*var\(--primary\)/s);
+        expect(styles).toMatch(/\.nostr-rich-mention\s*\{[^}]*color:\s*var\(--primary\)/s);
+        expect(styles).toMatch(/\.nostr-following-feed-copy-id\s*\{[^}]*color:\s*var\(--primary\)/s);
+        expect(styles).not.toMatch(/\.nostr-rich-(?:inline-link|hashtag|mention)\s*\{[^}]*color:\s*#[0-9a-fA-F]+/s);
+    });
+
+    test('uses shared overlay surface background for agora and routed pages', async () => {
+        const rendered = await renderElement(<FollowingFeedSurface {...buildProps()} />);
+        mounted.push(rendered);
+        const styles = readOverlayStyles();
+        const surface = rendered.container.querySelector('section[aria-label="Agora"]') as HTMLElement | null;
+        const content = rendered.container.querySelector('[data-testid="overlay-surface-content"]') as HTMLElement | null;
+
+        expect(surface?.className).toContain('bg-background/95');
+        expect(content?.className).toContain('bg-overlay-surface');
+        expect(styles).toMatch(/\.nostr-routed-surface\s*\{[^}]*background:\s*color-mix\(in oklab,\s*var\(--background\) 95%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.nostr-following-feed-surface\s*\{[^}]*background:\s*color-mix\(in oklab,\s*var\(--background\) 95%,\s*transparent\)/s);
+        expect(styles).toMatch(/\.nostr-routed-surface-content\s*\{[^}]*background:\s*var\(--overlay-surface\)/s);
+        expect(styles).not.toMatch(/\.nostr-(?:routed|following-feed)-surface\s*\{[^}]*radial-gradient/s);
+        expect(styles).not.toMatch(/\.nostr-routed-surface-content\s*\{[^}]*rgba\(255,\s*255,\s*255/s);
+    });
+
     test('uses the xl breakpoint before switching masonry to two columns', () => {
         const styles = readOverlayStyles();
 
@@ -1023,6 +1119,13 @@ describe('FollowingFeedSurface', () => {
 
         expect(styles).toMatch(/\.nostr-following-feed-pull-to-refresh\s*\{[^}]*will-change:\s*height/s);
         expect(styles).not.toMatch(/\.nostr-following-feed-pull-to-refresh\s*\{[^}]*transition:\s*height/s);
+    });
+
+    test('only transitions pull-to-refresh height during release settling', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-following-feed-pull-to-refresh\[data-settling="true"\]\s*\{[^}]*display:\s*grid/s);
+        expect(styles).toMatch(/\.nostr-following-feed-pull-to-refresh\[data-settling="true"\]\s*\{[^}]*transition:\s*height\s+140ms\s+ease-out/s);
     });
 
     test('keeps the loading footer outside the masonry items wrapper', async () => {

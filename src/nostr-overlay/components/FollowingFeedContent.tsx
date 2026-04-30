@@ -136,11 +136,15 @@ interface ParsedEmbeddedRepost {
 
 const PULL_TO_REFRESH_THRESHOLD_PX = 72;
 const PULL_TO_REFRESH_LOADING_PX = 56;
+const PULL_TO_REFRESH_SETTLE_START_MS = 16;
+const PULL_TO_REFRESH_SETTLE_MS = 160;
 
 function prefersReducedMotion(): boolean {
-    return typeof window !== 'undefined'
-        && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+        return false;
+    }
+
+    return Boolean(window.matchMedia('(prefers-reduced-motion: reduce)')?.matches);
 }
 
 function parseEmbeddedRepostEvent(content: string): ParsedEmbeddedRepost | null {
@@ -252,9 +256,12 @@ export function FollowingFeedContent({
     const [replyTargetPubkey, setReplyTargetPubkey] = useState<string | undefined>(undefined);
     const [pullDistance, setPullDistance] = useState(0);
     const [isPullRefreshPending, setIsPullRefreshPending] = useState(false);
+    const [isPullSettling, setIsPullSettling] = useState(false);
     const pullStartYRef = useRef<number | null>(null);
     const pullDistanceRef = useRef(0);
     const pullEligibleRef = useRef(false);
+    const pullSettleStartTimeoutRef = useRef<number | null>(null);
+    const pullSettleEndTimeoutRef = useRef<number | null>(null);
     const scrollToNewNoteRef = useRef(false);
 
     useEffect(() => {
@@ -311,11 +318,51 @@ export function FollowingFeedContent({
         }
     };
 
+    const clearPullSettleTimers = (): void => {
+        if (pullSettleStartTimeoutRef.current !== null) {
+            window.clearTimeout(pullSettleStartTimeoutRef.current);
+            pullSettleStartTimeoutRef.current = null;
+        }
+
+        if (pullSettleEndTimeoutRef.current !== null) {
+            window.clearTimeout(pullSettleEndTimeoutRef.current);
+            pullSettleEndTimeoutRef.current = null;
+        }
+    };
+
     const resetPullState = (): void => {
+        clearPullSettleTimers();
         pullStartYRef.current = null;
         pullDistanceRef.current = 0;
         pullEligibleRef.current = false;
+        setIsPullSettling(false);
         setPullDistance(0);
+    };
+
+    useEffect(() => () => clearPullSettleTimers(), []);
+
+    const settlePullState = (): void => {
+        const settledDistance = Math.min(pullDistanceRef.current, PULL_TO_REFRESH_THRESHOLD_PX);
+        pullStartYRef.current = null;
+        pullDistanceRef.current = 0;
+        pullEligibleRef.current = false;
+
+        if (settledDistance <= 0 || prefersReducedMotion()) {
+            resetPullState();
+            return;
+        }
+
+        clearPullSettleTimers();
+        setIsPullSettling(true);
+        setPullDistance(settledDistance);
+        pullSettleStartTimeoutRef.current = window.setTimeout(() => {
+            pullSettleStartTimeoutRef.current = null;
+            setPullDistance(0);
+        }, PULL_TO_REFRESH_SETTLE_START_MS);
+        pullSettleEndTimeoutRef.current = window.setTimeout(() => {
+            pullSettleEndTimeoutRef.current = null;
+            setIsPullSettling(false);
+        }, PULL_TO_REFRESH_SETTLE_MS);
     };
 
     const onFeedTouchStart = (event: TouchEvent<HTMLDivElement>): void => {
@@ -323,6 +370,8 @@ export function FollowingFeedContent({
             return;
         }
 
+        clearPullSettleTimers();
+        setIsPullSettling(false);
         const touch = event.touches[0];
         pullStartYRef.current = touch ? touch.clientY : null;
         pullDistanceRef.current = 0;
@@ -358,11 +407,12 @@ export function FollowingFeedContent({
             && !isRefreshingFeed
             && !isPullRefreshPending;
 
-        pullStartYRef.current = null;
-        pullDistanceRef.current = 0;
-        pullEligibleRef.current = false;
-
         if (shouldRefresh) {
+            clearPullSettleTimers();
+            setIsPullSettling(false);
+            pullStartYRef.current = null;
+            pullDistanceRef.current = 0;
+            pullEligibleRef.current = false;
             setIsPullRefreshPending(true);
             setPullDistance(PULL_TO_REFRESH_LOADING_PX);
             void Promise.resolve(onRefreshFeed()).finally(() => {
@@ -372,7 +422,7 @@ export function FollowingFeedContent({
             return;
         }
 
-        setPullDistance(0);
+        settlePullState();
     };
 
     const applyPendingNewItemsAndScroll = async (): Promise<void> => {
@@ -424,6 +474,7 @@ export function FollowingFeedContent({
     const showThreadLoadingFooter = Boolean(activeThread && (activeThread.isLoadingMore || (activeThread.isLoading && (Boolean(activeThread.root) || activeThread.replies.length > 0))));
     const isPullAffordanceRefreshing = isPullRefreshPending || isRefreshingFeed;
     const pullAffordanceHeight = isPullAffordanceRefreshing ? PULL_TO_REFRESH_LOADING_PX : pullDistance;
+    const isPullAffordanceActive = pullAffordanceHeight > 0 || isPullSettling;
     const pullRefreshIconRotation = Math.round((Math.min(pullDistance, PULL_TO_REFRESH_THRESHOLD_PX) / PULL_TO_REFRESH_THRESHOLD_PX) * 180);
     const threadReplyTree = useMemo(
         () => buildThreadReplyTree(activeThread?.replies ?? []),
@@ -555,8 +606,9 @@ export function FollowingFeedContent({
                             <div
                                 className="nostr-following-feed-pull-to-refresh"
                                 data-testid="following-feed-pull-to-refresh"
-                                data-active={pullAffordanceHeight > 0 ? 'true' : 'false'}
+                                data-active={isPullAffordanceActive ? 'true' : 'false'}
                                 data-refreshing={isPullAffordanceRefreshing ? 'true' : 'false'}
+                                data-settling={isPullSettling ? 'true' : 'false'}
                                 aria-live="polite"
                                 style={{ height: `${pullAffordanceHeight}px` }}
                             >

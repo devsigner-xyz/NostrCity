@@ -754,7 +754,7 @@
     min-height: 64vh;
     border: 1px solid var(--border);
     border-radius: 10px;
-    background: var(--background);
+    background: color-mix(in oklab, var(--background) 95%, transparent);
 }
 
 .nostr-easter-egg-text {
@@ -1323,10 +1323,7 @@
     pointer-events: auto;
     display: block;
     padding: 0;
-    background:
-        radial-gradient(1200px 400px at 10% -10%, rgba(84, 145, 176, 0.22), transparent 68%),
-        radial-gradient(900px 300px at 95% 0%, rgba(118, 152, 189, 0.18), transparent 62%),
-        linear-gradient(180deg, rgba(245, 250, 253, 0.98), rgba(237, 245, 250, 0.98));
+    background: color-mix(in oklab, var(--background) 95%, transparent);
 }
 
 .nostr-routed-surface-content {
@@ -1337,7 +1334,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.55rem;
-    background: rgba(255, 255, 255, 0.72);
+    background: var(--overlay-surface);
 }
 
 .nostr-routed-surface-panel {
@@ -1381,10 +1378,7 @@
     pointer-events: auto;
     display: block;
     padding: 0;
-    background:
-        radial-gradient(1200px 400px at 10% -10%, rgba(84, 145, 176, 0.22), transparent 68%),
-        radial-gradient(900px 300px at 95% 0%, rgba(118, 152, 189, 0.18), transparent 62%),
-        linear-gradient(180deg, rgba(245, 250, 253, 0.98), rgba(237, 245, 250, 0.98));
+    background: color-mix(in oklab, var(--background) 95%, transparent);
 }
 
 .nostr-following-feed-surface-content {
@@ -1504,8 +1498,20 @@
 }
 
 .nostr-following-feed-note-shell {
-    width: min(100%, 600px);
+    width: 100%;
+    max-width: 600px;
+    min-width: 0;
     justify-self: start;
+}
+
+.nostr-following-feed-note-shell > article,
+.nostr-following-feed-note-shell [data-slot="card"],
+.nostr-rich-content-stack,
+.nostr-rich-media-grid,
+.nostr-rich-media-item,
+.nostr-rich-media-trigger {
+    max-width: 100%;
+    min-width: 0;
 }
 
 .nostr-following-feed-list-layout-masonry .nostr-following-feed-note-shell {
@@ -1593,7 +1599,7 @@
 .nostr-following-feed-copy-id {
     border: none;
     background: transparent;
-    color: #2f5e7a;
+    color: var(--primary);
     font-size: 0.7rem;
     font-weight: 600;
     cursor: pointer;
@@ -1606,7 +1612,7 @@
 
 
 .nostr-rich-inline-link {
-    color: #2b5972;
+    color: var(--primary);
     text-decoration: underline;
     text-underline-offset: 0.08em;
 }
@@ -1614,7 +1620,7 @@
 .nostr-rich-hashtag {
     border: none;
     background: transparent;
-    color: #1e637f;
+    color: var(--primary);
     font-weight: 600;
     cursor: pointer;
     padding: 0;
@@ -1627,7 +1633,7 @@
 .nostr-rich-mention {
     border: none;
     background: transparent;
-    color: #1f546d;
+    color: var(--primary);
     font-weight: 600;
     cursor: pointer;
     padding: 0;
@@ -1814,6 +1820,24 @@
 }
 
 @media (max-width: 760px) {
+    .nostr-following-feed-action-group {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        width: 100%;
+        min-width: 0;
+    }
+
+    .nostr-following-feed-action-group > * {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .nostr-following-feed-action-group [data-slot="button"] {
+        width: 100%;
+        min-width: 0;
+        padding: 0 0.34rem;
+    }
+
     .nostr-following-feed-action-button,
     .nostr-following-feed-action-indicator {
         min-width: 0;
@@ -2594,6 +2618,11 @@
 
     .nostr-following-feed-pull-to-refresh[data-active="true"] {
         display: grid;
+    }
+
+    .nostr-following-feed-pull-to-refresh[data-settling="true"] {
+        display: grid;
+        transition: height 140ms ease-out;
     }
 
     .nostr-following-feed-pull-to-refresh svg {

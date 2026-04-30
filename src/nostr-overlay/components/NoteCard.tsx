@@ -297,7 +297,7 @@ function NoteActionGroup({ actions, t }: NoteActionGroupProps) {
     ) : reactionButtonElement;
 
     return (
-        <ButtonGroup>
+        <ButtonGroup className="nostr-following-feed-action-group">
             <ReadonlyActionTooltip enabled={isReadonly} label={readonlyReason}>
                 <Button type="button" variant="ghost" size="sm" disabled={isReadonly} title={isReadonly ? readonlyReason : undefined} aria-label={t('note.actions.reply', { count: String(actions.replies) })} onClick={(event) => {
                     event.stopPropagation();
