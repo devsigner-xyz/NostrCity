@@ -154,9 +154,9 @@ function SidebarActionsMenu({
     onOpenMissions,
 }: Omit<OverlaySidebarProps, 'open' | 'onOpenChange' | 'resolvedTheme' | 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout' | 'children'> & { isReadonlySession: boolean }) {
     const { t } = useI18n();
-    const { state } = useSidebar();
+    const { state, isMobile, setOpenMobile } = useSidebar();
     const location = useLocation();
-    const collapsed = state === 'collapsed';
+    const collapsed = !isMobile && state === 'collapsed';
     const activePath = location.pathname;
 
     const activeSettingsView = useMemo<SettingsRouteView | null>(() => settingsViewFromPathname(activePath), [activePath]);
@@ -178,6 +178,17 @@ function SidebarActionsMenu({
         }
     }, [isSettingsActive]);
 
+    const closeMobileSidebar = (): void => {
+        if (isMobile) {
+            setOpenMobile(false);
+        }
+    };
+
+    const runNavigationAction = (action: () => void): void => {
+        action();
+        closeMobileSidebar();
+    };
+
     return (
         <SidebarGroup className="pt-1 pb-0">
             <SidebarMenu className={cn('nostr-panel-toolbar flex flex-col gap-1.5', collapsed && 'nostr-compact-toolbar gap-1')}>
@@ -187,7 +198,7 @@ function SidebarActionsMenu({
                             type="button"
                             aria-label={t('sidebar.openMap')}
                             title={t('sidebar.map')}
-                            onClick={onOpenMap}
+                            onClick={() => runNavigationAction(onOpenMap)}
                         >
                             <MapPinIcon />
                             <span>{t('sidebar.map')}</span>
@@ -204,7 +215,7 @@ function SidebarActionsMenu({
                                 aria-label={t('sidebar.openAgora')}
                                 aria-description={followingFeedHasUnread ? t('sidebar.unreadActivity') : undefined}
                                 title={t('sidebar.agora')}
-                                onClick={onOpenFollowingFeed}
+                                onClick={() => runNavigationAction(onOpenFollowingFeed)}
                             >
                                 <UsersIcon />
                                 <span>{t('sidebar.agora')}</span>
@@ -221,7 +232,7 @@ function SidebarActionsMenu({
                                 type="button"
                                 aria-label={t('sidebar.openArticles')}
                                 title={t('sidebar.articles')}
-                                onClick={onOpenArticles}
+                                onClick={() => runNavigationAction(onOpenArticles)}
                             >
                                 <NewspaperIcon />
                                 <span>{t('sidebar.articles')}</span>
@@ -239,7 +250,7 @@ function SidebarActionsMenu({
                                     aria-label={t('sidebar.openPublish')}
                                     title={isReadonlySession ? readonlyReason : t('sidebar.publish')}
                                     disabled={isReadonlySession}
-                                    onClick={onOpenPublish}
+                                    onClick={() => runNavigationAction(onOpenPublish)}
                                 >
                                     <PenSquareIcon />
                                     <span>{t('sidebar.publish')}</span>
@@ -260,7 +271,7 @@ function SidebarActionsMenu({
                                     aria-description={chatHasUnread ? t('sidebar.unreadMessages') : undefined}
                                     title={isReadonlySession ? readonlyReason : t('sidebar.openChats')}
                                     disabled={isReadonlySession}
-                                    onClick={onOpenChat}
+                                    onClick={() => runNavigationAction(onOpenChat)}
                                 >
                                     <MessageCircleIcon />
                                     <span>{t('sidebar.chats')}</span>
@@ -277,7 +288,7 @@ function SidebarActionsMenu({
                             type="button"
                             aria-label={t('sidebar.openRelays')}
                             title={relaysBadgeTitle}
-                            onClick={onOpenRelays}
+                            onClick={() => runNavigationAction(onOpenRelays)}
                         >
                             <RadioTowerIcon />
                             <span>{t('sidebar.relays')}</span>
@@ -301,7 +312,7 @@ function SidebarActionsMenu({
                                     aria-description={notificationsHasUnread ? t('sidebar.unreadPending') : undefined}
                                     title={isReadonlySession ? readonlyReason : t('sidebar.notifications')}
                                     disabled={isReadonlySession}
-                                    onClick={onOpenNotifications}
+                                    onClick={() => runNavigationAction(onOpenNotifications)}
                                 >
                                     <BellIcon />
                                     <span>{t('sidebar.notifications')}</span>
@@ -318,7 +329,7 @@ function SidebarActionsMenu({
                             type="button"
                             aria-label={t('sidebar.openUserSearch')}
                             title={t('sidebar.userSearch')}
-                            onClick={onOpenGlobalSearch}
+                            onClick={() => runNavigationAction(onOpenGlobalSearch)}
                         >
                             <SearchIcon />
                             <span>{t('sidebar.userSearch')}</span>
@@ -332,7 +343,7 @@ function SidebarActionsMenu({
                             type="button"
                             aria-label={t('sidebar.openCityStats')}
                             title={t('sidebar.cityStatsTitle')}
-                            onClick={onOpenCityStats}
+                            onClick={() => runNavigationAction(onOpenCityStats)}
                         >
                             <ChartColumnIcon />
                             <span>{t('sidebar.cityStats')}</span>
@@ -346,7 +357,7 @@ function SidebarActionsMenu({
                             type="button"
                             aria-label={t('sidebar.openDiscover')}
                             title={t('sidebar.discover')}
-                            onClick={onOpenMissions}
+                            onClick={() => runNavigationAction(onOpenMissions)}
                         >
                             <CompassIcon />
                             <span>{t('sidebar.discover')}</span>
@@ -365,7 +376,7 @@ function SidebarActionsMenu({
                                 aria-label={t('sidebar.openWallet')}
                                 title={isReadonlySession ? readonlyReason : t('sidebar.wallet')}
                                 disabled={isReadonlySession}
-                                onClick={onOpenWallet}
+                                onClick={() => runNavigationAction(onOpenWallet)}
                             >
                                 <WalletIcon />
                                 <span>{t('sidebar.wallet')}</span>
@@ -385,7 +396,7 @@ function SidebarActionsMenu({
                             title={t('sidebar.settings')}
                             onClick={() => {
                                 if (collapsed) {
-                                    onOpenSettings('ui');
+                                    runNavigationAction(() => onOpenSettings('ui'));
                                     return;
                                 }
 
@@ -405,35 +416,35 @@ function SidebarActionsMenu({
                         <SidebarMenuSub>
                             <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={isUiSettingsOpen}>
-                                <button type="button" aria-label={t('sidebar.settingsUi')} onClick={() => onOpenSettings('ui')}>
+                                <button type="button" aria-label={t('sidebar.settingsUi')} onClick={() => runNavigationAction(() => onOpenSettings('ui'))}>
                                     <span>{t('sidebar.ui')}</span>
                                 </button>
                             </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={activeSettingsView === 'zaps'}>
-                                <button type="button" aria-label={t('sidebar.settingsZaps')} onClick={() => onOpenSettings('zaps')}>
+                                <button type="button" aria-label={t('sidebar.settingsZaps')} onClick={() => runNavigationAction(() => onOpenSettings('zaps'))}>
                                     <span>{t('sidebar.zaps')}</span>
                                 </button>
                             </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={activeSettingsView === 'shortcuts'}>
-                                <button type="button" aria-label={t('sidebar.settingsShortcuts')} onClick={() => onOpenSettings('shortcuts')}>
+                                <button type="button" aria-label={t('sidebar.settingsShortcuts')} onClick={() => runNavigationAction(() => onOpenSettings('shortcuts'))}>
                                     <span>{t('sidebar.shortcuts')}</span>
                                 </button>
                             </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={activeSettingsView === 'about'}>
-                                <button type="button" aria-label={t('sidebar.settingsAbout')} onClick={() => onOpenSettings('about')}>
+                                <button type="button" aria-label={t('sidebar.settingsAbout')} onClick={() => runNavigationAction(() => onOpenSettings('about'))}>
                                     <span>{t('sidebar.about')}</span>
                                 </button>
                             </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={activeSettingsView === 'advanced'}>
-                                <button type="button" aria-label={t('sidebar.settingsAdvanced')} onClick={() => onOpenSettings('advanced')}>
+                                <button type="button" aria-label={t('sidebar.settingsAdvanced')} onClick={() => runNavigationAction(() => onOpenSettings('advanced'))}>
                                     <span>{t('sidebar.advanced')}</span>
                                 </button>
                             </SidebarMenuSubButton>
@@ -447,8 +458,8 @@ function SidebarActionsMenu({
 
 function SidebarPlatformHeader({ resolvedTheme }: { resolvedTheme: ResolvedOverlayTheme }) {
     const { t } = useI18n();
-    const { state } = useSidebar();
-    const collapsed = state === 'collapsed';
+    const { state, isMobile } = useSidebar();
+    const collapsed = !isMobile && state === 'collapsed';
     const platformLogoSrc = resolvedTheme === 'dark' ? '/icon-dark-48x48.png' : '/icon-light-48x48.png';
 
     return (
@@ -456,8 +467,8 @@ function SidebarPlatformHeader({ resolvedTheme }: { resolvedTheme: ResolvedOverl
             {!collapsed ? (
                 <SidebarTrigger
                     className="absolute top-2 right-2 z-10"
-                    aria-label={t('sidebar.hidePanel')}
-                    title={t('sidebar.hidePanel')}
+                    aria-label={isMobile ? t('sidebar.closeNavigation') : t('sidebar.hidePanel')}
+                    title={isMobile ? t('sidebar.closeNavigation') : t('sidebar.hidePanel')}
                 />
             ) : null}
             <SidebarMenu>
@@ -484,9 +495,9 @@ function SidebarPlatformHeader({ resolvedTheme }: { resolvedTheme: ResolvedOverl
 
 function SidebarCollapsedTrigger() {
     const { t } = useI18n();
-    const { state } = useSidebar();
+    const { state, isMobile } = useSidebar();
 
-    if (state !== 'collapsed') {
+    if (isMobile || state !== 'collapsed') {
         return null;
     }
 
@@ -497,6 +508,23 @@ function SidebarCollapsedTrigger() {
                 title={t('sidebar.showPanel')}
             />
         </div>
+    );
+}
+
+function MobileSidebarTrigger() {
+    const { t } = useI18n();
+    const { isMobile, openMobile } = useSidebar();
+
+    if (!isMobile || openMobile) {
+        return null;
+    }
+
+    return (
+        <SidebarTrigger
+            className="nostr-mobile-sidebar-trigger md:hidden"
+            aria-label={t('sidebar.openNavigation')}
+            title={t('sidebar.openNavigation')}
+        />
     );
 }
 
@@ -511,7 +539,7 @@ function SidebarUserMenu({
     onLogout,
 }: Pick<OverlaySidebarProps, 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onOpenProfileEditor' | 'onLogout'>) {
     const { t } = useI18n();
-    const { isMobile } = useSidebar();
+    const { isMobile, setOpenMobile } = useSidebar();
     const resolvedOwnerPubkey = ownerPubkey ?? authSession?.pubkey;
     const isReadonlySession = Boolean(authSession?.readonly);
     const readonlyReason = t('auth.readOnlySignInRequired');
@@ -534,6 +562,12 @@ function SidebarUserMenu({
     const ownerLabel = ownerNpub
         ? `${ownerNpub.slice(0, 14)}...${ownerNpub.slice(-6)}`
         : shortPubkey;
+
+    const closeMobileSidebar = (): void => {
+        if (isMobile) {
+            setOpenMobile(false);
+        }
+    };
 
     return (
         <SidebarMenu className="mt-1 border-t border-sidebar-border/60 pt-2">
@@ -580,6 +614,7 @@ function SidebarUserMenu({
                                     event.preventDefault();
                                     return;
                                 }
+                                closeMobileSidebar();
                                 onOpenProfileEditor?.();
                             }}
                         >
@@ -588,6 +623,7 @@ function SidebarUserMenu({
                         </DropdownMenuItem>
                         {ownerPubkey ? (
                             <DropdownMenuItem onSelect={() => {
+                                closeMobileSidebar();
                                 onLocateOwner?.();
                             }}>
                                 <MapPinIcon />
@@ -596,6 +632,7 @@ function SidebarUserMenu({
                         ) : null}
                         {ownerPubkey ? (
                             <DropdownMenuItem onSelect={() => {
+                                closeMobileSidebar();
                                 onViewOwnerDetails?.();
                             }}>
                                 <SearchIcon />
@@ -608,6 +645,7 @@ function SidebarUserMenu({
                                 <DropdownMenuItem
                                     variant="destructive"
                                     onSelect={() => {
+                                        closeMobileSidebar();
                                         void onLogout?.();
                                     }}
                                 >
@@ -624,9 +662,9 @@ function SidebarUserMenu({
 }
 
 function SidebarSocialContent({ children }: { children: ReactNode }) {
-    const { state } = useSidebar();
+    const { state, isMobile } = useSidebar();
 
-    if (state === 'collapsed') {
+    if (!isMobile && state === 'collapsed') {
         return null;
     }
 
@@ -671,6 +709,7 @@ export function OverlaySidebar({
     onOpenMissions,
     children,
 }: OverlaySidebarProps) {
+    const { t } = useI18n();
     const providerStyle = useMemo(() => ({
         '--sidebar-width': `${OVERLAY_SIDEBAR_EXPANDED_WIDTH}px`,
         '--sidebar-width-icon': `${OVERLAY_SIDEBAR_COLLAPSED_WIDTH}px`,
@@ -678,7 +717,12 @@ export function OverlaySidebar({
 
     return (
         <SidebarProvider open={open} onOpenChange={onOpenChange} style={providerStyle}>
-            <Sidebar collapsible="icon">
+            <MobileSidebarTrigger />
+            <Sidebar
+                collapsible="icon"
+                mobileTitle={t('sidebar.navigationTitle')}
+                mobileDescription={t('sidebar.navigationDescription')}
+            >
                 <SidebarPlatformHeader resolvedTheme={resolvedTheme} />
                 <SidebarCollapsedTrigger />
                 <SidebarContent>

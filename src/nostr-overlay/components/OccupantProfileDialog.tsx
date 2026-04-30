@@ -662,10 +662,6 @@ export function OccupantProfileDialog({
             <DialogContent
                 className="nostr-dialog nostr-profile-dialog"
                 showCloseButton={false}
-                style={{
-                    width: '640px',
-                    maxWidth: 'calc(100vw - 32px)',
-                }}
                 aria-label={t('profile.dialog.aria')}
             >
                 <DialogTitle className="sr-only">{t('profile.dialog.title')}</DialogTitle>

@@ -25,6 +25,37 @@
     }
 }
 
+@media (max-width: 767px) {
+    .nostr-overlay-shell,
+    .nostr-overlay-shell [data-slot="sidebar-wrapper"] {
+        pointer-events: none;
+    }
+
+    .nostr-mobile-sidebar-trigger,
+    .nostr-map-zoom-controls,
+    .nostr-map-display-controls,
+    .nostr-routed-surface,
+    .nostr-following-feed-surface,
+    .nostr-dialog,
+    .nostr-login-screen {
+        pointer-events: auto;
+    }
+}
+
+.nostr-mobile-sidebar-trigger {
+    position: fixed;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
+    z-index: 6;
+    min-width: 44px;
+    min-height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    color: var(--foreground);
+    box-shadow: 0 12px 24px color-mix(in oklab, var(--foreground) 14%, transparent);
+}
+
 .nostr-panel-toolbar-status {
     min-height: 1.15rem;
     display: flex;
@@ -76,13 +107,9 @@
     justify-content: center;
 }
 
-.nostr-login-cover-wrap {
-    display: flex;
-    justify-content: center;
-}
-
 .nostr-login-cover {
-    max-width: 400px;
+    width: min(100%, 400px);
+    max-height: min(28vh, 160px);
     height: auto;
     object-fit: contain;
     display: block;
@@ -212,9 +239,7 @@
 }
 
 .nostr-map-zoom-button:hover,
-.nostr-map-regenerate-button:hover,
-.nostr-map-display-toggle-button:hover,
-.nostr-map-theme-toggle-button:hover {
+.nostr-map-options-button:hover {
     background: var(--muted);
     color: var(--foreground);
 }
@@ -240,7 +265,7 @@
     background: transparent;
 }
 
-.nostr-map-regenerate-button {
+.nostr-map-options-button {
     width: 38px;
     height: 38px;
     border-radius: 999px;
@@ -257,69 +282,12 @@
     z-index: 6;
 }
 
-.nostr-map-display-toggle-group {
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--background) 92%, transparent);
-    color: var(--foreground);
-    box-shadow: 0 12px 24px color-mix(in oklab, var(--foreground) 14%, transparent);
-    min-height: 38px;
-    padding: 0.2rem;
-}
-
-.nostr-map-theme-toggle-group {
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--background) 92%, transparent);
-    color: var(--foreground);
-    box-shadow: 0 12px 24px color-mix(in oklab, var(--foreground) 14%, transparent);
-    min-height: 38px;
-    padding: 0.2rem;
-}
-
-.nostr-map-display-toggle-group [data-slot="toggle-group-item"],
-.nostr-map-theme-toggle-group [data-slot="toggle-group-item"] {
-    border-radius: 999px;
-}
-
-.nostr-map-display-toggle-button,
-.nostr-map-theme-toggle-button {
-    width: 30px;
-    min-width: 30px;
-    height: 30px;
-    border-color: transparent;
-    color: var(--foreground);
-    padding: 0;
-}
-
-.nostr-map-display-toggle-button[data-state="on"] {
-    border-color: transparent;
-    background: var(--primary);
-    color: var(--primary-foreground);
-}
-
-.nostr-map-theme-toggle-button[data-state="on"] {
-    border-color: transparent;
-    background: var(--primary);
-    color: var(--primary-foreground);
-}
-
 .dark .nostr-map-zoom-group {
     background: color-mix(in oklab, var(--background) 92%, transparent);
     box-shadow: 0 14px 28px color-mix(in oklab, black 42%, transparent);
 }
 
-.dark .nostr-map-regenerate-button {
-    background: color-mix(in oklab, var(--background) 92%, transparent);
-    box-shadow: 0 14px 28px color-mix(in oklab, black 42%, transparent);
-}
-
-.dark .nostr-map-display-toggle-group {
-    background: color-mix(in oklab, var(--background) 92%, transparent);
-    box-shadow: 0 14px 28px color-mix(in oklab, black 42%, transparent);
-}
-
-.dark .nostr-map-theme-toggle-group {
+.dark .nostr-map-options-button {
     background: color-mix(in oklab, var(--background) 92%, transparent);
     box-shadow: 0 14px 28px color-mix(in oklab, black 42%, transparent);
 }
@@ -1430,6 +1398,7 @@
 }
 
 .nostr-following-feed-page {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -1509,6 +1478,15 @@
 .nostr-following-feed-list {
     width: 100%;
     max-width: none;
+    overscroll-behavior-y: contain;
+}
+
+.nostr-following-feed-pull-to-refresh {
+    display: none;
+}
+
+.nostr-following-feed-mobile-new-notes {
+    display: none;
 }
 
 .nostr-following-feed-items {
@@ -2563,13 +2541,97 @@
     }
 
     .nostr-map-display-controls {
-        left: 12px;
+        left: auto;
+        right: 12px;
         bottom: 12px;
     }
 
     .nostr-map-zoom-controls {
         right: 12px;
         bottom: 12px;
+    }
+}
+
+@media (max-width: 767px) {
+    .nostr-map-zoom-button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .nostr-map-options-button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .nostr-map-zoom-group {
+        min-height: 52px;
+    }
+
+    .nostr-map-zoom-group {
+        display: none;
+    }
+
+    .nostr-map-display-controls {
+        left: auto;
+        right: max(12px, env(safe-area-inset-right));
+        bottom: max(12px, env(safe-area-inset-bottom));
+    }
+
+    .nostr-following-feed-pull-to-refresh {
+        display: none;
+        place-items: center;
+        grid-template-columns: auto auto;
+        justify-content: center;
+        align-items: center;
+        gap: 0.4rem;
+        min-height: 0;
+        overflow: hidden;
+        color: var(--muted-foreground);
+        font-size: 0.78rem;
+        font-weight: 600;
+        will-change: height;
+    }
+
+    .nostr-following-feed-pull-to-refresh[data-active="true"] {
+        display: grid;
+    }
+
+    .nostr-following-feed-pull-to-refresh svg {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .nostr-following-feed-mobile-new-notes {
+        position: absolute;
+        left: 50%;
+        bottom: max(48px, calc(env(safe-area-inset-bottom) + 48px));
+        z-index: 8;
+        display: inline-flex;
+        transform: translateX(-50%);
+        border-radius: 999px;
+        box-shadow: 0 14px 28px color-mix(in oklab, var(--foreground) 18%, transparent);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .nostr-following-feed-pull-to-refresh,
+        .nostr-following-feed-mobile-new-notes {
+            transition: none;
+        }
+    }
+
+    .nostr-profile-dialog {
+        width: 100vw;
+        max-width: none;
+        height: 100dvh;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+
+    .nostr-profile-dialog-body {
+        height: 100dvh;
+        max-height: 100dvh;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
     }
 }
 

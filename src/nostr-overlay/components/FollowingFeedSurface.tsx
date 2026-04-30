@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { RefreshCwIcon } from 'lucide-react';
 import type { AgoraFeedLayout } from '../../nostr/ui-settings';
 import { FollowingFeedContent, type FollowingFeedViewProps } from './FollowingFeedContent';
@@ -12,12 +13,15 @@ interface FollowingFeedSurfaceProps extends FollowingFeedViewProps {
     onAgoraFeedLayoutChange?: (layout: AgoraFeedLayout) => void;
     activeHashtag?: string;
     onClearHashtag?: () => void;
+    isMobile?: boolean;
 }
 
 const AGORA_LAYOUT_TOGGLE_ITEM_CLASS = 'data-[state=on]:border-primary! data-[state=on]:bg-primary! data-[state=on]:text-primary-foreground! data-[state=on]:hover:bg-primary/90!';
+const FEED_REFRESH_COOLDOWN_MS = 15_000;
 
 export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayoutChange, activeHashtag, onClearHashtag, ...feedProps }: FollowingFeedSurfaceProps) {
     const { t } = useI18n();
+    const lastRefreshAtRef = useRef(Number.NEGATIVE_INFINITY);
     const headerSubtitle = activeHashtag
         ? t('feed.subtitle.hashtag', { hashtag: activeHashtag })
         : t('feed.subtitle.following');
@@ -25,6 +29,15 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
     const pendingItemsLabel = feedProps.pendingNewCount === 1
         ? t('feed.newPosts.one')
         : t('feed.newPosts.many', { count: feedProps.pendingNewCount });
+    const onRefreshFeedWithCooldown = (): Promise<void> | void => {
+        const now = Date.now();
+        if (now - lastRefreshAtRef.current < FEED_REFRESH_COOLDOWN_MS) {
+            return;
+        }
+
+        lastRefreshAtRef.current = now;
+        return feedProps.onRefreshFeed();
+    };
 
     const headerActions = showFeedHeaderActions
         ? (
@@ -50,13 +63,13 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
                         </ToggleGroupItem>
                     </ToggleGroup>
                 ) : null}
-                {feedProps.hasPendingNewItems ? (
+                {feedProps.hasPendingNewItems && !feedProps.isMobile ? (
                     <Button type="button" size="sm" onClick={feedProps.onApplyPendingNewItems}>
                         {pendingItemsLabel}
                     </Button>
                 ) : null}
-                <Button type="button" variant="outline" size="sm" onClick={() => {
-                    void feedProps.onRefreshFeed();
+                <Button type="button" variant="outline" size="sm" className={feedProps.isMobile ? 'sr-only focus:not-sr-only focus:absolute focus:right-3 focus:top-3 focus:z-20' : undefined} onClick={() => {
+                    void onRefreshFeedWithCooldown();
                 }} disabled={feedProps.isRefreshingFeed}>
                     {feedProps.isRefreshingFeed ? (
                         <>
@@ -84,6 +97,7 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
             <div className="flex min-h-0 flex-1 flex-col">
                 <FollowingFeedContent
                     {...feedProps}
+                    onRefreshFeed={onRefreshFeedWithCooldown}
                     agoraFeedLayout={agoraFeedLayout}
                     {...(activeHashtag ? { activeHashtag } : {})}
                     className="nostr-following-feed-surface-content nostr-following-feed-page nostr-routed-surface-panel nostr-page-layout"

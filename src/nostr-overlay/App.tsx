@@ -1050,6 +1050,7 @@ export function App({ mapBridge, services }: AppProps) {
                     sessionRestorationResolved={sessionRestorationResolved}
                     locationSearch={location.search}
                     agora={{
+                        isMobile,
                         agoraFeedLayout: uiSettings.agoraFeedLayout,
                         onAgoraFeedLayoutChange: setAgoraFeedLayout,
                         followingFeed: {

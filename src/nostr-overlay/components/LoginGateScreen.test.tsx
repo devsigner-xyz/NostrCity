@@ -1,9 +1,13 @@
 import { act } from 'react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { UI_SETTINGS_STORAGE_KEY } from '../../nostr/ui-settings';
 import { LoginGateScreen } from './LoginGateScreen';
 import type { AuthSessionState } from '../../nostr/auth/session';
+
+const overlayStyles = readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
 
 interface RenderResult {
     container: HTMLDivElement;
@@ -136,9 +140,11 @@ describe('LoginGateScreen', () => {
         const logo = rendered.container.querySelector('img.nostr-login-cover') as HTMLImageElement | null;
 
         expect(content?.className).toContain('gap-4');
+        expect(rendered.container.querySelector('.nostr-login-cover-wrap')).toBeNull();
+        expect(logo?.parentElement).toBe(content);
         expect(logo?.className).toContain('h-auto');
-        expect(logo?.className).toContain('w-auto');
         expect(logo?.className).toContain('max-w-full');
+        expect(overlayStyles).toMatch(/\.nostr-login-cover\s*\{[^}]*width:\s*min\(100%,\s*400px\);[^}]*max-height:\s*min\(28vh,\s*160px\)/s);
     });
 
     test('renders the dark logo when the overlay theme is dark', async () => {
@@ -403,8 +409,11 @@ describe('LoginGateScreen', () => {
         const rendered = await renderScreen({ restoringSession: true });
         mounted.push(rendered);
 
+        const empty = rendered.container.querySelector('[data-slot="empty"]') as HTMLElement | null;
         const content = rendered.container.textContent || '';
-        expect(rendered.container.querySelector('[data-slot="empty"]')).not.toBeNull();
+        expect(empty).not.toBeNull();
+        expect(empty?.className).toContain('min-h-36');
+        expect(empty?.className).not.toContain('min-h-48');
         expect(content).toContain('Recuperando sesión');
         expect(content).toContain('Preparando acceso...');
         expect(content).not.toContain('Restaurando sesion');

@@ -218,6 +218,18 @@ describe('OccupantProfileDialog', () => {
         expect(closeButton?.className).not.toContain('nostr-dialog-close');
     });
 
+    test('keeps profile dialog sizing in CSS so mobile fullscreen rules can apply', async () => {
+        const rendered = await renderElement(<OccupantProfileDialog {...buildProps()} />);
+        mounted.push(rendered);
+
+        const dialog = document.body.querySelector('.nostr-profile-dialog') as HTMLElement | null;
+
+        expect(dialog).not.toBeNull();
+        expect(dialog?.style.width).toBe('');
+        expect(dialog?.style.maxWidth).toBe('');
+        expect(overlayStyles).toMatch(/@media\s*\(max-width:\s*767px\)[\s\S]*\.nostr-profile-dialog\s*\{[\s\S]*width:\s*100vw;[\s\S]*height:\s*100dvh;/);
+    });
+
     test('copies the full npub when clicking the displayed npub', async () => {
         const clipboardWriteText = vi.fn().mockResolvedValue(undefined);
         Object.assign(navigator, {

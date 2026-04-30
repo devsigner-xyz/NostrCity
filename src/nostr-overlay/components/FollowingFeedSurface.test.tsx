@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, type ReactElement } from 'react';
+import { act, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -14,6 +14,23 @@ const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
 interface RenderResult {
     container: HTMLDivElement;
     root: Root;
+}
+
+interface Deferred<T> {
+    promise: Promise<T>;
+    resolve: (value: T) => void;
+    reject: (error?: unknown) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+    let resolve!: (value: T) => void;
+    let reject!: (error?: unknown) => void;
+    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+    });
+
+    return { promise, resolve, reject };
 }
 
 async function renderElement(element: ReactElement): Promise<RenderResult> {
@@ -43,6 +60,25 @@ beforeAll(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     URL.createObjectURL = vi.fn(() => 'blob:inline-preview');
     URL.revokeObjectURL = vi.fn();
+
+    if (!Element.prototype.scrollIntoView) {
+        Element.prototype.scrollIntoView = () => {};
+    }
+
+    Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+            matches: false,
+            media: query,
+            onchange: null,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        })),
+    });
 });
 
 afterEach(async () => {
@@ -102,6 +138,36 @@ function buildProps(overrides: Partial<Parameters<typeof FollowingFeedSurface>[0
         onClearHashtag: () => {},
         ...overrides,
     };
+}
+
+function createFeedNote(id: string, content = 'hola agora'): Parameters<typeof FollowingFeedSurface>[0]['items'][number] {
+    return {
+        id,
+        pubkey: 'a'.repeat(64),
+        createdAt: 100,
+        content,
+        kind: 'note',
+        rawEvent: {
+            id,
+            pubkey: 'a'.repeat(64),
+            kind: 1,
+            created_at: 100,
+            tags: [],
+            content,
+        },
+    };
+}
+
+function dispatchTouch(target: Element, type: 'touchstart' | 'touchmove' | 'touchend', clientY: number): void {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'touches', {
+        value: type === 'touchend' ? [] : [{ clientY }],
+    });
+    Object.defineProperty(event, 'changedTouches', {
+        value: [{ clientY }],
+    });
+
+    target.dispatchEvent(event);
 }
 
 describe('FollowingFeedSurface', () => {
@@ -238,6 +304,144 @@ describe('FollowingFeedSurface', () => {
         expect(onApplyPendingNewItems).toHaveBeenCalledTimes(1);
     });
 
+    test('mobile renders a floating localized new-notes button instead of the header CTA', async () => {
+        const onApplyPendingNewItems = vi.fn();
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    pendingNewCount: 2,
+                    hasPendingNewItems: true,
+                    onApplyPendingNewItems,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const floatingButton = rendered.container.querySelector('[data-testid="following-feed-mobile-new-notes"]') as HTMLButtonElement | null;
+        expect(floatingButton).not.toBeNull();
+        expect(floatingButton?.textContent || '').toContain('Ver 2 notas nuevas');
+        expect(floatingButton?.className).toContain('nostr-following-feed-mobile-new-notes');
+
+        const headerActions = rendered.container.querySelector('.nostr-following-feed-header-actions') as HTMLDivElement;
+        expect(headerActions.textContent || '').not.toContain('Ver 2 notas nuevas');
+    });
+
+    test('mobile floating new-notes button applies notes, hides, and focuses the first inserted note', async () => {
+        const onApplyPendingNewItems = vi.fn();
+        const scrollIntoViewSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
+
+        function Harness() {
+            const [items, setItems] = useState([createFeedNote('old-note', 'nota vieja')]);
+            const [hasPendingNewItems, setHasPendingNewItems] = useState(true);
+
+            return (
+                <FollowingFeedSurface
+                    {...buildProps({
+                        isMobile: true,
+                        items,
+                        pendingNewCount: 1,
+                        hasPendingNewItems,
+                        onApplyPendingNewItems: () => {
+                            onApplyPendingNewItems();
+                            setItems([createFeedNote('new-note', 'nota nueva'), ...items]);
+                            setHasPendingNewItems(false);
+                        },
+                    })}
+                />
+            );
+        }
+
+        try {
+            const rendered = await renderElement(<Harness />);
+            mounted.push(rendered);
+
+            const floatingButton = rendered.container.querySelector('[data-testid="following-feed-mobile-new-notes"]') as HTMLButtonElement;
+            expect(floatingButton).toBeDefined();
+
+            await act(async () => {
+                floatingButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            });
+
+            expect(onApplyPendingNewItems).toHaveBeenCalledTimes(1);
+            expect(rendered.container.querySelector('[data-testid="following-feed-mobile-new-notes"]')).toBeNull();
+            const firstNewNote = rendered.container.querySelector('[data-feed-note-id="new-note"]') as HTMLElement | null;
+            expect(firstNewNote).not.toBeNull();
+            expect(document.activeElement).toBe(firstNewNote);
+            expect(scrollIntoViewSpy).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' });
+        } finally {
+            scrollIntoViewSpy.mockRestore();
+        }
+    });
+
+    test('mobile floating new-notes button uses localized singular english copy', async () => {
+        window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
+
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    pendingNewCount: 1,
+                    hasPendingNewItems: true,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const floatingButton = rendered.container.querySelector('[data-testid="following-feed-mobile-new-notes"]') as HTMLButtonElement | null;
+        expect(floatingButton).not.toBeNull();
+        expect(floatingButton?.textContent || '').toContain('View 1 new note');
+    });
+
+    test('mobile new-notes scroll respects reduced-motion preference', async () => {
+        const scrollIntoViewSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
+        const matchMediaSpy = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+            matches: query === '(prefers-reduced-motion: reduce)',
+            media: query,
+            onchange: null,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        }));
+
+        function Harness() {
+            const [items, setItems] = useState([createFeedNote('old-note', 'nota vieja')]);
+            const [hasPendingNewItems, setHasPendingNewItems] = useState(true);
+
+            return (
+                <FollowingFeedSurface
+                    {...buildProps({
+                        isMobile: true,
+                        items,
+                        pendingNewCount: 1,
+                        hasPendingNewItems,
+                        onApplyPendingNewItems: () => {
+                            setItems([createFeedNote('new-note', 'nota nueva'), ...items]);
+                            setHasPendingNewItems(false);
+                        },
+                    })}
+                />
+            );
+        }
+
+        try {
+            const rendered = await renderElement(<Harness />);
+            mounted.push(rendered);
+
+            const floatingButton = rendered.container.querySelector('[data-testid="following-feed-mobile-new-notes"]') as HTMLButtonElement;
+            await act(async () => {
+                floatingButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            });
+
+            expect(scrollIntoViewSpy).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' });
+        } finally {
+            scrollIntoViewSpy.mockRestore();
+            matchMediaSpy.mockRestore();
+        }
+    });
+
     test('renders empty feed copy in english when ui language is en', async () => {
         window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
 
@@ -277,6 +481,249 @@ describe('FollowingFeedSurface', () => {
         });
 
         expect(onRefreshFeed).toHaveBeenCalledTimes(1);
+    });
+
+    test('manual refresh ignores repeated clicks during the shared cooldown', async () => {
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+        const onRefreshFeed = vi.fn(async () => {});
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    onRefreshFeed,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const refreshButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            (button.textContent || '').trim() === 'Actualizar'
+        ) as HTMLButtonElement;
+
+        try {
+            await act(async () => {
+                refreshButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            });
+            nowSpy.mockReturnValue(114_999);
+            await act(async () => {
+                refreshButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            });
+            nowSpy.mockReturnValue(115_000);
+            await act(async () => {
+                refreshButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            });
+
+            expect(onRefreshFeed).toHaveBeenCalledTimes(2);
+        } finally {
+            nowSpy.mockRestore();
+        }
+    });
+
+    test('mobile hides the visible header refresh button and keeps a screen-reader refresh action', async () => {
+        const onRefreshFeed = vi.fn(async () => {});
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    onRefreshFeed,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const refreshButtons = Array.from(rendered.container.querySelectorAll('button')).filter((button) =>
+            (button.textContent || '').trim() === 'Actualizar'
+        ) as HTMLButtonElement[];
+        expect(refreshButtons).toHaveLength(1);
+        expect(refreshButtons[0]?.className).toContain('sr-only');
+        expect(refreshButtons[0]?.className).toContain('focus:not-sr-only');
+
+        await act(async () => {
+            refreshButtons[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onRefreshFeed).toHaveBeenCalledTimes(1);
+    });
+
+    test('mobile pull-to-refresh at the top calls the refresh handler', async () => {
+        const onRefreshFeed = vi.fn(async () => {});
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    items: [createFeedNote('note-1')],
+                    onRefreshFeed,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const pullAffordance = rendered.container.querySelector('[data-testid="following-feed-pull-to-refresh"]') as HTMLElement | null;
+        expect(pullAffordance).not.toBeNull();
+        expect(pullAffordance?.textContent || '').toContain('Actualizar');
+        expect(pullAffordance?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+
+        const feedList = rendered.container.querySelector('[data-testid="following-feed-list"]') as HTMLDivElement;
+        const firstNote = rendered.container.querySelector('[data-feed-note-id="note-1"]') as HTMLDivElement;
+        Object.defineProperty(feedList, 'scrollTop', { configurable: true, value: 0 });
+
+        await act(async () => {
+            dispatchTouch(firstNote, 'touchstart', 20);
+            dispatchTouch(firstNote, 'touchmove', 105);
+        });
+
+        expect(pullAffordance?.style.height).toBe('72px');
+
+        await act(async () => {
+            dispatchTouch(firstNote, 'touchend', 105);
+        });
+
+        expect(onRefreshFeed).toHaveBeenCalledTimes(1);
+    });
+
+    test('mobile pull-to-refresh shares the manual refresh cooldown', async () => {
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+        const onRefreshFeed = vi.fn(async () => {});
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    items: [createFeedNote('note-1')],
+                    onRefreshFeed,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const refreshButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            (button.textContent || '').trim() === 'Actualizar'
+        ) as HTMLButtonElement;
+        const feedList = rendered.container.querySelector('[data-testid="following-feed-list"]') as HTMLDivElement;
+        const firstNote = rendered.container.querySelector('[data-feed-note-id="note-1"]') as HTMLDivElement;
+        Object.defineProperty(feedList, 'scrollTop', { configurable: true, value: 0 });
+
+        try {
+            await act(async () => {
+                refreshButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            });
+            nowSpy.mockReturnValue(114_999);
+            await act(async () => {
+                dispatchTouch(firstNote, 'touchstart', 20);
+                dispatchTouch(firstNote, 'touchmove', 105);
+                dispatchTouch(firstNote, 'touchend', 105);
+            });
+
+            expect(onRefreshFeed).toHaveBeenCalledTimes(1);
+        } finally {
+            nowSpy.mockRestore();
+        }
+    });
+
+    test('mobile pull-to-refresh rotates the refresh icon while pulling', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    items: [createFeedNote('note-1')],
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const feedList = rendered.container.querySelector('[data-testid="following-feed-list"]') as HTMLDivElement;
+        const firstNote = rendered.container.querySelector('[data-feed-note-id="note-1"]') as HTMLDivElement;
+        Object.defineProperty(feedList, 'scrollTop', { configurable: true, value: 0 });
+
+        await act(async () => {
+            dispatchTouch(firstNote, 'touchstart', 20);
+            dispatchTouch(firstNote, 'touchmove', 76);
+        });
+
+        const pullAffordance = rendered.container.querySelector('[data-testid="following-feed-pull-to-refresh"]') as HTMLElement | null;
+        const refreshIcon = pullAffordance?.querySelector('[data-testid="following-feed-pull-refresh-icon"]') as SVGElement | null;
+        expect(refreshIcon).not.toBeNull();
+        expect(refreshIcon?.style.transform).toBe('rotate(140deg)');
+    });
+
+    test('mobile pull-to-refresh shows a loading spinner in the pull area while refresh is pending', async () => {
+        const deferredRefresh = createDeferred<void>();
+        const onRefreshFeed = vi.fn(() => deferredRefresh.promise);
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    items: [createFeedNote('note-1')],
+                    onRefreshFeed,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const feedList = rendered.container.querySelector('[data-testid="following-feed-list"]') as HTMLDivElement;
+        const firstNote = rendered.container.querySelector('[data-feed-note-id="note-1"]') as HTMLDivElement;
+        Object.defineProperty(feedList, 'scrollTop', { configurable: true, value: 0 });
+
+        await act(async () => {
+            dispatchTouch(firstNote, 'touchstart', 20);
+            dispatchTouch(firstNote, 'touchmove', 105);
+            dispatchTouch(firstNote, 'touchend', 105);
+        });
+
+        const pullAffordance = rendered.container.querySelector('[data-testid="following-feed-pull-to-refresh"]') as HTMLElement | null;
+        expect(onRefreshFeed).toHaveBeenCalledTimes(1);
+        expect(pullAffordance?.getAttribute('data-refreshing')).toBe('true');
+        expect(pullAffordance?.style.height).toBe('56px');
+        expect(pullAffordance?.querySelector('svg[aria-label="Loading"]')).not.toBeNull();
+        expect(pullAffordance?.textContent || '').toContain('Sincronizando relays');
+        expect(pullAffordance?.textContent || '').not.toContain('Desliza hacia abajo para actualizar');
+
+        await act(async () => {
+            deferredRefresh.resolve(undefined);
+            await deferredRefresh.promise;
+        });
+
+        expect(pullAffordance?.getAttribute('data-refreshing')).toBe('false');
+        expect(pullAffordance?.style.height).toBe('0px');
+    });
+
+    test('mobile pull-to-refresh affordance does not reserve space before pulling', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    items: [createFeedNote('note-1')],
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const pullAffordance = rendered.container.querySelector('[data-testid="following-feed-pull-to-refresh"]') as HTMLElement | null;
+        expect(pullAffordance).not.toBeNull();
+        expect(pullAffordance?.style.height).toBe('0px');
+    });
+
+    test('mobile pull-to-refresh does not run while the feed is scrolled away from the top', async () => {
+        const onRefreshFeed = vi.fn(async () => {});
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    items: [createFeedNote('note-1')],
+                    onRefreshFeed,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const feedList = rendered.container.querySelector('[data-testid="following-feed-list"]') as HTMLDivElement;
+        Object.defineProperty(feedList, 'scrollTop', { configurable: true, value: 48 });
+
+        await act(async () => {
+            dispatchTouch(feedList, 'touchstart', 20);
+            dispatchTouch(feedList, 'touchmove', 120);
+            dispatchTouch(feedList, 'touchend', 120);
+        });
+
+        expect(onRefreshFeed).not.toHaveBeenCalled();
     });
 
     test('shows loading state with spinner on refresh button while feed refresh is in progress', async () => {
@@ -493,7 +940,7 @@ describe('FollowingFeedSurface', () => {
 
         expect(rendered.container.textContent || '').toContain('Sin notas');
         expect(rendered.container.textContent || '').not.toContain('Volver al mapa');
-        expect(rendered.container.textContent || '').toContain('Timeline en tiempo real de personas que sigues');
+        expect(rendered.container.textContent || '').toContain('Cronología en tiempo real de personas a las que sigues');
 
         const surfaceContent = rendered.container.querySelector('.nostr-following-feed-surface-content') as HTMLElement;
         const routedSurfaceContent = rendered.container.querySelector('[data-testid="overlay-surface-content"]') as HTMLElement;
@@ -564,6 +1011,20 @@ describe('FollowingFeedSurface', () => {
         expect(styles).not.toMatch(/@media \(min-width:\s*900px\)\s*\{\s*\.nostr-following-feed-list-layout-masonry\s*\{/s);
     });
 
+    test('positions the mobile new-notes indicator near the mobile bottom controls', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-following-feed-mobile-new-notes\s*\{[^}]*bottom:\s*max\(48px,\s*calc\(env\(safe-area-inset-bottom\) \+ 48px\)\)/s);
+        expect(styles).not.toMatch(/\.nostr-following-feed-mobile-new-notes\s*\{[^}]*76px/s);
+    });
+
+    test('does not transition pull-to-refresh height while tracking touch movement', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-following-feed-pull-to-refresh\s*\{[^}]*will-change:\s*height/s);
+        expect(styles).not.toMatch(/\.nostr-following-feed-pull-to-refresh\s*\{[^}]*transition:\s*height/s);
+    });
+
     test('keeps the loading footer outside the masonry items wrapper', async () => {
         const rendered = await renderElement(
             <FollowingFeedSurface
@@ -615,8 +1076,8 @@ describe('FollowingFeedSurface', () => {
         mounted.push(rendered);
 
         const text = rendered.container.textContent || '';
-        expect(text).toContain('No sigues a nadie todavia');
-        expect(text).toContain('Empieza a seguir perfiles para ver su actividad en Agora.');
+        expect(text).toContain('No sigues a nadie todavía');
+        expect(text).toContain('Empieza a seguir perfiles para ver su actividad en Ágora.');
     });
 
     test('renders author identity and engagement icon counters on cards', async () => {
@@ -1246,7 +1707,7 @@ describe('FollowingFeedSurface', () => {
         expect(pageHeader).toBeDefined();
         expect(header.firstElementChild).toBe(pageHeader);
         expect(headerActions).toBeDefined();
-        expect(backButton.textContent || '').toContain('Volver al Agora');
+        expect(backButton.textContent || '').toContain('Volver al Ágora');
     });
 
     test('renders centered empty loading state for initial thread load', async () => {
@@ -1276,7 +1737,7 @@ describe('FollowingFeedSurface', () => {
         const empty = centeredState.querySelector('[data-slot="empty"]') as HTMLElement;
         expect(empty).toBeDefined();
         expect(empty.textContent || '').toContain('Cargando hilo');
-        expect(empty.textContent || '').toContain('Recuperando la conversacion.');
+        expect(empty.textContent || '').toContain('Recuperando la conversación.');
         expect(empty.querySelector('[aria-label="Loading"]')).not.toBeNull();
         expect(rendered.container.textContent || '').not.toContain('Cargando hilo...');
     });

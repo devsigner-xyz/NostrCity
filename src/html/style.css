@@ -15,6 +15,7 @@ html, body {
     top:0;
     width:calc(100% - var(--nostr-map-inset-left));
     height:100%;
+    touch-action: none;
 }
 
 #map-svg {

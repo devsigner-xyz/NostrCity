@@ -6,6 +6,7 @@ import type { ZapIntentInput } from '../controllers/use-wallet-zap-controller';
 type FollowingFeedSurfaceProps = ComponentProps<typeof FollowingFeedSurface>;
 
 export interface AgoraRouteContainerProps {
+    isMobile?: boolean;
     agoraFeedLayout: UiSettingsState['agoraFeedLayout'];
     onAgoraFeedLayoutChange: (layout: UiSettingsState['agoraFeedLayout']) => void;
     followingFeed: {
@@ -61,6 +62,7 @@ export interface AgoraRouteContainerProps {
 }
 
 export function AgoraRouteContainer({
+    isMobile = false,
     agoraFeedLayout,
     onAgoraFeedLayoutChange,
     followingFeed,
@@ -86,6 +88,7 @@ export function AgoraRouteContainer({
 }: AgoraRouteContainerProps) {
     return (
         <FollowingFeedSurface
+            isMobile={isMobile}
             agoraFeedLayout={agoraFeedLayout}
             onAgoraFeedLayoutChange={onAgoraFeedLayoutChange}
             items={followingFeed.items}

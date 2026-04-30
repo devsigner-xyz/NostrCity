@@ -22,6 +22,7 @@ import type { GenerationBounds } from './ts/ui/map_generation_context';
 import { mountNostrOverlay } from './nostr-overlay/bootstrap';
 import { createLatestRequestRunner } from './ts/ui/map_generation_request_guard';
 import { createMiddlePanState, stopMiddlePanState, type MiddlePanState, updateMiddlePanState } from './ts/ui/middle_pan_drag';
+import { calculatePinchZoom, hasMovedBeyondTouchTapThreshold, midpointBetweenTouchPoints, TOUCH_LONG_PRESS_DELAY_MS } from './ts/ui/touch_map_interactions';
 import { runMapGeneration } from './ts/ui/map_generation_runner';
 import { calculateGeneratedMapCoverView } from './ts/ui/map_view_fit';
 import { createViewChangeScheduler } from './ts/ui/view_change_scheduler';
@@ -157,6 +158,7 @@ class Main {
         this.tensorField = new TensorFieldGUI(this.tensorFolder, this.dragController, true, noiseParamsPlaceholder);
         this.mainGui = new MainGUI(this.roadsFolder, this.tensorField, () => this.tensorFolder.close());
         this.bindOccupiedBuildingClick();
+        this.bindTouchMapInteractions();
 
         this.optionsFolder.add(this.tensorField, 'drawCentre');
         this.optionsFolder.add(this, 'highDPI').onChange((high: boolean) => this.changeCanvasScale(high));
@@ -745,6 +747,214 @@ class Main {
                 clientY: event.clientY,
             });
         });
+    }
+
+    private bindTouchMapInteractions(): void {
+        let touchStartPoint: Vector | null = null;
+        let lastTouchPoint: Vector | null = null;
+        let touchMoved = false;
+        let longPressFired = false;
+        let longPressTimer: number | null = null;
+        let pinchStartDistance = 0;
+        let pinchStartZoom = 1;
+        let pinchLastMidpoint: Vector | null = null;
+
+        const pointFromTouch = (touch: Touch): Vector => new Vector(touch.clientX, touch.clientY);
+        const clearLongPressTimer = (): void => {
+            if (longPressTimer !== null) {
+                window.clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        };
+        const resetTouchState = (): void => {
+            clearLongPressTimer();
+            touchStartPoint = null;
+            lastTouchPoint = null;
+            touchMoved = false;
+            longPressFired = false;
+            pinchStartDistance = 0;
+            pinchStartZoom = 1;
+            pinchLastMidpoint = null;
+        };
+        const notifyTouchClick = (screenPoint: Vector): void => {
+            if (this.showTensorField() || this.isPanModeActive()) {
+                return;
+            }
+
+            const worldPoint = this.domainController.screenToWorld(screenPoint.clone());
+            const hit = this.mainGui.getOccupiedBuildingAtWorldPoint(worldPoint);
+            if (hit) {
+                this.notifyOccupiedBuildingClick({
+                    buildingIndex: hit.index,
+                    pubkey: hit.pubkey,
+                });
+                return;
+            }
+
+            const easterEggHit = this.mainGui.getEasterEggBuildingAtWorldPoint(worldPoint);
+            if (!easterEggHit) {
+                return;
+            }
+
+            this.notifyEasterEggBuildingClick({
+                buildingIndex: easterEggHit.index,
+                easterEggId: easterEggHit.easterEggId,
+            });
+        };
+        const notifyTouchContextMenu = (screenPoint: Vector): boolean => {
+            if (this.showTensorField() || this.isPanModeActive()) {
+                return false;
+            }
+
+            const worldPoint = this.domainController.screenToWorld(screenPoint.clone());
+            const hit = this.mainGui.getOccupiedBuildingAtWorldPoint(worldPoint);
+            if (!hit) {
+                return false;
+            }
+
+            this.notifyOccupiedBuildingContextMenu({
+                buildingIndex: hit.index,
+                pubkey: hit.pubkey,
+                clientX: screenPoint.x,
+                clientY: screenPoint.y,
+            });
+            return true;
+        };
+
+        this.canvas.addEventListener('touchstart', (event: TouchEvent): void => {
+            if (this.showTensorField()) {
+                return;
+            }
+
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                if (!touch) {
+                    return;
+                }
+
+                const point = pointFromTouch(touch);
+                touchStartPoint = point;
+                lastTouchPoint = point;
+                touchMoved = false;
+                longPressFired = false;
+                pinchLastMidpoint = null;
+                clearLongPressTimer();
+                longPressTimer = window.setTimeout(() => {
+                    if (!touchStartPoint || touchMoved) {
+                        return;
+                    }
+
+                    longPressFired = notifyTouchContextMenu(touchStartPoint);
+                }, TOUCH_LONG_PRESS_DELAY_MS);
+                event.preventDefault();
+                return;
+            }
+
+            if (event.touches.length >= 2) {
+                const firstTouch = event.touches[0];
+                const secondTouch = event.touches[1];
+                if (!firstTouch || !secondTouch) {
+                    return;
+                }
+
+                clearLongPressTimer();
+                touchMoved = true;
+                const firstPoint = pointFromTouch(firstTouch);
+                const secondPoint = pointFromTouch(secondTouch);
+                pinchStartDistance = firstPoint.distanceTo(secondPoint);
+                pinchStartZoom = this.domainController.zoom;
+                pinchLastMidpoint = midpointBetweenTouchPoints(firstPoint, secondPoint);
+                event.preventDefault();
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (event: TouchEvent): void => {
+            if (this.showTensorField()) {
+                return;
+            }
+
+            if (event.touches.length >= 2) {
+                const firstTouch = event.touches[0];
+                const secondTouch = event.touches[1];
+                if (!firstTouch || !secondTouch) {
+                    return;
+                }
+
+                clearLongPressTimer();
+                touchMoved = true;
+                const firstPoint = pointFromTouch(firstTouch);
+                const secondPoint = pointFromTouch(secondTouch);
+                const midpoint = midpointBetweenTouchPoints(firstPoint, secondPoint);
+                const currentDistance = firstPoint.distanceTo(secondPoint);
+                const targetZoom = calculatePinchZoom({
+                    startDistance: pinchStartDistance,
+                    currentDistance,
+                    startZoom: pinchStartZoom,
+                });
+
+                this.domainController.setZoomAroundScreenPoint(targetZoom, midpoint);
+                if (pinchLastMidpoint) {
+                    const deltaScreen = new Vector(midpoint.x - pinchLastMidpoint.x, midpoint.y - pinchLastMidpoint.y);
+                    this.domainController.zoomToWorld(deltaScreen);
+                    this.domainController.pan(deltaScreen);
+                }
+                pinchLastMidpoint = midpoint;
+                event.preventDefault();
+                return;
+            }
+
+            const touch = event.touches[0];
+            if (!touch || !touchStartPoint || !lastTouchPoint || pinchLastMidpoint) {
+                return;
+            }
+
+            const point = pointFromTouch(touch);
+            if (hasMovedBeyondTouchTapThreshold(touchStartPoint, point)) {
+                touchMoved = true;
+                clearLongPressTimer();
+            }
+
+            if (touchMoved) {
+                const deltaScreen = new Vector(point.x - lastTouchPoint.x, point.y - lastTouchPoint.y);
+                this.domainController.zoomToWorld(deltaScreen);
+                this.domainController.pan(deltaScreen);
+                event.preventDefault();
+            }
+
+            lastTouchPoint = point;
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', (event: TouchEvent): void => {
+            clearLongPressTimer();
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                if (touch) {
+                    const point = pointFromTouch(touch);
+                    touchStartPoint = point;
+                    lastTouchPoint = point;
+                    touchMoved = true;
+                    longPressFired = true;
+                    pinchLastMidpoint = null;
+                    pinchStartDistance = 0;
+                    pinchStartZoom = this.domainController.zoom;
+                }
+                return;
+            }
+
+            if (event.touches.length > 0) {
+                return;
+            }
+
+            if (touchStartPoint && lastTouchPoint && !touchMoved && !longPressFired) {
+                notifyTouchClick(lastTouchPoint);
+                event.preventDefault();
+            }
+
+            resetTouchState();
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchcancel', resetTouchState);
+        window.addEventListener('blur', resetTouchState);
     }
 
     private updatePanMode(): void {

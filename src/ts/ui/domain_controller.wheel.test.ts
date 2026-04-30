@@ -37,4 +37,19 @@ describe('DomainController wheel zoom sensitivity', () => {
 
         expect(controller.zoom).toBeLessThan(0.9);
     });
+
+    test('keeps the touched world point stable when zooming around a screen point', () => {
+        const controller = DomainController.getInstance();
+        controller.screenDimensions = new Vector(1000, 800);
+        controller.zoom = 1;
+        const screenPoint = new Vector(240, 180);
+        const worldBefore = controller.screenToWorld(screenPoint.clone());
+
+        controller.setZoomAroundScreenPoint(2, screenPoint.clone());
+
+        const worldAfter = controller.screenToWorld(screenPoint.clone());
+        expect(controller.zoom).toBe(2);
+        expect(worldAfter.x).toBeCloseTo(worldBefore.x, 5);
+        expect(worldAfter.y).toBeCloseTo(worldBefore.y, 5);
+    });
 });

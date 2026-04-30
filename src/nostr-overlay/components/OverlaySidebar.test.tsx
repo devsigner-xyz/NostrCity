@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -9,6 +11,7 @@ import type { AuthSessionState } from '../../nostr/auth/session';
 interface RenderResult {
     container: HTMLDivElement;
     root: Root;
+    onOpenMap: ReturnType<typeof vi.fn>;
     onOpenChat: ReturnType<typeof vi.fn>;
     onOpenNotifications: ReturnType<typeof vi.fn>;
     onOpenPublish: ReturnType<typeof vi.fn>;
@@ -57,6 +60,7 @@ async function renderSidebar({
     const onOpenPublish = vi.fn();
     const onOpenWallet = vi.fn();
     const onOpenProfileEditor = vi.fn();
+    const onOpenMap = vi.fn();
 
     await act(async () => {
         root.render(
@@ -75,7 +79,7 @@ async function renderSidebar({
                     chatHasUnread
                     notificationsHasUnread
                     followingFeedHasUnread
-                    onOpenMap={vi.fn()}
+                    onOpenMap={onOpenMap}
                     onOpenCityStats={vi.fn()}
                     onOpenChat={onOpenChat}
                     onOpenRelays={vi.fn()}
@@ -104,17 +108,28 @@ async function renderSidebar({
         );
     });
 
-    return { container, root, onOpenChat, onOpenNotifications, onOpenPublish, onOpenWallet, onOpenProfileEditor };
+    return { container, root, onOpenMap, onOpenChat, onOpenNotifications, onOpenPublish, onOpenWallet, onOpenProfileEditor };
+}
+
+function setMobileViewport(): void {
+    Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: 390,
+    });
 }
 
 async function openUserMenu(container: ParentNode): Promise<void> {
-    const userMenuButton = container.querySelector('button[aria-label="Abrir menu de usuario"]') as HTMLButtonElement;
+    const userMenuButton = container.querySelector('button[aria-label="Abrir menú de usuario"]') as HTMLButtonElement;
     expect(userMenuButton).toBeDefined();
 
     await act(async () => {
         userMenuButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
         userMenuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
+}
+
+function readOverlayStyles(): string {
+    return readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
 }
 
 let mounted: RenderResult[] = [];
@@ -155,7 +170,7 @@ describe('OverlaySidebar', () => {
         const rendered = await renderSidebar({ pathname: '/' });
         mounted.push(rendered);
 
-        const agoraButton = rendered.container.querySelector('button[aria-label="Abrir Agora"]');
+        const agoraButton = rendered.container.querySelector('button[aria-label="Abrir Ágora"]');
         const chatButton = rendered.container.querySelector('button[aria-label="Abrir chats"]');
         const notificationsButton = rendered.container.querySelector('button[aria-label="Abrir notificaciones"]');
 
@@ -198,8 +213,8 @@ describe('OverlaySidebar', () => {
         const panelButtons = Array.from(rendered.container.querySelectorAll('.nostr-panel-toolbar > [data-slot="sidebar-menu-item"] button'));
         const labels = panelButtons.map((button) => button.getAttribute('aria-label') || '').filter(Boolean);
 
-        expect(labels.slice(0, 4)).toEqual(['Abrir mapa', 'Abrir Agora', 'Abrir articulos', 'Abrir publicar']);
-        expect(rendered.container.querySelector('button[aria-label="Abrir articulos"]')).not.toBeNull();
+        expect(labels.slice(0, 4)).toEqual(['Abrir mapa', 'Abrir Ágora', 'Abrir artículos', 'Abrir publicar']);
+        expect(rendered.container.querySelector('button[aria-label="Abrir artículos"]')).not.toBeNull();
     });
 
     test('renders english top-level labels when ui language is en', async () => {
@@ -337,5 +352,78 @@ describe('OverlaySidebar', () => {
         expect(collapsedSidebar).not.toBeNull();
         expect(collapsedSidebar?.querySelector('[data-slot="sidebar-header"] [data-slot="sidebar-trigger"]')).toBeNull();
         expect(collapsedSidebar?.querySelector('[data-slot="sidebar-rail"]')).not.toBeNull();
+    });
+
+    test('opens mobile sidebar content from a visible map overlay trigger', async () => {
+        setMobileViewport();
+        const rendered = await renderSidebar({ open: false });
+        mounted.push(rendered);
+
+        const mobileTrigger = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement | null;
+
+        expect(mobileTrigger).not.toBeNull();
+        expect(document.body.textContent || '').not.toContain('Social content');
+
+        await act(async () => {
+            mobileTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(document.body.textContent || '').toContain('Social content');
+        expect(document.body.textContent || '').toContain('Navegación de Nostr City');
+    });
+
+    test('places the mobile sidebar trigger in the bottom-left map corner', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-mobile-sidebar-trigger\s*\{[\s\S]*bottom:\s*max\(12px, env\(safe-area-inset-bottom\)\)/);
+        expect(styles).toMatch(/\.nostr-mobile-sidebar-trigger\s*\{[\s\S]*left:\s*max\(12px, env\(safe-area-inset-left\)\)/);
+        expect(styles).not.toMatch(/\.nostr-mobile-sidebar-trigger\s*\{[\s\S]*top:\s*max\(12px, env\(safe-area-inset-top\)\)/);
+    });
+
+    test('closes the mobile sidebar after selecting a navigation action', async () => {
+        setMobileViewport();
+        const rendered = await renderSidebar({ open: false });
+        mounted.push(rendered);
+
+        const mobileTrigger = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement | null;
+        await act(async () => {
+            mobileTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const mapButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
+            button.getAttribute('aria-label') === 'Abrir mapa'
+        ) as HTMLButtonElement | undefined;
+        expect(mapButton).toBeDefined();
+
+        await act(async () => {
+            mapButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(rendered.onOpenMap).toHaveBeenCalledTimes(1);
+        expect(document.body.textContent || '').not.toContain('Social content');
+    });
+
+    test('closes the mobile sidebar when a user menu action opens a dialog', async () => {
+        setMobileViewport();
+        const rendered = await renderSidebar({ open: false });
+        mounted.push(rendered);
+
+        const mobileTrigger = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement | null;
+        await act(async () => {
+            mobileTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await openUserMenu(document.body);
+        const editProfileAction = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+            (item.textContent || '').trim() === 'Editar perfil'
+        ) as HTMLElement;
+        expect(editProfileAction).toBeDefined();
+
+        await act(async () => {
+            editProfileAction.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(rendered.onOpenProfileEditor).toHaveBeenCalledTimes(1);
+        expect(document.body.textContent || '').not.toContain('Social content');
     });
 });

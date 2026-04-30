@@ -138,6 +138,9 @@ For Playwright smoke tests, CI installs Chromium with `pnpm exec playwright inst
 
 - VitePress docs live in `docs`. Use `pnpm docs:dev` for local authoring and `pnpm docs:build` before claiming docs build health.
 - Keep Spanish docs in Spanish unless the task asks otherwise.
+- Use `project-documentation` when planning or making changes that may require VitePress documentation updates.
+- Documentation updates should explain the current application behavior and user/contributor guidance, not act as a changelog of code changes.
+- Keep docs structurally organized around app behavior, a dedicated stack section, and supported protocol functionality when those areas are affected.
 - If landing or docs links change, check `src/site/app-url.ts`, `src/site/docs-url.ts`, and their tests.
 - Architecture/spec work commonly lives in `docs/superpowers/specs`.
 
@@ -156,7 +159,7 @@ For Playwright smoke tests, CI installs Chromium with `pnpm exec playwright inst
 - If a project-local skill exists on disk but does not appear in skill discovery, treat it as a discovery/configuration issue. Do not edit `skills-lock.json` or skill metadata unless the user asked for skill maintenance.
 - Use `.opencode/agents` subagents for complex or specialized work when their domain matches the task.
 - For multi-domain work, start with `project-orchestrator` or dispatch independent agents in parallel when tasks do not share mutable state.
-- When elaborating plans, always include recommended skills for each chunk of the task.
+- When elaborating plans, always include recommended skills for each chunk of the task and use `project-documentation` to decide whether VitePress docs need updates.
 - Do not commit, amend, reset, checkout, or push unless the user explicitly asks.
 
 ## Agent Selection Policy
@@ -173,6 +176,7 @@ For Playwright smoke tests, CI installs Chromium with `pnpm exec playwright inst
 | Work type | Recommended skills |
 | --- | --- |
 | AGENTS.md or agent guidance | `create-agentsmd`, `writing-skills` if editing or fixing skills themselves. |
+| Project documentation plans or VitePress guide updates | `project-documentation`, `vitepress`, `tech-writer`. |
 | Nostr protocol, relays, auth, DMs, zaps, NWC, WebLN | `nostr-specialist`, plus `bitcoin-bips-development` for Bitcoin-level compatibility. |
 | React UI implementation or landing/overlay UX | `frontend-specialist`, `shadcn`, `tailwind-v4-shadcn`, `tailwind-css-patterns`, `accessibility`. |
 | Visual strategy or UX critique | `ui-ux-designer`, `web-design-guidelines`, `accessibility`. |
@@ -197,6 +201,7 @@ For Playwright smoke tests, CI installs Chromium with `pnpm exec playwright inst
 - Project-specific skills live in `.agents/skills`.
 - Keep skill files in the expected `SKILL.md` format with valid YAML frontmatter.
 - Use skill names with letters, numbers, and hyphens only.
+- Use `project-documentation` as the project-specific source of truth for VitePress documentation planning, stack coverage, and supported protocol functionality docs.
 - After changing skills, verify discovery with `opencode debug skill`.
 - Do not remove or rename local skills without checking whether agents, docs, or plans reference them.
 

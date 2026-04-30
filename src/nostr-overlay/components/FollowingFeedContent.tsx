@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { CopyIcon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
+import { CopyIcon, RefreshCwIcon } from 'lucide-react';
 import type { AgoraFeedLayout } from '../../nostr/ui-settings';
 import type { NostrEvent, NostrProfile } from '../../nostr/types';
 import type { SocialEngagementMetrics, SocialFeedItem, ViewerReactionByEventId, ViewerReplyByEventId, ViewerZapByEventId } from '../../nostr/social-feed-service';
@@ -113,6 +113,7 @@ export interface FollowingFeedViewProps {
     ) => Promise<Record<string, NostrEvent> | void> | Record<string, NostrEvent> | void;
     eventReferencesById?: Record<string, NostrEvent>;
     onCopyNoteId?: (noteId: string) => void;
+    isMobile?: boolean;
 }
 
 interface FollowingFeedContentProps extends FollowingFeedViewProps {
@@ -131,6 +132,15 @@ interface ParsedEmbeddedRepost {
     content: string;
     tags: string[][];
     sig?: string;
+}
+
+const PULL_TO_REFRESH_THRESHOLD_PX = 72;
+const PULL_TO_REFRESH_LOADING_PX = 56;
+
+function prefersReducedMotion(): boolean {
+    return typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 function parseEmbeddedRepostEvent(content: string): ParsedEmbeddedRepost | null {
@@ -189,9 +199,12 @@ export function FollowingFeedContent({
     profilesByPubkey,
     engagementByEventId,
     isLoadingFeed,
+    isRefreshingFeed,
     feedError,
     hasMoreFeed,
     activeThread,
+    pendingNewCount,
+    hasPendingNewItems,
     canWrite,
     isPublishingPost: _isPublishingPost,
     isPublishingReply,
@@ -204,6 +217,8 @@ export function FollowingFeedContent({
     pendingReactionByEventId,
     pendingRepostByEventId,
     onLoadMoreFeed,
+    onApplyPendingNewItems,
+    onRefreshFeed,
     onOpenThread,
     onCloseThread,
     onLoadMoreThread,
@@ -225,6 +240,7 @@ export function FollowingFeedContent({
     onResolveEventReferences,
     eventReferencesById,
     onCopyNoteId,
+    isMobile = false,
 }: FollowingFeedContentProps) {
     const { t } = useI18n();
     const [replyDraft, setReplyDraft] = useState<MentionDraft>(createMentionDraft(''));
@@ -234,6 +250,12 @@ export function FollowingFeedContent({
     const replyImageInputRef = useRef<HTMLInputElement | null>(null);
     const [replyTargetEventId, setReplyTargetEventId] = useState<string | null>(null);
     const [replyTargetPubkey, setReplyTargetPubkey] = useState<string | undefined>(undefined);
+    const [pullDistance, setPullDistance] = useState(0);
+    const [isPullRefreshPending, setIsPullRefreshPending] = useState(false);
+    const pullStartYRef = useRef<number | null>(null);
+    const pullDistanceRef = useRef(0);
+    const pullEligibleRef = useRef(false);
+    const scrollToNewNoteRef = useRef(false);
 
     useEffect(() => {
         if (!activeThread) {
@@ -289,6 +311,93 @@ export function FollowingFeedContent({
         }
     };
 
+    const resetPullState = (): void => {
+        pullStartYRef.current = null;
+        pullDistanceRef.current = 0;
+        pullEligibleRef.current = false;
+        setPullDistance(0);
+    };
+
+    const onFeedTouchStart = (event: TouchEvent<HTMLDivElement>): void => {
+        if (!isMobile || activeThread || isRefreshingFeed || isPullRefreshPending) {
+            return;
+        }
+
+        const touch = event.touches[0];
+        pullStartYRef.current = touch ? touch.clientY : null;
+        pullDistanceRef.current = 0;
+        pullEligibleRef.current = event.currentTarget.scrollTop <= 0;
+    };
+
+    const onFeedTouchMove = (event: TouchEvent<HTMLDivElement>): void => {
+        if (!isMobile || !pullEligibleRef.current || pullStartYRef.current === null) {
+            return;
+        }
+
+        const touch = event.touches[0];
+        if (!touch) {
+            return;
+        }
+
+        const distance = touch.clientY - pullStartYRef.current;
+        if (distance <= 0 || event.currentTarget.scrollTop > 0) {
+            pullDistanceRef.current = 0;
+            setPullDistance(0);
+            return;
+        }
+
+        pullDistanceRef.current = distance;
+        setPullDistance(Math.min(distance, PULL_TO_REFRESH_THRESHOLD_PX));
+        event.preventDefault();
+    };
+
+    const onFeedTouchEnd = (): void => {
+        const shouldRefresh = isMobile
+            && pullEligibleRef.current
+            && pullDistanceRef.current >= PULL_TO_REFRESH_THRESHOLD_PX
+            && !isRefreshingFeed
+            && !isPullRefreshPending;
+
+        pullStartYRef.current = null;
+        pullDistanceRef.current = 0;
+        pullEligibleRef.current = false;
+
+        if (shouldRefresh) {
+            setIsPullRefreshPending(true);
+            setPullDistance(PULL_TO_REFRESH_LOADING_PX);
+            void Promise.resolve(onRefreshFeed()).finally(() => {
+                setIsPullRefreshPending(false);
+                setPullDistance(0);
+            });
+            return;
+        }
+
+        setPullDistance(0);
+    };
+
+    const applyPendingNewItemsAndScroll = async (): Promise<void> => {
+        scrollToNewNoteRef.current = true;
+        await onApplyPendingNewItems();
+    };
+
+    useEffect(() => {
+        if (!scrollToNewNoteRef.current || items.length === 0) {
+            return;
+        }
+
+        scrollToNewNoteRef.current = false;
+        const firstNewNote = document.querySelector(`[data-feed-note-id="${items[0]?.id ?? ''}"]`) as HTMLElement | null;
+        if (!firstNewNote) {
+            return;
+        }
+
+        firstNewNote.scrollIntoView({
+            block: 'start',
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        });
+        firstNewNote.focus({ preventScroll: true });
+    }, [items]);
+
     const replyDisabled = !canWrite || isPublishingReply || !replyTargetEventId;
     const activeThreadNoteId = activeThread?.root?.id ?? activeThread?.rootEventId;
     const resolvedSubtitle = activeThread && activeThreadNoteId
@@ -313,6 +422,9 @@ export function FollowingFeedContent({
         : (headerSubtitle || t('feed.subtitle.following'));
     const showThreadBlockingEmpty = Boolean(activeThread && activeThread.isLoading && !activeThread.root && activeThread.replies.length === 0);
     const showThreadLoadingFooter = Boolean(activeThread && (activeThread.isLoadingMore || (activeThread.isLoading && (Boolean(activeThread.root) || activeThread.replies.length > 0))));
+    const isPullAffordanceRefreshing = isPullRefreshPending || isRefreshingFeed;
+    const pullAffordanceHeight = isPullAffordanceRefreshing ? PULL_TO_REFRESH_LOADING_PX : pullDistance;
+    const pullRefreshIconRotation = Math.round((Math.min(pullDistance, PULL_TO_REFRESH_THRESHOLD_PX) / PULL_TO_REFRESH_THRESHOLD_PX) * 180);
     const threadReplyTree = useMemo(
         () => buildThreadReplyTree(activeThread?.replies ?? []),
         [activeThread?.replies]
@@ -434,7 +546,32 @@ export function FollowingFeedContent({
                         className="nostr-following-feed-list min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
                         data-testid="following-feed-list"
                         onScroll={(event) => onFeedScroll(event.currentTarget)}
+                        onTouchStart={onFeedTouchStart}
+                        onTouchMove={onFeedTouchMove}
+                        onTouchEnd={onFeedTouchEnd}
+                        onTouchCancel={resetPullState}
                     >
+                        {isMobile ? (
+                            <div
+                                className="nostr-following-feed-pull-to-refresh"
+                                data-testid="following-feed-pull-to-refresh"
+                                data-active={pullAffordanceHeight > 0 ? 'true' : 'false'}
+                                data-refreshing={isPullAffordanceRefreshing ? 'true' : 'false'}
+                                aria-live="polite"
+                                style={{ height: `${pullAffordanceHeight}px` }}
+                            >
+                                {isPullAffordanceRefreshing ? (
+                                    <Spinner />
+                                ) : (
+                                    <RefreshCwIcon
+                                        data-testid="following-feed-pull-refresh-icon"
+                                        aria-hidden="true"
+                                        style={{ transform: `rotate(${pullRefreshIconRotation}deg)` }}
+                                    />
+                                )}
+                                <span>{isPullAffordanceRefreshing ? t('feed.refreshingRelays') : t('feed.refresh')}</span>
+                            </div>
+                        ) : null}
                         {items.length === 0 ? (
                             isLoadingFeed ? (
                                 <Empty className="nostr-following-feed-empty">
@@ -556,7 +693,7 @@ export function FollowingFeedContent({
                                     });
 
                                     return (
-                                        <div key={item.id} className="nostr-following-feed-note-shell grid gap-2">
+                                        <div key={item.id} className="nostr-following-feed-note-shell grid gap-2" data-feed-note-id={item.id} tabIndex={-1}>
                                             <NoteCard
                                                 note={note}
                                                 profilesByPubkey={profilesByPubkey}
@@ -575,6 +712,20 @@ export function FollowingFeedContent({
                         />
 
                     </div>
+
+                    {isMobile && hasPendingNewItems ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="nostr-following-feed-mobile-new-notes"
+                            data-testid="following-feed-mobile-new-notes"
+                            onClick={() => {
+                                void applyPendingNewItemsAndScroll();
+                            }}
+                        >
+                            {pendingNewCount === 1 ? t('feed.newPosts.one') : t('feed.newPosts.many', { count: pendingNewCount })}
+                        </Button>
+                    ) : null}
                 </>
             ) : (
                 <>

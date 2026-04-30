@@ -62,9 +62,7 @@ export function LoginGateScreen({
             <div className="nostr-login-screen-center">
                 <Card variant="elevated" className="nostr-login-screen-card w-full max-w-[448px] gap-0 py-0">
                     <CardContent className="flex flex-col gap-4 p-5 sm:p-6">
-                        <div className="nostr-login-cover-wrap">
-                            <img src={loginLogo} alt={t('auth.login.coverAlt')} className="nostr-login-cover h-auto w-auto max-w-full" />
-                        </div>
+                        <img src={loginLogo} alt={t('auth.login.coverAlt')} className="nostr-login-cover mx-auto h-auto max-w-full" />
 
                         {panel === 'login' && !restoringSession && !showUnlockLocalAccount ? (
                             <div
@@ -78,7 +76,7 @@ export function LoginGateScreen({
 
                         {restoringSession ? (
                             <>
-                                <Empty className="min-h-48 border-0 p-0" role="status" aria-live="polite">
+                                <Empty className="min-h-36 border-0 p-0" role="status" aria-live="polite">
                                     <EmptyHeader>
                                         <EmptyMedia variant="icon">
                                             <Spinner />

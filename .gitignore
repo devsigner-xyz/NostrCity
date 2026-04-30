@@ -27,6 +27,10 @@ logs/
 /plans
 /context
 .agents/skills/
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/project-documentation/
+!.agents/skills/project-documentation/SKILL.md
 docs/superpowers/
 
 # Local tool state

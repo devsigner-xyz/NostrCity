@@ -184,9 +184,6 @@ export function OverlayMapInteractionLayer({
             {isMapRoute && !showLoginGate ? (
                 <MapZoomControls
                     mapBridge={mapBridge}
-                    onRegenerateMap={onRegenerateMap}
-                    theme={resolvedOverlayTheme}
-                    onThemeChange={onThemeChange}
                 />
             ) : null}
 
@@ -198,6 +195,9 @@ export function OverlayMapInteractionLayer({
                     onCarsEnabledChange={onCarsEnabledChange}
                     onStreetLabelsEnabledChange={onStreetLabelsEnabledChange}
                     onSpecialMarkersEnabledChange={onSpecialMarkersEnabledChange}
+                    onRegenerateMap={onRegenerateMap}
+                    theme={resolvedOverlayTheme}
+                    onThemeChange={onThemeChange}
                 />
             ) : null}
 

@@ -4974,8 +4974,9 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const zoomGroup = rendered.container.querySelector('.nostr-map-zoom-controls [data-slot="button-group"]');
+        const zoomGroup = rendered.container.querySelector('.nostr-map-zoom-controls .nostr-map-zoom-group');
         expect(zoomGroup).toBeDefined();
+        expect(zoomGroup?.getAttribute('role')).toBe('group');
 
         const zoomButtons = Array.from(rendered.container.querySelectorAll('.nostr-map-zoom-controls .nostr-map-zoom-button')) as HTMLButtonElement[];
         expect(zoomButtons.length).toBe(2);
@@ -4984,12 +4985,10 @@ describe('Nostr overlay App', () => {
         expect(zoomButtons[0]?.className.includes('nostr-map-zoom-button-left')).toBe(true);
         expect(zoomButtons[1]?.className.includes('nostr-map-zoom-button-right')).toBe(true);
 
-        const regenerateButton = rendered.container.querySelector('.nostr-map-zoom-controls .nostr-map-regenerate-button') as HTMLButtonElement;
-        expect(regenerateButton).toBeDefined();
-        expect(regenerateButton.getAttribute('aria-label')).toBe('Regenerar mapa');
+        expect(rendered.container.querySelector('.nostr-map-zoom-controls .nostr-map-regenerate-button')).toBeNull();
     });
 
-    test('renders floating display toggle group with car, street and special marker toggles', async () => {
+    test('renders floating map options menu with car, street and special marker toggles', async () => {
         const { bridge } = createMapBridgeStub();
         const rendered = await renderApp(<App mapBridge={bridge} services={createBasicOverlayServices()} />);
         mounted.push(rendered);
@@ -4997,17 +4996,13 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const controls = rendered.container.querySelector('.nostr-map-display-controls [data-slot="toggle-group"]');
-        expect(controls).toBeDefined();
-        const carsButton = rendered.container.querySelector('button[aria-label="Alternar coches del mapa"]') as HTMLButtonElement;
-        const streetsButton = rendered.container.querySelector('button[aria-label="Alternar etiquetas de calles"]') as HTMLButtonElement;
-        const specialMarkersButton = rendered.container.querySelector('button[aria-label="Alternar iconos especiales"]') as HTMLButtonElement;
-        expect(carsButton).toBeDefined();
-        expect(streetsButton).toBeDefined();
-        expect(specialMarkersButton).toBeDefined();
-        expect(carsButton.className.includes('nostr-map-display-toggle-button')).toBe(true);
-        expect(streetsButton.className.includes('nostr-map-display-toggle-button')).toBe(true);
-        expect(specialMarkersButton.className.includes('nostr-map-display-toggle-button')).toBe(true);
+        const optionsButton = rendered.container.querySelector('button[aria-label="Opciones del mapa"]') as HTMLButtonElement;
+        expect(optionsButton).toBeDefined();
+        await openDropdownTrigger(optionsButton);
+
+        const optionLabels = Array.from(document.body.querySelectorAll('[role="menuitemcheckbox"]')).map((item) => item.textContent?.trim());
+        expect(optionLabels).toEqual(['Coches', 'Etiquetas de calles', 'Iconos especiales']);
+        expect(Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).some((item) => item.textContent?.trim() === 'Regenerar mapa')).toBe(true);
     });
 
     test('toggles special markers from floating controls and persists preference', async () => {
@@ -5018,19 +5013,25 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const specialMarkersButton = rendered.container.querySelector('button[aria-label="Alternar iconos especiales"]') as HTMLButtonElement;
-        expect(specialMarkersButton).toBeDefined();
+        const optionsButton = rendered.container.querySelector('button[aria-label="Opciones del mapa"]') as HTMLButtonElement;
+        expect(optionsButton).toBeDefined();
+        await openDropdownTrigger(optionsButton);
+        const getSpecialMarkersItem = () => Array.from(document.body.querySelectorAll('[role="menuitemcheckbox"]')).find((item) =>
+            item.textContent?.trim() === 'Iconos especiales'
+        ) as HTMLElement;
 
         await act(async () => {
-            specialMarkersButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            getSpecialMarkersItem().dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         const firstSaved = JSON.parse(window.localStorage.getItem(UI_SETTINGS_STORAGE_KEY) || '{}');
         expect(firstSaved.specialMarkersEnabled).toBe(false);
         await waitFor(() => (document.body.textContent || '').includes('Iconos especiales desactivados'));
 
+        await openDropdownTrigger(optionsButton);
+
         await act(async () => {
-            specialMarkersButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            getSpecialMarkersItem().dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         const secondSaved = JSON.parse(window.localStorage.getItem(UI_SETTINGS_STORAGE_KEY) || '{}');
@@ -5102,11 +5103,15 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const carsButton = rendered.container.querySelector('button[aria-label="Alternar coches del mapa"]') as HTMLButtonElement;
-        expect(carsButton).toBeDefined();
+        const optionsButton = rendered.container.querySelector('button[aria-label="Opciones del mapa"]') as HTMLButtonElement;
+        expect(optionsButton).toBeDefined();
+        await openDropdownTrigger(optionsButton);
+        const getCarsItem = () => Array.from(document.body.querySelectorAll('[role="menuitemcheckbox"]')).find((item) =>
+            item.textContent?.trim() === 'Coches'
+        ) as HTMLElement;
 
         await act(async () => {
-            carsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            getCarsItem().dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         await waitFor(() => {
@@ -5117,8 +5122,10 @@ describe('Nostr overlay App', () => {
         expect((bridge.setTrafficParticlesCount as any).mock.calls.at(-1)?.[0]).toBe(0);
         await waitFor(() => (document.body.textContent || '').includes('Coches desactivados'));
 
+        await openDropdownTrigger(optionsButton);
+
         await act(async () => {
-            carsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            getCarsItem().dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         await waitFor(() => {

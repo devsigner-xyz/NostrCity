@@ -9,6 +9,8 @@ export default class DomainController {
     private static instance: DomainController;
 
     private readonly ZOOM_SPEED = 0.92;
+    private readonly MIN_ZOOM = 0.3;
+    private readonly MAX_ZOOM = 20;
     private readonly WHEEL_STEP_BASE = 53;
     private readonly MIN_WHEEL_STEPS = 0.35;
     private readonly MAX_WHEEL_STEPS = 3;
@@ -133,7 +135,7 @@ export default class DomainController {
 
     set zoom(z: number) {
         this.stopViewAnimation();
-        if (z >= 0.3 && z <= 20) {
+        if (z >= this.MIN_ZOOM && z <= this.MAX_ZOOM) {
             this.moved = true;
             const oldWorldSpaceMidpoint = this.origin.add(this.worldDimensions.divideScalar(2));
             this._zoom = z;
@@ -141,6 +143,21 @@ export default class DomainController {
             this.pan(newWorldSpaceMidpoint.sub(oldWorldSpaceMidpoint));
             this.zoomCallback();
         }
+    }
+
+    setZoomAroundScreenPoint(zoom: number, screenPoint: Vector): void {
+        if (!Number.isFinite(zoom)) {
+            return;
+        }
+
+        this.stopViewAnimation();
+        const targetZoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, zoom));
+        const worldBeforeZoom = this.screenToWorld(screenPoint.clone());
+        this._zoom = targetZoom;
+        const worldAfterZoom = this.screenToWorld(screenPoint.clone());
+        this._origin.add(worldBeforeZoom.sub(worldAfterZoom));
+        this.moved = true;
+        this.zoomCallback();
     }
 
     centerOnWorldPoint(point: Vector): void {
@@ -153,7 +170,7 @@ export default class DomainController {
     animateToWorldPoint(point: Vector, options?: { zoom?: number; durationMs?: number }): void {
         this.stopViewAnimation();
 
-        const targetZoom = Math.min(20, Math.max(0.3, options?.zoom ?? this._zoom));
+        const targetZoom = Math.min(this.MAX_ZOOM, Math.max(this.MIN_ZOOM, options?.zoom ?? this._zoom));
         const durationMs = Math.max(0, options?.durationMs ?? 650);
 
         const startCenter = this.origin.add(this.worldDimensions.divideScalar(2));
