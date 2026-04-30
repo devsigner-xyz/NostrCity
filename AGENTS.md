@@ -29,8 +29,8 @@ Core stack: TypeScript, React 19, Vite, Tailwind CSS v4, shadcn/ui, Radix UI, Fa
 
 ## Setup
 
-- Use Node from `.nvmrc` (`20`) for CI parity. Newer local Node versions may work, but verify against Node 20 when failures are version-sensitive.
-- Use pnpm through Corepack. The current workspace has `pnpm --version` at `10.33.0`; CI currently installs pnpm `10.29.3`.
+- Use Node from `.nvmrc` (`24`) for CI parity.
+- Use pnpm through Corepack. The current workspace has `pnpm --version` at `10.33.0`; CI uses the `packageManager` version from `package.json`.
 - Install dependencies with `pnpm install`.
 - Use `pnpm install --frozen-lockfile` when reproducing CI.
 
