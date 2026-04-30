@@ -70,10 +70,10 @@ describe('CreateAccountDialog', () => {
         const footer = rendered.container.querySelector('[data-testid="auth-flow-footer"]');
         const footerButtons = Array.from(footer?.querySelectorAll('button') ?? []);
 
-        expect(content).toContain('Usar app o extension');
-        expect(content).toContain('Elige como conectar una cuenta que ya controlas.');
+        expect(content).toContain('Usar app o extensión');
+        expect(content).toContain('Elige cómo conectar una cuenta que ya controlas.');
         expect(rendered.container.querySelector('[data-testid="create-account-external-form"]')).not.toBeNull();
-        expect(content).not.toContain('Crear cuenta con app o extension');
+        expect(content).not.toContain('Crear cuenta con app o extensión');
         expect(content).not.toContain('Conecta un signer externo para seguir usando tu identidad fuera del navegador.');
         expect(footerButtons).toHaveLength(1);
         expect(footerButtons[0]?.textContent || '').toContain('Volver');
@@ -95,9 +95,9 @@ describe('CreateAccountDialog', () => {
         expect(backupStep).not.toBeNull();
         expect(rendered.container.querySelector('textarea#generated-nsec')).not.toBeNull();
         expect(rendered.container.querySelector('textarea#generated-npub-backup')).not.toBeNull();
-        expect(content).toContain('Copy nsec');
-        expect(content).toContain('Cpy npub');
-        expect(content).toContain('Descargar backup');
+        expect(content).toContain('Copiar nsec');
+        expect(content).toContain('Copiar npub');
+        expect(content).toContain('Descargar copia de seguridad');
         expect(backupStep?.querySelector('[data-slot="separator"]')).toBeNull();
         expect(backupStep?.querySelector('label input[name="confirm-backup"]')).not.toBeNull();
         expect(content).not.toContain('Crear cuenta en esta app');
@@ -236,7 +236,7 @@ describe('CreateAccountDialog', () => {
         const handlers = (rendered.container as any).__handlers;
 
         const extensionButton = Array.from(rendered.container.querySelectorAll('button')).find((candidate) =>
-            (candidate.textContent || '').includes('Continuar con extension')
+            (candidate.textContent || '').includes('Continuar con extensión')
         ) as HTMLButtonElement | undefined;
         expect(extensionButton).toBeDefined();
 

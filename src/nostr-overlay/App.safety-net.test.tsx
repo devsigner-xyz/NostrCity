@@ -136,7 +136,7 @@ async function loginWithNip07(container: HTMLDivElement): Promise<void> {
     });
 
     const nip07Option = Array.from(document.body.querySelectorAll('[data-slot="select-item"]')).find((item) =>
-        (item.textContent || '').trim() === 'Extension (NIP-07)'
+        (item.textContent || '').trim() === 'Extensión (NIP-07)'
     );
     if (!nip07Option) {
         throw new Error('Expected NIP-07 login option to be rendered');
@@ -148,7 +148,7 @@ async function loginWithNip07(container: HTMLDivElement): Promise<void> {
     });
 
     const continueButton = Array.from(container.querySelectorAll('button')).find((button) =>
-        (button.textContent || '').includes('Continuar con extension')
+        (button.textContent || '').includes('Continuar con extensión')
     );
     if (!continueButton) {
         throw new Error('Expected NIP-07 continue button to be rendered');
@@ -487,7 +487,7 @@ describe('Nostr overlay App focused safety-net harness', () => {
 
         expect(loginScreen).not.toBeNull();
         expect(npubInput).not.toBeNull();
-        expect(rendered.container.textContent || '').toContain('Metodo de acceso');
+        expect(rendered.container.textContent || '').toContain('Método de acceso');
     });
 
     test('hides map controls while the login gate is visible', async () => {

@@ -115,7 +115,7 @@ describe('ArticleDetailRouteContainer', () => {
         expect(detailContent?.className).toContain('pb-10');
 
         const backButtons = Array.from(rendered.container.querySelectorAll('button'))
-            .filter((button) => button.textContent === 'Volver a articulos');
+            .filter((button) => button.textContent === 'Volver a artículos');
         expect(backButtons).toHaveLength(2);
         expect(backButtons[1]?.className).toContain('self-center');
         expect(backButtons[1]?.className).toContain('mt-4');

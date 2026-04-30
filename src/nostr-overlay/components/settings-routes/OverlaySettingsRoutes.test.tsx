@@ -142,7 +142,7 @@ describe('Overlay settings routes', () => {
         const rendered = await renderSettingsRoute('/settings');
         mounted.push(rendered);
 
-        expect(rendered.container.textContent || '').toContain('Define cantidades rapidas para enviar zaps.');
+        expect(rendered.container.textContent || '').toContain('Define cantidades rápidas para enviar zaps.');
     });
 
     test('mounts and unmounts advanced settings host on route lifecycle', async () => {

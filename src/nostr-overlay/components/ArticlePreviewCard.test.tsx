@@ -65,14 +65,14 @@ describe('ArticlePreviewCard', () => {
         expect(rendered.container.textContent).toContain('Alice');
         expect(rendered.container.textContent).toContain('nostr');
         expect(rendered.container.textContent).toContain('maps');
-        expect(rendered.container.querySelector('img')?.getAttribute('alt')).toBe('Imagen del articulo My article');
+        expect(rendered.container.querySelector('img')?.getAttribute('alt')).toBe('Imagen del artículo My article');
     });
 
     test('uses fallback title when title metadata is missing', async () => {
         const rendered = await renderElement(<ArticlePreviewCard event={article({ tags: [] })} />);
         mounted.push(rendered);
 
-        expect(rendered.container.textContent).toContain('Articulo sin titulo');
+        expect(rendered.container.textContent).toContain('Artículo sin título');
     });
 
     test('opens article from the read action', async () => {

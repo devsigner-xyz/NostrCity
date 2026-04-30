@@ -282,7 +282,7 @@ describe('UserSearchPage', () => {
             ) as HTMLElement;
             expect(row).toBeDefined();
             expect(row.querySelector('.nostr-nip05-status-icon')).toBeNull();
-            const warningBadge = row.querySelector('[data-slot="avatar-badge"][aria-label="NIP-05 pendiente de verificacion DNS: example.com"]') as HTMLElement;
+            const warningBadge = row.querySelector('[data-slot="avatar-badge"][aria-label="NIP-05 pendiente de verificación DNS: example.com"]') as HTMLElement;
             expect(warningBadge).toBeDefined();
             expect(warningBadge.querySelector('.lucide-triangle-alert')).toBeDefined();
         } finally {
@@ -371,11 +371,11 @@ describe('UserSearchPage', () => {
             });
 
             const actionsButton = rendered.container.querySelector(`[data-testid="person-actions-${pubkey}"]`) as HTMLButtonElement;
-            const followButton = rendered.container.querySelector('button[aria-label="Unfollow Dora"]') as HTMLButtonElement;
+            const followButton = rendered.container.querySelector('button[aria-label="Dejar de seguir a Dora"]') as HTMLButtonElement;
             expect(actionsButton).toBeDefined();
             expect(followButton).toBeDefined();
             expect(followButton.disabled).toBe(false);
-            expect((followButton.textContent || '').trim()).toBe('Following');
+            expect((followButton.textContent || '').trim()).toBe('Siguiendo');
 
             await act(async () => {
                 followButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -385,7 +385,7 @@ describe('UserSearchPage', () => {
             expect(onFollowUser).toHaveBeenCalledWith(pubkey);
             expect(onClose).not.toHaveBeenCalled();
             expect(followButton.disabled).toBe(true);
-            expect((followButton.textContent || '').trim()).toBe('Following');
+            expect((followButton.textContent || '').trim()).toBe('Siguiendo');
         } finally {
             vi.useRealTimers();
         }

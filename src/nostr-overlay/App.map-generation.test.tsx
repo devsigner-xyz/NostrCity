@@ -113,6 +113,31 @@ async function waitFor(condition: () => boolean): Promise<void> {
     throw new Error('Condition was not met in time');
 }
 
+async function clickMapOptionsRegenerate(container: HTMLDivElement): Promise<void> {
+    await waitFor(() => container.querySelector('button[aria-label="Opciones del mapa"]') !== null);
+    const optionsButton = container.querySelector('button[aria-label="Opciones del mapa"]') as HTMLButtonElement;
+
+    await act(async () => {
+        optionsButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+        optionsButton.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+    });
+
+    await waitFor(() => Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).some((item) =>
+        (item.textContent || '').trim() === 'Regenerar mapa'
+    ));
+    const regenerateItem = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+        (item.textContent || '').trim() === 'Regenerar mapa'
+    ) as HTMLElement;
+
+    await act(async () => {
+        regenerateItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+}
+
 describe('App map generation sizing', () => {
     const mounted: RenderResult[] = [];
 
@@ -178,13 +203,7 @@ describe('App map generation sizing', () => {
         await waitFor(() => (bridge.regenerateMap as any).mock.calls.length > 0);
         (bridge.regenerateMap as any).mockClear();
 
-        await waitFor(() => rendered.container.querySelector('.nostr-map-zoom-controls button[aria-label="Regenerar mapa"]') !== null);
-        const regenerateButton = rendered.container.querySelector('.nostr-map-zoom-controls button[aria-label="Regenerar mapa"]') as HTMLButtonElement | null;
-        expect(regenerateButton).not.toBeNull();
-
-        await act(async () => {
-            regenerateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await clickMapOptionsRegenerate(rendered.container);
 
         await waitFor(() => (bridge.regenerateMap as any).mock.calls.length > 0);
         expect(bridge.regenerateMap).toHaveBeenCalledWith({ targetBuildings: 600 });

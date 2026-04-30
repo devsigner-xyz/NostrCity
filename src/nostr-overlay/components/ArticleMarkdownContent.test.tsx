@@ -77,7 +77,7 @@ describe('ArticleMarkdownContent', () => {
         expect(bodyNode?.querySelector('li')?.className).toContain('my-2');
         expect(bodyNode?.querySelector('li p')).toBeNull();
         expect(rendered.container.querySelector('strong')?.textContent).toBe('bold');
-        expect(rendered.container.querySelector('img')?.getAttribute('alt')).toBe('Imagen del articulo Markdown article');
+        expect(rendered.container.querySelector('img')?.getAttribute('alt')).toBe('Imagen del artículo Markdown article');
     });
 
     test('does not insert raw script nodes from article content', async () => {

@@ -172,7 +172,7 @@ describe('PeopleListTab', () => {
             input.dispatchEvent(new Event('change', { bubbles: true }));
         });
 
-        const clearButton = rendered.container.querySelector('button[aria-label="Limpiar busqueda"]') as HTMLButtonElement;
+        const clearButton = rendered.container.querySelector('button[aria-label="Limpiar búsqueda"]') as HTMLButtonElement;
         expect(clearButton).toBeDefined();
 
         await act(async () => {
@@ -197,7 +197,7 @@ describe('PeopleListTab', () => {
         );
         mounted.push(rendered);
 
-        const clearButton = rendered.container.querySelector('button[aria-label="Limpiar busqueda"]') as HTMLButtonElement;
+        const clearButton = rendered.container.querySelector('button[aria-label="Limpiar búsqueda"]') as HTMLButtonElement;
         expect(clearButton).toBeDefined();
         expect(clearButton.disabled).toBe(true);
     });
@@ -388,7 +388,7 @@ describe('PeopleListTab', () => {
 
         expect(rendered.container.textContent || '').toContain('Alice');
         expect(rendered.container.querySelector('.nostr-nip05-status-icon')).toBeNull();
-        const warningBadge = rendered.container.querySelector('[data-slot="avatar-badge"][aria-label="NIP-05 pendiente de verificacion DNS: example.com"]') as HTMLElement;
+        const warningBadge = rendered.container.querySelector('[data-slot="avatar-badge"][aria-label="NIP-05 pendiente de verificación DNS: example.com"]') as HTMLElement;
         expect(warningBadge).toBeDefined();
         expect(warningBadge.querySelector('.lucide-triangle-alert')).toBeDefined();
     });
@@ -665,7 +665,7 @@ describe('PeopleListTab', () => {
                 scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
             });
 
-            expect(rendered.container.textContent || '').toContain('Cargando mas');
+            expect(rendered.container.textContent || '').toContain('Cargando más');
 
             await act(async () => {
                 await vi.advanceTimersByTimeAsync(200);

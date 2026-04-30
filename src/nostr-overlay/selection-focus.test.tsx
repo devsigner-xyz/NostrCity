@@ -129,6 +129,31 @@ beforeEach(() => {
     } as any);
 });
 
+async function clickMapOptionsRegenerate(container: HTMLDivElement): Promise<void> {
+    await waitFor(() => container.querySelector('button[aria-label="Opciones del mapa"]') !== null);
+    const optionsButton = container.querySelector('button[aria-label="Opciones del mapa"]') as HTMLButtonElement;
+
+    await act(async () => {
+        optionsButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+        optionsButton.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+    });
+
+    await waitFor(() => Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).some((item) =>
+        (item.textContent || '').trim() === 'Regenerar mapa'
+    ));
+    const regenerateItem = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+        (item.textContent || '').trim() === 'Regenerar mapa'
+    ) as HTMLElement;
+
+    await act(async () => {
+        regenerateItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+}
+
 afterEach(async () => {
     for (const entry of mounted) {
         await act(async () => {
@@ -293,12 +318,7 @@ describe('Nostr overlay selection map interaction', () => {
         (bridge.focusBuilding as any).mockClear();
         (bridge.regenerateMap as any).mockClear();
 
-        const regenerateButton = rendered.container.querySelector('.nostr-map-zoom-controls button[aria-label="Regenerar mapa"]') as HTMLButtonElement | null;
-        expect(regenerateButton).not.toBeNull();
-
-        await act(async () => {
-            regenerateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await clickMapOptionsRegenerate(rendered.container);
 
         await waitFor(() => (bridge.regenerateMap as any).mock.calls.length === 1);
         expect(bridge.focusBuilding).not.toHaveBeenCalled();

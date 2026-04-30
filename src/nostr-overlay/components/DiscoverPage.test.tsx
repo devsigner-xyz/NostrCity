@@ -63,7 +63,7 @@ describe('DiscoverPage', () => {
 
         expect(title).not.toBeNull();
         expect(subtitle).not.toBeNull();
-        expect(title?.textContent || '').toContain('Encuentra Bitcoin whitepaper');
+        expect(title?.textContent || '').toContain('Encuentra el whitepaper de Bitcoin');
         expect(subtitle?.textContent || '').toContain('Bitcoin: A Peer-to-Peer Electronic Cash System');
     });
 

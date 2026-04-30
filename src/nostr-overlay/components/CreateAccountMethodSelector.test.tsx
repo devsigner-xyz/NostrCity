@@ -44,9 +44,9 @@ describe('CreateAccountMethodSelector', () => {
         mounted.push(rendered);
 
         const content = rendered.container.textContent || '';
-        expect(content).toContain('Usar app o extension');
-        expect(content).toContain('Conecta una extension o un signer externo.');
-        expect(content).toContain('Crear cuenta local');
+        expect(content).toContain('Usar app o extensión');
+        expect(content).toContain('Conecta una extensión o un signer externo.');
+        expect(content).toContain('Crear una cuenta local');
         expect(content).toContain('Crea una cuenta nueva en este dispositivo.');
         expect(content).not.toContain('Crear cuenta en esta app');
         expect(content).not.toContain('Elige si quieres conectar un signer externo o crear una identidad nueva aqui.');
@@ -59,7 +59,7 @@ describe('CreateAccountMethodSelector', () => {
 
         const handlers = (rendered.container as any).__handlers;
         const buttons = rendered.container.querySelectorAll('button');
-        const externalButton = Array.from(buttons).find((button) => (button.textContent || '').includes('Usar app o extension'));
+        const externalButton = Array.from(buttons).find((button) => (button.textContent || '').includes('Usar app o extensión'));
         expect(externalButton).toBeDefined();
 
         await act(async () => {
@@ -74,8 +74,8 @@ describe('CreateAccountMethodSelector', () => {
         mounted.push(rendered);
 
         const buttons = Array.from(rendered.container.querySelectorAll('button'));
-        const externalButton = buttons.find((button) => (button.textContent || '').includes('Usar app o extension'));
-        const localButton = buttons.find((button) => (button.textContent || '').includes('Crear cuenta local'));
+        const externalButton = buttons.find((button) => (button.textContent || '').includes('Usar app o extensión'));
+        const localButton = buttons.find((button) => (button.textContent || '').includes('Crear una cuenta local'));
 
         expect(externalButton).toBeDefined();
         expect(localButton).toBeDefined();
@@ -93,7 +93,7 @@ describe('CreateAccountMethodSelector', () => {
 
         const handlers = (rendered.container as any).__handlers;
         const buttons = rendered.container.querySelectorAll('button');
-        const localButton = Array.from(buttons).find((button) => (button.textContent || '').includes('Crear cuenta local'));
+        const localButton = Array.from(buttons).find((button) => (button.textContent || '').includes('Crear una cuenta local'));
         expect(localButton).toBeDefined();
 
         await act(async () => {

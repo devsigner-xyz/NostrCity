@@ -254,7 +254,7 @@ describe('ChatsPage', () => {
 
         const rowButton = rendered.container.querySelector('button[data-chat-conversation="peer-1"]') as HTMLButtonElement;
         expect(rowButton.querySelector('.nostr-nip05-status-icon')).toBeNull();
-        const warningBadge = rowButton.querySelector('[data-slot="avatar-badge"][aria-label="NIP-05 pendiente de verificacion DNS: example.com"]') as HTMLElement;
+        const warningBadge = rowButton.querySelector('[data-slot="avatar-badge"][aria-label="NIP-05 pendiente de verificación DNS: example.com"]') as HTMLElement;
         expect(warningBadge).toBeDefined();
         expect(warningBadge.querySelector('.lucide-triangle-alert')).toBeDefined();
     });

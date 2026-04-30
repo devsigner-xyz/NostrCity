@@ -118,7 +118,7 @@ describe('LandingPage theme selector', () => {
 
     expect(rendered.container.querySelector('[data-testid="landing-map-preview"]')).toBeNull();
     expect(rendered.container.querySelector('.hero-visual')).toBeNull();
-    expect(rendered.container.querySelector('h1')?.textContent).toContain('Explora Nostr como ciudad open source');
+    expect(rendered.container.querySelector('h1')?.textContent).toContain('Explora Nostr como ciudad de código abierto');
   });
 
   test('presents features as a two-column editorial list', async () => {
@@ -146,7 +146,7 @@ describe('LandingPage theme selector', () => {
 
     expect(howLink).not.toBeNull();
     expect(featuresLink).not.toBeNull();
-    expect(howLink?.textContent).toContain('Ver como funciona');
-    expect(featuresLink?.textContent).toContain('Features');
+    expect(howLink?.textContent).toContain('Ver cómo funciona');
+    expect(featuresLink?.textContent).toContain('Funciones');
   });
 });

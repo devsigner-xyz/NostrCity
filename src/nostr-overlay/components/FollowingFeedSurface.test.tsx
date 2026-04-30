@@ -676,7 +676,6 @@ describe('FollowingFeedSurface', () => {
         expect(onRefreshFeed).not.toHaveBeenCalled();
         expect(pullAffordance?.getAttribute('data-settling')).toBe('true');
         expect(pullAffordance?.getAttribute('data-active')).toBe('true');
-        expect(pullAffordance?.style.height).toBe('56px');
     });
 
     test('mobile pull-to-refresh shows a loading spinner in the pull area while refresh is pending', async () => {

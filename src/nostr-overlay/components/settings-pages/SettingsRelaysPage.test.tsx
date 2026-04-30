@@ -219,10 +219,10 @@ describe('SettingsRelaysPage', () => {
         const configuredCard = getCardByTitle(rendered.container, 'Relays configurados');
         const configuredTable = getTableFromCard(configuredCard);
 
-        expect(getTableHeaders(configuredTable)).toEqual(['Relay', 'Read', 'Write', 'Estado', 'Acciones']);
+        expect(getTableHeaders(configuredTable)).toEqual(['Relay', 'Lectura', 'Escritura', 'Estado', 'Acciones']);
         expect(configuredTable.textContent).toContain('wss://relay.one');
         expect(configuredTable.textContent).not.toContain('wss://relay.dm');
-        expect(configuredCard.textContent).toContain('Estado actual y categorias activas de tus relays.');
+        expect(configuredCard.textContent).toContain('Estado actual y categorías activas de tus relays.');
 
         const readSwitch = rendered.container.querySelector('button[aria-label="Lectura para wss://relay.one"]');
         const writeSwitch = rendered.container.querySelector('button[aria-label="Escritura para wss://relay.one"]');
@@ -298,7 +298,7 @@ describe('SettingsRelaysPage', () => {
         expect(input?.getAttribute('aria-invalid')).toBe('true');
         expect(input?.getAttribute('aria-describedby')).toBe('relay-input-error');
         expect(alert?.getAttribute('role')).toBe('alert');
-        expect(alert?.textContent).toContain('Entradas invalidas: relay-invalido');
+        expect(alert?.textContent).toContain('Entradas inválidas: relay-invalido');
     });
 
     test('renders the extracted dm relay section with independent controls', async () => {
@@ -416,7 +416,7 @@ describe('SettingsRelaysPage', () => {
         expect(input?.getAttribute('aria-invalid')).toBe('true');
         expect(input?.getAttribute('aria-describedby')).toBe('dm-relay-input-error');
         expect(alert?.getAttribute('role')).toBe('alert');
-        expect(alert?.textContent).toContain('Entradas invalidas: relay-dm-invalido');
+        expect(alert?.textContent).toContain('Entradas inválidas: relay-dm-invalido');
     });
 
     test('wires the search relay controls to their dedicated handlers', async () => {
@@ -462,7 +462,7 @@ describe('SettingsRelaysPage', () => {
         expect(input?.getAttribute('aria-invalid')).toBe('true');
         expect(input?.getAttribute('aria-describedby')).toBe('search-relay-input-error');
         expect(alert?.getAttribute('role')).toBe('alert');
-        expect(alert?.textContent).toContain('Entradas invalidas: relay-search-invalido');
+        expect(alert?.textContent).toContain('Entradas inválidas: relay-search-invalido');
     });
 
     test('adds all suggested search relays from the search section', async () => {

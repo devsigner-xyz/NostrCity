@@ -467,7 +467,7 @@ function getUiSettingsDialog(): HTMLElement | null {
 }
 
 async function selectUserMenuAction(container: HTMLDivElement, label: string): Promise<void> {
-    const userMenuButton = container.querySelector('button[aria-label="Abrir menu de usuario"]') as HTMLButtonElement;
+    const userMenuButton = container.querySelector('button[aria-label="Abrir menú de usuario"]') as HTMLButtonElement;
     expect(userMenuButton).toBeDefined();
 
     await openDropdownTrigger(userMenuButton);
@@ -537,6 +537,7 @@ beforeAll(() => {
 
 beforeEach(() => {
     window.localStorage.clear();
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
     __resetFollowsCacheForTests();
     createFireworksMock.mockReset();
     createFireworksMock.mockResolvedValue({ stop: vi.fn() });
@@ -674,12 +675,12 @@ describe('Nostr overlay App', () => {
         const footer = rendered.container.querySelector('[data-testid="auth-flow-footer"]');
         const footerButtons = Array.from(footer?.querySelectorAll('button') ?? []);
 
-        expect(content).toContain('Usar app o extension');
-        expect(content).toContain('Conecta una extension o un signer externo.');
-        expect(content).toContain('Crear cuenta local');
+        expect(content).toContain('Usar app o extensión');
+        expect(content).toContain('Conecta una extensión o un signer externo.');
+        expect(content).toContain('Crear una cuenta local');
         expect(content).toContain('Crea una cuenta nueva en este dispositivo.');
         expect(footerButtons).toHaveLength(1);
-        expect(footerButtons[0]?.textContent || '').toContain('Volver al login');
+        expect(footerButtons[0]?.textContent || '').toContain('Volver');
     });
 
     test('renders updated external and local auth-flow copy with stable auth test ids', async () => {
@@ -699,7 +700,7 @@ describe('Nostr overlay App', () => {
         });
 
         const externalButton = Array.from(rendered.container.querySelectorAll('button')).find(
-            (button) => (button.textContent || '').includes('Usar app o extension')
+            (button) => (button.textContent || '').includes('Usar app o extensión')
         ) as HTMLButtonElement | undefined;
         expect(externalButton).toBeDefined();
 
@@ -709,8 +710,8 @@ describe('Nostr overlay App', () => {
 
         let content = rendered.container.textContent || '';
 
-        expect(content).toContain('Usar app o extension');
-        expect(content).toContain('Elige como conectar una cuenta que ya controlas.');
+        expect(content).toContain('Usar app o extensión');
+        expect(content).toContain('Elige cómo conectar una cuenta que ya controlas.');
         expect(rendered.container.querySelector('[data-testid="create-account-external-form"]')).not.toBeNull();
 
         const backButton = Array.from(rendered.container.querySelectorAll('button')).find(
@@ -723,7 +724,7 @@ describe('Nostr overlay App', () => {
         });
 
         const localButton = Array.from(rendered.container.querySelectorAll('button')).find(
-            (button) => (button.textContent || '').includes('Crear cuenta local')
+            (button) => (button.textContent || '').includes('Crear una cuenta local')
         ) as HTMLButtonElement | undefined;
         expect(localButton).toBeDefined();
 
@@ -1006,7 +1007,7 @@ describe('Nostr overlay App', () => {
         const content = rendered.container.textContent || '';
 
         expect(content).toContain('Método de acceso');
-        expect(content).not.toContain('Estadisticas de la ciudad');
+        expect(content).not.toContain('Estadísticas de la ciudad');
     });
 
     test('does not render redundant profile identity block in information tab', async () => {
@@ -1056,7 +1057,7 @@ describe('Nostr overlay App', () => {
 
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
         expect(rendered.container.textContent || '').not.toContain('Accede o explora');
-        expect(rendered.container.textContent || '').not.toContain('Modo solo lectura. Cambia a extension o bunker para habilitar acciones de escritura.');
+        expect(rendered.container.textContent || '').not.toContain('Modo solo lectura. Cambia a extensión o búnker para habilitar acciones de escritura.');
         expect(rendered.container.textContent || '').toContain('Solo lectura');
 
         expect(rendered.container.querySelector('.nostr-profile-avatar')).toBeNull();
@@ -1094,25 +1095,30 @@ describe('Nostr overlay App', () => {
         const toolbarButtons = Array.from(rendered.container.querySelectorAll('.nostr-panel-toolbar button')) as HTMLButtonElement[];
         expect(toolbarButtons.length).toBeGreaterThanOrEqual(4);
         expect(toolbarButtons[0]?.getAttribute('aria-label')).toBe('Abrir mapa');
-        expect(toolbarButtons.some((button) => button.getAttribute('aria-label') === 'Abrir estadisticas de la ciudad')).toBe(true);
+        expect(toolbarButtons.some((button) => button.getAttribute('aria-label') === 'Abrir estadísticas de la ciudad')).toBe(true);
         expect(toolbarButtons.some((button) => button.getAttribute('aria-label') === 'Abrir descubre')).toBe(true);
         expect(toolbarButtons.some((button) => button.getAttribute('aria-label') === 'Regenerar mapa')).toBe(false);
         expect(rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir chats"]')).not.toBeNull();
 
-        const statsButton = rendered.container.querySelector('button[aria-label="Abrir estadisticas de la ciudad"]') as HTMLButtonElement;
-        const regenerateButton = rendered.container.querySelector('.nostr-map-zoom-controls button[aria-label="Regenerar mapa"]') as HTMLButtonElement;
+        const statsButton = rendered.container.querySelector('button[aria-label="Abrir estadísticas de la ciudad"]') as HTMLButtonElement;
+        const optionsButton = rendered.container.querySelector('button[aria-label="Opciones del mapa"]') as HTMLButtonElement;
 
         expect(statsButton).toBeDefined();
-        expect(regenerateButton).toBeDefined();
-        expect(regenerateButton.getAttribute('title')).toBe('New map');
+        expect(optionsButton).toBeDefined();
         const settingsButton = rendered.container.querySelector('button[aria-label="Abrir ajustes"]') as HTMLButtonElement;
         expect(settingsButton.getAttribute('title')).toBe('Ajustes');
 
         await waitFor(() => (bridge.regenerateMap as any).mock.calls.length > 0);
         (bridge.regenerateMap as any).mockClear();
 
+        await openDropdownTrigger(optionsButton);
+        const regenerateItem = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+            (item.textContent || '').trim() === 'Regenerar mapa'
+        ) as HTMLElement;
+        expect(regenerateItem).toBeDefined();
+
         await act(async () => {
-            regenerateButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            regenerateItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         await waitFor(() => (bridge.regenerateMap as any).mock.calls.length > 0);
@@ -1122,7 +1128,7 @@ describe('Nostr overlay App', () => {
             statsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        expect(rendered.container.textContent || '').toContain('Estadisticas de la ciudad');
+        expect(rendered.container.textContent || '').toContain('Estadísticas de la ciudad');
     });
 
     test('renders global user search button in panel and compact toolbar', async () => {
@@ -1238,7 +1244,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const panelFeedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]');
+        const panelFeedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]');
         expect(panelFeedButton).not.toBeNull();
 
         const hidePanelButton = rendered.container.querySelector('button[aria-label="Ocultar panel"]') as HTMLButtonElement;
@@ -1246,7 +1252,7 @@ describe('Nostr overlay App', () => {
             hidePanelButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        const compactFeedButton = rendered.container.querySelector('.nostr-compact-toolbar button[aria-label="Abrir Agora"]');
+        const compactFeedButton = rendered.container.querySelector('.nostr-compact-toolbar button[aria-label="Abrir Ágora"]');
         expect(compactFeedButton).not.toBeNull();
     });
 
@@ -1306,7 +1312,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -1459,7 +1465,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -1578,7 +1584,7 @@ describe('Nostr overlay App', () => {
             await loginWithNip07(rendered.container);
             await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-            const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+            const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
             expect(feedButton).toBeDefined();
 
             await act(async () => {
@@ -1686,7 +1692,7 @@ describe('Nostr overlay App', () => {
             await loginWithNip07(rendered.container);
             await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-            const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+            const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
             expect(feedButton).toBeDefined();
 
             await act(async () => {
@@ -1790,7 +1796,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -1858,7 +1864,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -1940,7 +1946,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -2022,7 +2028,7 @@ describe('Nostr overlay App', () => {
             await loginWithNip07(rendered.container);
             await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-            const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+            const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
             expect(feedButton).toBeDefined();
 
             await act(async () => {
@@ -2166,7 +2172,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -2295,7 +2301,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -2476,7 +2482,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -2582,7 +2588,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -2628,7 +2634,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -2637,7 +2643,7 @@ describe('Nostr overlay App', () => {
 
         expect(rendered.container.textContent || '').not.toContain('Volver al mapa');
         expect(rendered.container.querySelector('button[aria-label="Abrir mapa"]')).not.toBeNull();
-        expect(rendered.container.querySelector('button[aria-label="Abrir Agora"][data-active="true"]')).not.toBeNull();
+        expect(rendered.container.querySelector('button[aria-label="Abrir Ágora"][data-active="true"]')).not.toBeNull();
     });
 
     test('following feed route returns back to map view from sidebar map action', async () => {
@@ -2675,7 +2681,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -2825,7 +2831,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -2853,7 +2859,7 @@ describe('Nostr overlay App', () => {
         });
 
         await waitFor(() => (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mock.calls.length > 0);
-        expect(rendered.container.textContent || '').toContain('Timeline en tiempo real de personas que sigues');
+        expect(rendered.container.textContent || '').toContain('Cronología en tiempo real de personas a las que sigues');
     });
 
     test('clicking a hashtag in agora activates hashtag route loading', async () => {
@@ -2913,7 +2919,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -3038,7 +3044,7 @@ describe('Nostr overlay App', () => {
 
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -3109,9 +3115,9 @@ describe('Nostr overlay App', () => {
     test('wallet entry is available in the authenticated shell', async () => {
         const ownerPubkey = 'f'.repeat(64);
         window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
-            method: 'npub',
+            method: 'nip07',
             pubkey: ownerPubkey,
-            readonly: true,
+            readonly: false,
             locked: false,
             createdAt: Date.now(),
         }));
@@ -3153,9 +3159,9 @@ describe('Nostr overlay App', () => {
         const ownerPubkey = 'f'.repeat(64);
         const enable = vi.fn(async () => {});
         window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
-            method: 'npub',
+            method: 'nip07',
             pubkey: ownerPubkey,
-            readonly: true,
+            readonly: false,
             locked: false,
             createdAt: Date.now(),
         }));
@@ -3321,9 +3327,9 @@ describe('Nostr overlay App', () => {
     test('marks WebLN wallet as reconnect-required when refresh revalidation fails', async () => {
         const ownerPubkey = 'f'.repeat(64);
         window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
-            method: 'npub',
+            method: 'nip07',
             pubkey: ownerPubkey,
-            readonly: true,
+            readonly: false,
             locked: false,
             createdAt: Date.now(),
         }));
@@ -3404,9 +3410,9 @@ describe('Nostr overlay App', () => {
         const ownerPubkey = 'f'.repeat(64);
         const enable = vi.fn(async () => {});
         window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
-            method: 'npub',
+            method: 'nip07',
             pubkey: ownerPubkey,
-            readonly: true,
+            readonly: false,
             locked: false,
             createdAt: Date.now(),
         }));
@@ -3508,9 +3514,9 @@ describe('Nostr overlay App', () => {
     test('keeps remembered WebLN wallet pending reconnection when provider is missing after reload', async () => {
         const ownerPubkey = 'f'.repeat(64);
         window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
-            method: 'npub',
+            method: 'nip07',
             pubkey: ownerPubkey,
-            readonly: true,
+            readonly: false,
             locked: false,
             createdAt: Date.now(),
         }));
@@ -3611,9 +3617,9 @@ describe('Nostr overlay App', () => {
             content: 'pay_invoice make_invoice',
         }, walletServiceSecret);
         window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
-            method: 'npub',
+            method: 'nip07',
             pubkey: ownerPubkey,
-            readonly: true,
+            readonly: false,
             locked: false,
             createdAt: Date.now(),
         }));
@@ -3731,7 +3737,7 @@ describe('Nostr overlay App', () => {
         await waitFor(() => (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mock.calls.length > 0);
         await waitFor(() => rendered.container.querySelector('.nostr-panel-toolbar .nostr-following-feed-unread-dot') !== null);
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -3908,13 +3914,13 @@ describe('Nostr overlay App', () => {
 
         const requiredOrder = [
             'Abrir mapa',
-            'Abrir Agora',
+            'Abrir Ágora',
             'Abrir publicar',
             'Abrir chats',
             'Abrir relays',
             'Abrir notificaciones',
             'Abrir buscador global de usuarios',
-            'Abrir estadisticas de la ciudad',
+            'Abrir estadísticas de la ciudad',
             'Abrir descubre',
             'Abrir ajustes',
         ];
@@ -4014,7 +4020,7 @@ describe('Nostr overlay App', () => {
         expect(publishedContent).toContain('hola ');
         expect(publishedContent).toContain('nostr:nprofile1');
         expect(publishedTags).toEqual([['p', mentionPubkey]]);
-        await waitFor(() => (document.body.textContent || '').includes('Publicacion enviada'));
+        await waitFor(() => (document.body.textContent || '').includes('Publicación enviada'));
     });
 
     test('opens quote dialog from repost menu and publishes quote content with nevent reference', async () => {
@@ -4091,7 +4097,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const agoraButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const agoraButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             agoraButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -4199,7 +4205,7 @@ describe('Nostr overlay App', () => {
         });
 
         expect(rendered.container.textContent || '').toContain('Notificaciones');
-        expect(rendered.container.textContent || '').toContain('reacciono con + a tu nota');
+        expect(rendered.container.textContent || '').toContain('reaccionó con + a tu nota');
         expect(rendered.container.querySelector('.nostr-panel-toolbar .nostr-notifications-unread-dot')).toBeNull();
     });
 
@@ -5214,11 +5220,15 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const streetLabelsButton = rendered.container.querySelector('button[aria-label="Alternar etiquetas de calles"]') as HTMLButtonElement;
-        expect(streetLabelsButton).toBeDefined();
+        const optionsButton = rendered.container.querySelector('button[aria-label="Opciones del mapa"]') as HTMLButtonElement;
+        expect(optionsButton).toBeDefined();
+        await openDropdownTrigger(optionsButton);
+        const getStreetLabelsItem = () => Array.from(document.body.querySelectorAll('[role="menuitemcheckbox"]')).find((item) =>
+            item.textContent?.trim() === 'Etiquetas de calles'
+        ) as HTMLElement;
 
         await act(async () => {
-            streetLabelsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            getStreetLabelsItem().dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         await waitFor(() => {
@@ -5228,8 +5238,10 @@ describe('Nostr overlay App', () => {
 
         expect((bridge.setStreetLabelsEnabled as any).mock.calls.at(-1)?.[0]).toBe(false);
 
+        await openDropdownTrigger(optionsButton);
+
         await act(async () => {
-            streetLabelsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            getStreetLabelsItem().dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         await waitFor(() => {
@@ -5359,7 +5371,7 @@ describe('Nostr overlay App', () => {
 
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const actionsButton = rendered.container.querySelector('button[aria-label="Abrir menu de usuario"]') as HTMLButtonElement;
+        const actionsButton = rendered.container.querySelector('button[aria-label="Abrir menú de usuario"]') as HTMLButtonElement;
         expect(actionsButton).toBeDefined();
         const userMenuSection = actionsButton.closest('[data-slot="sidebar-menu"]') as HTMLElement;
         expect(userMenuSection).toBeDefined();
@@ -5470,7 +5482,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -6127,7 +6139,7 @@ describe('Nostr overlay App', () => {
         });
 
         await waitFor(() => (rendered.container.textContent || '').includes('Solo lectura'));
-        const userMenuButton = rendered.container.querySelector('button[aria-label="Abrir menu de usuario"]') as HTMLButtonElement;
+        const userMenuButton = rendered.container.querySelector('button[aria-label="Abrir menú de usuario"]') as HTMLButtonElement;
         expect(userMenuButton).toBeDefined();
         expect(userMenuButton.textContent || '').toContain('Solo lectura');
 
@@ -6204,8 +6216,8 @@ describe('Nostr overlay App', () => {
 
         const occupantDialog = document.body.querySelector('[data-slot="dialog-content"][aria-label="Perfil del ocupante"]') as HTMLElement;
         expect(occupantDialog).toBeDefined();
-        expect(occupantDialog.style.width).toBe('640px');
-        expect(occupantDialog.style.maxWidth).toBe('calc(100vw - 32px)');
+        expect(occupantDialog.style.width).toBe('');
+        expect(occupantDialog.style.maxWidth).toBe('');
 
         const closeButton = rendered.container.querySelector('button[aria-label="Cerrar perfil"]') as HTMLButtonElement;
         expect(closeButton).toBeDefined();
@@ -6805,8 +6817,8 @@ describe('Nostr overlay App', () => {
 
         await waitFor(() => (rendered.container.textContent || '').includes('Conectada por WebLN'));
 
-        const agoraButton = rendered.container.querySelector('button[aria-label="Abrir Agora"][data-active="true"]') as HTMLButtonElement
-            ?? rendered.container.querySelector('button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const agoraButton = rendered.container.querySelector('button[aria-label="Abrir Ágora"][data-active="true"]') as HTMLButtonElement
+            ?? rendered.container.querySelector('button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             agoraButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -7269,7 +7281,7 @@ describe('Nostr overlay App', () => {
         await selectSettingsContextAction(rendered.container, 'Atajos');
 
         expect(rendered.container.textContent || '').toContain('Mantener pulsada la barra espaciadora y arrastrar');
-        expect(rendered.container.textContent || '').toContain('Mantener pulsado el wheel del raton y mover el raton');
+        expect(rendered.container.textContent || '').toContain('Mantener pulsado el wheel del ratón y mover el ratón');
     });
 
     test('shows settings dropdown inside sidebar and opens routed settings pages', async () => {
@@ -7473,7 +7485,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Agora"]') as HTMLButtonElement;
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         expect(feedButton).toBeDefined();
 
         await act(async () => {
@@ -7547,7 +7559,7 @@ describe('Nostr overlay App', () => {
         expect(compactLabels).toContain('Abrir mapa');
         expect(compactLabels).toContain('Abrir relays');
         expect(compactLabels).toContain('Abrir buscador global de usuarios');
-        expect(compactLabels).toContain('Abrir estadisticas de la ciudad');
+        expect(compactLabels).toContain('Abrir estadísticas de la ciudad');
         expect(compactLabels).toContain('Abrir descubre');
         expect(compactLabels).toContain('Abrir ajustes');
         expect(rendered.container.textContent || '').not.toContain('Sigues (');
@@ -7613,7 +7625,7 @@ describe('Nostr overlay App', () => {
 
         const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
         const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
-        const cityStatsButton = rendered.container.querySelector('button[aria-label="Abrir estadisticas de la ciudad"]') as HTMLButtonElement | null;
+        const cityStatsButton = rendered.container.querySelector('button[aria-label="Abrir estadísticas de la ciudad"]') as HTMLButtonElement | null;
 
         expect(followingItem).toBeDefined();
         expect(followersItem).toBeDefined();
@@ -7797,7 +7809,7 @@ describe('Nostr overlay App', () => {
         expect(document.body.textContent || '').toContain('Bob');
         expect(document.body.textContent || '').not.toContain('Alice');
 
-        const clearButton = document.body.querySelector('button[aria-label="Limpiar busqueda"]') as HTMLButtonElement;
+        const clearButton = document.body.querySelector('button[aria-label="Limpiar búsqueda"]') as HTMLButtonElement;
         expect(clearButton).toBeDefined();
 
         await act(async () => {
@@ -9441,7 +9453,7 @@ describe('Nostr overlay App', () => {
         };
 
         await clickButton('Crear cuenta');
-        await clickButton('Crear cuenta local');
+        await clickButton('Crear una cuenta local');
         await clickButton('Continuar');
 
         const backupCheckbox = rendered.container.querySelector('input[name="confirm-backup"]') as HTMLInputElement;

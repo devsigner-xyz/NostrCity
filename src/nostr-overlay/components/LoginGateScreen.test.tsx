@@ -177,7 +177,7 @@ describe('LoginGateScreen', () => {
         const rendered = await renderScreen();
         mounted.push(rendered);
 
-        const selectorSection = rendered.container.querySelector('section[aria-label="Selector de login de Nostr"]');
+        const selectorSection = rendered.container.querySelector('section[aria-label="Selector de acceso de Nostr"]');
         const actionGroup = rendered.container.querySelector('[data-testid="login-gate-actions"]');
 
         expect(selectorSection).not.toBeNull();
@@ -215,7 +215,7 @@ describe('LoginGateScreen', () => {
 
         expect(footer).not.toBeNull();
         expect(footerButtons).toHaveLength(1);
-        expect(footerButtons[0]?.textContent || '').toContain('Volver al login');
+        expect(footerButtons[0]?.textContent || '').toContain('Volver');
         expect(rendered.container.querySelectorAll('[data-slot="card"]')).toHaveLength(1);
     });
 
@@ -233,7 +233,7 @@ describe('LoginGateScreen', () => {
         });
 
         const backButton = Array.from(rendered.container.querySelectorAll('button')).find(
-            (button) => (button.textContent || '').includes('Volver al login')
+            (button) => (button.textContent || '').includes('Volver')
         ) as HTMLButtonElement | undefined;
         expect(backButton).toBeDefined();
 
@@ -242,7 +242,7 @@ describe('LoginGateScreen', () => {
         });
 
         expect(rendered.container.querySelector('[data-testid="auth-flow-footer"]')).toBeNull();
-        expect(rendered.container.textContent || '').toContain('Metodo de acceso');
+        expect(rendered.container.textContent || '').toContain('Método de acceso');
     });
 
     test('shows unlock form for locked local sessions and submits passphrase unlock', async () => {
@@ -417,7 +417,7 @@ describe('LoginGateScreen', () => {
         expect(content).toContain('Recuperando sesión');
         expect(content).toContain('Preparando acceso...');
         expect(content).not.toContain('Restaurando sesion');
-        expect(content).not.toContain('Metodo de acceso');
+        expect(content).not.toContain('Método de acceso');
         expect(rendered.container.querySelector('input[name="npub"]')).toBeNull();
         expect(rendered.container.querySelector('[data-slot="empty-icon"] [aria-label="Loading"]')).not.toBeNull();
     });
@@ -430,7 +430,7 @@ describe('LoginGateScreen', () => {
         const avatar = link?.querySelector('img') as HTMLImageElement | null;
 
         expect(link).not.toBeNull();
-        expect(link?.textContent || '').toContain('Made with ❤️ by strhodler');
+        expect(link?.textContent || '').toContain('Hecho con ❤️ por strhodler');
         expect(link?.getAttribute('href')).toBe('https://github.com/strhodler');
         expect(link?.getAttribute('target')).toBe('_blank');
         expect(link?.getAttribute('rel')).toBe('noreferrer');

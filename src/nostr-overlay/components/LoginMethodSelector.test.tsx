@@ -91,8 +91,8 @@ describe('LoginMethodSelector', () => {
 
         expect(content).not.toContain('Accede o explora');
         expect(content).toContain('npub (solo lectura)');
-        expect(content).toContain('Metodo de acceso');
-        expect(content).toContain('Clave publica');
+        expect(content).toContain('Método de acceso');
+        expect(content).toContain('Clave pública');
         expect(content).toContain('Acceder');
         expect(rendered.container.querySelector('[data-testid="login-method-selector"]')).not.toBeNull();
         expect(rendered.container.querySelector('[data-testid="login-method-form-npub"]')).not.toBeNull();
@@ -126,9 +126,9 @@ describe('LoginMethodSelector', () => {
 
         const options = Array.from(document.body.querySelectorAll('[data-slot="select-item"]'));
         expect(options.some((option) => (option.textContent || '').trim() === 'nsec')).toBe(false);
-        expect(options.some((option) => (option.textContent || '').trim() === 'Extension (NIP-07)')).toBe(false);
+        expect(options.some((option) => (option.textContent || '').trim() === 'Extensión (NIP-07)')).toBe(false);
         expect(options.some((option) => (option.textContent || '').trim() === 'Bunker (NIP-46)')).toBe(false);
-        expect(rendered.container.textContent || '').not.toContain('Extension (NIP-07)');
+        expect(rendered.container.textContent || '').not.toContain('Extensión (NIP-07)');
         expect(rendered.container.textContent || '').not.toContain('Bunker (NIP-46)');
     });
 
@@ -233,7 +233,7 @@ describe('LoginMethodSelector', () => {
         expect(primaryButton).not.toBeNull();
         expect(primaryButton?.classList.contains('mt-2')).toBe(true);
         expect(primaryButton?.classList.contains('w-full')).toBe(true);
-        expect(rendered.container.textContent || '').not.toContain('Usa tu extension Nostr para firmar sin exponer tu clave privada.');
+        expect(rendered.container.textContent || '').not.toContain('Usa tu extensión Nostr para firmar sin exponer tu clave privada.');
     });
 
     test('exposes a stable nip46 submit test id in development mode', async () => {
