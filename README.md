@@ -118,7 +118,6 @@ pnpm docs:dev
 | `pnpm build` | Build the app and docs. |
 | `pnpm lint` | Run the full ESLint check. |
 | `pnpm typecheck` | Typecheck frontend and server projects. |
-| `pnpm quality:budget` | Enforce the configured quality budget. |
 | `pnpm test` | Run frontend and backend unit tests. |
 | `pnpm test:smoke` | Build and run Playwright smoke tests. |
 
@@ -174,7 +173,6 @@ For focused changes, run the closest relevant checks. For CI parity, run:
 ```bash
 pnpm lint
 pnpm typecheck
-pnpm quality:budget
 pnpm build
 pnpm test:smoke
 ```

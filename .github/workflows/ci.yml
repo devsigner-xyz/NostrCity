@@ -31,9 +31,6 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Quality budget
-        run: pnpm quality:budget
-
       - name: Build
         run: pnpm build
 

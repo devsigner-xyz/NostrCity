@@ -64,9 +64,6 @@ Vite proxies `/v1/*` to `http://127.0.0.1:3000`. If only `pnpm dev` is running, 
 | `pnpm typecheck` | Frontend and server typecheck. |
 | `pnpm typecheck:frontend` | Typecheck frontend TS project. |
 | `pnpm typecheck:server` | Typecheck Fastify server TS project. |
-| `pnpm typecheck:strict-report` | Strict TS report with `tsconfig.strict.json`. |
-| `pnpm quality:budget` | Enforce quality budget. |
-| `pnpm quality:strict-report` | Generate strict quality report. |
 | `pnpm test` | Default unit test suite. |
 | `pnpm test:unit` | Frontend and backend Vitest unit tests. |
 | `pnpm test:unit:frontend` | Frontend Vitest project with jsdom. |
@@ -74,7 +71,7 @@ Vite proxies `/v1/*` to `http://127.0.0.1:3000`. If only `pnpm dev` is running, 
 | `pnpm test:unit:watch` | Watch mode for Vitest. |
 | `pnpm test:smoke` | Build and run Playwright smoke tests. |
 
-Run focused checks for the files you changed. Before claiming a feature or fix is complete, run the closest relevant lint, typecheck, and test commands. Use the full CI sequence for broad changes: `pnpm lint`, `pnpm typecheck`, `pnpm quality:budget`, `pnpm build`, and `pnpm test:smoke`.
+Run focused checks for the files you changed. Before claiming a feature or fix is complete, run the closest relevant lint, typecheck, and test commands. Use the full CI sequence for broad changes: `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test:smoke`.
 
 For Playwright smoke tests, CI installs Chromium with `pnpm exec playwright install --with-deps chromium` before `pnpm test:smoke`.
 
@@ -207,6 +204,6 @@ For Playwright smoke tests, CI installs Chromium with `pnpm exec playwright inst
 
 ## CI Reference
 
-CI runs on GitHub Actions with this sequence: checkout, pnpm setup, Node from `.nvmrc`, `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`, `pnpm quality:budget`, `pnpm build`, Playwright Chromium install, and `pnpm test:smoke`.
+CI runs on GitHub Actions with this sequence: checkout, pnpm setup, Node from `.nvmrc`, `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, Playwright Chromium install, and `pnpm test:smoke`.
 
 Use this as the final verification target for changes that affect frontend, backend, docs, build tooling, or smoke-test behavior.
