@@ -65,6 +65,8 @@ describe('CityStatsPage', () => {
         const text = rendered.container.textContent || '';
         expect(text).toContain('City stats');
         expect(text).toContain('Map capacity and Nostr identity signals for the people you follow.');
+        expect(rendered.container.querySelector('[data-slot="overlay-page-header-title"]')?.textContent).toBe('City stats');
+        expect(rendered.container.querySelector('[data-slot="overlay-page-header-description"]')?.textContent).toBe('Map capacity and Nostr identity signals for the people you follow.');
         expect(text).toContain('Total homes');
         expect(text).toContain('Occupied buildings');
         expect(text).toContain('NIP-05 identity verified');

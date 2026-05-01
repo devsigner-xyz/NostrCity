@@ -414,6 +414,14 @@ describe('OverlaySidebar', () => {
         expect(styles).toMatch(/\.nostr-mobile-app-bar-button\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s);
     });
 
+    test('keeps mobile routed page descriptions visible while hiding duplicate titles', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-routed-surface-panel \[data-slot="overlay-page-header-title"\][\s\S]*?position:\s*absolute;/);
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-routed-surface-panel \[data-slot="overlay-page-header-copy"\]:not\(:has\(\[data-slot="overlay-page-header-description"\]\)\)[\s\S]*?display:\s*none;/);
+        expect(styles).not.toMatch(/\.nostr-routed-surface \[data-slot="overlay-page-header-copy"\][\s\S]*?display:\s*none;/);
+    });
+
     test('renders an internal-route back button and calls the provided callback', async () => {
         setMobileViewport();
         const rendered = await renderSidebar({

@@ -21,13 +21,13 @@ export function OverlayPageHeader({
             <div className="flex items-start justify-between gap-3">
                 <div data-slot="overlay-page-header-copy" className="min-w-0 flex-1 space-y-1">
                     <div className="inline-flex min-w-0 items-center gap-1.5">
-                        <h2 className="scroll-m-20 text-xl font-semibold tracking-tight">{title}</h2>
+                        <h2 data-slot="overlay-page-header-title" className="scroll-m-20 text-xl font-semibold tracking-tight">{title}</h2>
                         {indicator}
                     </div>
                     {description ? (
                         typeof description === 'string'
-                            ? <p className="text-sm text-muted-foreground">{description}</p>
-                            : <div className="text-sm text-muted-foreground">{description}</div>
+                            ? <p data-slot="overlay-page-header-description" className="text-sm text-muted-foreground">{description}</p>
+                            : <div data-slot="overlay-page-header-description" className="text-sm text-muted-foreground">{description}</div>
                     ) : null}
                 </div>
 
