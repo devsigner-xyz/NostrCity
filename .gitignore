@@ -24,23 +24,18 @@ logs/
 *.log
 
 # Internal planning / agent material
+AGENTS.md
+.agents/
+.opencode/
 /plans
 /context
-.agents/skills/
-!.agents/skills/
-.agents/skills/*
-!.agents/skills/project-documentation/
-!.agents/skills/project-documentation/SKILL.md
 docs/superpowers/
+skills-lock.json
 
 # Local tool state
 .playwright-mcp/
 .worktrees/
 .superpowers/
-.opencode/node_modules/
-.opencode/package.json
-.opencode/package-lock.json
-.opencode/bun.lock
 
 # Build / cache artifacts
 /dist

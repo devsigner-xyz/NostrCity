@@ -8,12 +8,12 @@
 *Explore Nostr as a living city instead of a linear timeline.*
 
 [![CI](https://img.shields.io/github/actions/workflow/status/devsigner-xyz/NostrCity/ci.yml?style=flat-square&label=CI)](https://github.com/devsigner-xyz/NostrCity/actions)
-![Node.js](https://img.shields.io/badge/Node.js-20-3c873a?style=flat-square)
+![Node.js](https://img.shields.io/badge/Node.js-24-3c873a?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?style=flat-square&logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-149eca?style=flat-square&logo=react&logoColor=white)
 ![Fastify](https://img.shields.io/badge/Fastify-5-000000?style=flat-square&logo=fastify&logoColor=white)
 
-[Overview](#overview) • [Features](#features) • [Getting Started](#getting-started) • [Project Structure](#project-structure) • [Scripts](#scripts)
+[Overview](#overview) • [Features](#features) • [Getting Started](#getting-started) • [Project Structure](#project-structure) • [Scripts](#scripts) • [Contributing](#contributing)
 
 </div>
 
@@ -44,13 +44,13 @@ In development, Vite proxies `/v1/*` to the local BFF so the browser app can use
 - **Fastify BFF** with identity, graph, content, social, notifications, users, DM, and publish modules.
 - **Modern frontend stack** using React 19, Vite, Tailwind CSS v4, shadcn/ui-compatible components, Radix UI, and React Router.
 - **Documentation site** powered by VitePress.
-- **Quality gates** with ESLint, TypeScript, Vitest, Playwright smoke tests, and a quality budget check.
+- **Quality gates** with ESLint, TypeScript, Vitest, and Playwright smoke tests.
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) `20` as defined in `.nvmrc`
+- [Node.js](https://nodejs.org/) `24` as defined in `.nvmrc`
 - [pnpm](https://pnpm.io/) via Corepack
 - Git
 
@@ -178,6 +178,10 @@ pnpm test:smoke
 ```
 
 CI installs dependencies with `pnpm install --frozen-lockfile`, runs the same core checks, installs Playwright Chromium, and then executes smoke tests.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the development workflow, coding standards, testing guidance, and pull request checklist.
 
 ## Project Origin
 
