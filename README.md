@@ -7,7 +7,7 @@
 
 *Explore Nostr as a living city instead of a linear timeline.*
 
-[![CI](https://img.shields.io/github/actions/workflow/status/devsigner-xyz/NostrCity/ci.yml?style=flat-square&label=CI)](https://github.com/devsigner-xyz/NostrCity/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/strhodler/NostrCity/ci.yml?style=flat-square&label=CI)](https://github.com/strhodler/NostrCity/actions)
 ![Node.js](https://img.shields.io/badge/Node.js-24-3c873a?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?style=flat-square&logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-149eca?style=flat-square&logo=react&logoColor=white)

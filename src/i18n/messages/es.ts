@@ -153,7 +153,7 @@ export const esMessages = {
     'auth.login.continueSavedLocal': 'Continuar con cuenta local guardada',
     'auth.login.unlockSavedLocal': 'Desbloquear cuenta local guardada',
     'auth.login.desktopNotice': 'Por el momento, el cliente está optimizado para la versión de escritorio.',
-    'auth.login.devsignerByline': 'Hecho con ❤️ por strhodler',
+    'auth.login.strhodlerByline': 'Hecho con ❤️ por strhodler',
     'auth.selector.aria': 'Selector de acceso de Nostr',
     'auth.selector.accessMethod': 'Método de acceso',
     'auth.selector.loginMethodAria': 'Método de acceso',

@@ -466,7 +466,7 @@ describe('LoginGateScreen', () => {
         const rendered = await renderScreen({ restoringSession: true });
         mounted.push(rendered);
 
-        const link = rendered.container.querySelector('[data-testid="devsigner-attribution-link"]') as HTMLAnchorElement | null;
+        const link = rendered.container.querySelector('[data-testid="strhodler-attribution-link"]') as HTMLAnchorElement | null;
         const avatar = link?.querySelector('img') as HTMLImageElement | null;
 
         expect(link).not.toBeNull();

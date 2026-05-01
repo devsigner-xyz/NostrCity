@@ -11,7 +11,7 @@ import {
   type SiteTheme,
 } from '@/site/theme-preference';
 
-const GITHUB_REPOSITORY_URL = 'https://github.com/devsigner-xyz/NostrCity';
+const GITHUB_REPOSITORY_URL = 'https://github.com/strhodler/NostrCity';
 
 const VALUE_PILLS = [
   'landing.values.openSource',

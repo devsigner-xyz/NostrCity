@@ -155,7 +155,7 @@ export const enMessages = {
     'auth.login.continueSavedLocal': 'Continue with saved local account',
     'auth.login.unlockSavedLocal': 'Unlock saved local account',
     'auth.login.desktopNotice': 'For now, the client is optimized for the desktop version.',
-    'auth.login.devsignerByline': 'Made with ❤️ by strhodler',
+    'auth.login.strhodlerByline': 'Made with ❤️ by strhodler',
     'auth.selector.aria': 'Nostr login selector',
     'auth.selector.accessMethod': 'Access method',
     'auth.selector.loginMethodAria': 'Login method',

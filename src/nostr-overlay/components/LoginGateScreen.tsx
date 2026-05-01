@@ -90,10 +90,10 @@ export function LoginGateScreen({
                                         href="https://github.com/strhodler"
                                         target="_blank"
                                         rel="noreferrer"
-                                        data-testid="devsigner-attribution-link"
+                                        data-testid="strhodler-attribution-link"
                                     >
                                         <img src="/strhodler.jpg" alt="" className="size-5 rounded-full object-cover" />
-                                        {t('auth.login.devsignerByline')}
+                                        {t('auth.login.strhodlerByline')}
                                     </a>
                                 </Badge>
                             </>
