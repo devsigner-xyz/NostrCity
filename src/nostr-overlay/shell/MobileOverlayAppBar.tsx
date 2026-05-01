@@ -14,6 +14,19 @@ export function MobileOverlayAppBar({ title, showBack, onBack }: MobileOverlayAp
     const { t } = useI18n();
     const { isMobile, setOpenMobile } = useSidebar();
     const isHome = !showBack;
+    const menuButton = (
+        <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="nostr-mobile-app-bar-button"
+            aria-label={t('sidebar.openNavigation')}
+            title={t('sidebar.openNavigation')}
+            onClick={() => setOpenMobile(true)}
+        >
+            <MenuIcon aria-hidden="true" />
+        </Button>
+    );
 
     if (!isMobile) {
         return null;
@@ -25,42 +38,31 @@ export function MobileOverlayAppBar({ title, showBack, onBack }: MobileOverlayAp
             className={cn('nostr-mobile-app-bar md:hidden', isHome && 'nostr-mobile-app-bar-home')}
             aria-label={t('navigation.mobileHeader')}
         >
-            <div className="nostr-mobile-app-bar-main">
-                {showBack ? (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="nostr-mobile-app-bar-button"
-                        aria-label={t('navigation.back')}
-                        title={t('navigation.back')}
-                        onClick={onBack}
-                    >
-                        <ArrowLeftIcon aria-hidden="true" />
-                    </Button>
-                ) : (
-                    <img
-                        data-testid="mobile-overlay-app-bar-logo"
-                        className="nostr-mobile-app-bar-logo"
-                        src="/icon-light-48x48.png"
-                        alt=""
-                        aria-hidden="true"
-                    />
-                )}
-                <h1 className={cn('nostr-mobile-app-bar-title', isHome && 'nostr-mobile-app-bar-title-center')}>{title}</h1>
-            </div>
-
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="nostr-mobile-app-bar-button"
-                aria-label={t('sidebar.openNavigation')}
-                title={t('sidebar.openNavigation')}
-                onClick={() => setOpenMobile(true)}
-            >
-                <MenuIcon aria-hidden="true" />
-            </Button>
+            {isHome ? (
+                <>
+                    {menuButton}
+                    <h1 className="nostr-mobile-app-bar-title nostr-mobile-app-bar-title-center">{title}</h1>
+                    <span className="nostr-mobile-app-bar-spacer" aria-hidden="true" />
+                </>
+            ) : (
+                <>
+                    <div className="nostr-mobile-app-bar-main">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="nostr-mobile-app-bar-button"
+                            aria-label={t('navigation.back')}
+                            title={t('navigation.back')}
+                            onClick={onBack}
+                        >
+                            <ArrowLeftIcon aria-hidden="true" />
+                        </Button>
+                        <h1 className="nostr-mobile-app-bar-title">{title}</h1>
+                    </div>
+                    {menuButton}
+                </>
+            )}
         </header>
     );
 }

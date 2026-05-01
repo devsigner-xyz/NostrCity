@@ -18,7 +18,10 @@ La experiencia depende de los relays desde los que cargas perfiles, follows y ac
 
 Una vez dentro, la app construye una representacion espacial del ecosistema y te deja navegar perfiles, conexiones y capas visuales.
 
+Para moverte por el mapa, revisar edificios ocupados y entender los controles flotantes, consulta [Mapa y controles](/empezar/mapa-y-controles).
+
 ## Relacionado
 
 - [Acceso y login](/cuenta-y-acceso/acceso-y-login)
+- [Mapa y controles](/empezar/mapa-y-controles)
 - [Relays y configuracion](/cuenta-y-acceso/relays-y-configuracion)

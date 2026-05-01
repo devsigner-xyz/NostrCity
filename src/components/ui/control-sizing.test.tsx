@@ -94,4 +94,24 @@ describe("base control sizing", () => {
 
     expect(overlay?.className).toContain("backdrop-blur")
   })
+
+  test("renders dialogs fullscreen on mobile and wider on desktop", async () => {
+    const rendered = await renderElement(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Dialogo</DialogTitle>
+          <DialogDescription>Descripcion del dialogo</DialogDescription>
+        </DialogContent>
+      </Dialog>
+    )
+    mounted.push(rendered)
+
+    const content = document.body.querySelector('[data-slot="dialog-content"]')
+
+    expect(content?.className).toContain("max-md:h-dvh")
+    expect(content?.className).toContain("max-md:max-w-none")
+    expect(content?.className).toContain("max-md:rounded-none")
+    expect(content?.className).toContain("md:max-w-2xl")
+    expect(content?.className).toContain("md:rounded-xl")
+  })
 })

@@ -203,14 +203,21 @@ export default class DragController {
             return null;
         }
 
-        const data = event as Partial<{ delta: { x: number; y: number } }>;
-        if (!data.delta || !Number.isFinite(data.delta.x) || !Number.isFinite(data.delta.y)) {
-            return null;
+        const data = event as Partial<{ delta: { x: number; y: number }; dx: number; dy: number }>;
+        if (data.delta && Number.isFinite(data.delta.x) && Number.isFinite(data.delta.y)) {
+            return {
+                deltaX: data.delta.x,
+                deltaY: data.delta.y,
+            };
         }
 
-        return {
-            deltaX: data.delta.x,
-            deltaY: data.delta.y,
-        };
+        if (Number.isFinite(data.dx) && Number.isFinite(data.dy)) {
+            return {
+                deltaX: data.dx as number,
+                deltaY: data.dy as number,
+            };
+        }
+
+        return null;
     }
 }

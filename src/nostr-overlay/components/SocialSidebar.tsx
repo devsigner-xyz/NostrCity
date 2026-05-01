@@ -6,7 +6,7 @@ import type { NostrProfile } from '../../nostr/types';
 import { useI18n } from '@/i18n/useI18n';
 import { PeopleListTab } from './PeopleListTab';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 
 type SocialTab = 'following' | 'followers';
 
@@ -48,6 +48,7 @@ export function SocialSidebar({
     verificationByPubkey = {},
 }: SocialSidebarProps) {
     const { t } = useI18n();
+    const { isMobile, setOpenMobile } = useSidebar();
     const [activeDialog, setActiveDialog] = useState<SocialTab | null>(null);
     const [followingSearch, setFollowingSearch] = useState('');
     const [followersSearch, setFollowersSearch] = useState('');
@@ -90,6 +91,28 @@ export function SocialSidebar({
     }, [followerPeople, followerProfiles, followersSearch]);
     const dialogTitle = activeDialog === 'followers' ? t('social.followersList') : t('social.followingList');
     const dialogDescription = activeDialog === 'followers' ? t('social.followersDialogDescription') : t('social.followingDialogDescription');
+
+    const closeMobileSidebar = (): void => {
+        if (isMobile) {
+            setOpenMobile(false);
+        }
+    };
+
+    const selectPerson = (pubkey: string): void => {
+        if (onViewPersonDetails) {
+            onViewPersonDetails(pubkey);
+        } else {
+            onSelectFollowing?.(pubkey);
+        }
+        setActiveDialog(null);
+        closeMobileSidebar();
+    };
+
+    const locatePerson = (pubkey: string): void => {
+        onLocateFollowing?.(pubkey);
+        setActiveDialog(null);
+        closeMobileSidebar();
+    };
 
     return (
         <div className="nostr-social-sidebar" aria-label={t('social.panel')}>
@@ -140,8 +163,8 @@ export function SocialSidebar({
                                 emptyText={followersSearch ? t('social.emptyFollowersSearch') : t('social.emptyFollowers')}
                                 loading={followersLoading}
                                 {...(selectedFollowingPubkey !== undefined ? { selectedPubkey: selectedFollowingPubkey } : {})}
-                                {...(onSelectFollowing ? { onSelectPerson: onSelectFollowing } : {})}
-                                {...(onLocateFollowing ? { onLocatePerson: onLocateFollowing } : {})}
+                                {...(onSelectFollowing ? { onSelectPerson: selectPerson } : {})}
+                                {...(onLocateFollowing ? { onLocatePerson: locatePerson } : {})}
                                 {...(onCopyOwnerNpub ? { onCopyNpub: onCopyOwnerNpub } : {})}
                                 {...(onMessagePerson ? { onSendMessage: onMessagePerson } : {})}
                                 {...(onViewPersonDetails ? { onViewDetails: onViewPersonDetails } : {})}
@@ -162,8 +185,8 @@ export function SocialSidebar({
                                 emptyText={followingSearch ? t('social.emptyFollowingSearch') : t('social.emptyFollowing')}
                                 loading={false}
                                 {...(selectedFollowingPubkey !== undefined ? { selectedPubkey: selectedFollowingPubkey } : {})}
-                                {...(onSelectFollowing ? { onSelectPerson: onSelectFollowing } : {})}
-                                {...(onLocateFollowing ? { onLocatePerson: onLocateFollowing } : {})}
+                                {...(onSelectFollowing ? { onSelectPerson: selectPerson } : {})}
+                                {...(onLocateFollowing ? { onLocatePerson: locatePerson } : {})}
                                 {...(onCopyOwnerNpub ? { onCopyNpub: onCopyOwnerNpub } : {})}
                                 {...(onMessagePerson ? { onSendMessage: onMessagePerson } : {})}
                                 {...(onViewPersonDetails ? { onViewDetails: onViewPersonDetails } : {})}

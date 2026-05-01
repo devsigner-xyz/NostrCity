@@ -1098,7 +1098,12 @@ export function App({ mapBridge, services }: AppProps) {
                     onLocateFollowing={locateFollowingOnMap}
                     {...(canAccessDirectMessages ? { onMessagePerson: openDmFromContextMenu } : {})}
                     {...(overlay.canWrite ? { onFollowPerson: followPerson } : {})}
-                    onViewPersonDetails={(pubkey) => overlay.openActiveProfile(pubkey)}
+                    onViewPersonDetails={(pubkey) => {
+                        if (!isMapRoute) {
+                            navigate('/');
+                        }
+                        overlay.openActiveProfile(pubkey);
+                    }}
                     zapAmounts={zapSettings.amounts}
                     {...(overlay.canWrite ? { onZapPerson: (pubkey: string, amount: number) => requestZapPayment({ targetPubkey: pubkey, amount }) } : {})}
                     onConfigureZapAmounts={() => openSettingsPage('zaps')}

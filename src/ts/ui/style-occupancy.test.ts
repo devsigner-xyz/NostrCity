@@ -374,6 +374,47 @@ describe('DefaultStyle occupied/selected rendering with building models', () => 
         expect(setFillStyle).toHaveBeenCalledWith('rgba(0, 0, 0, 0.82)');
     });
 
+    test('keeps traffic particles visible at low fitted mobile zoom', () => {
+        const drawCircle = vi.fn();
+        const fakeCanvas = {
+            needsUpdate: false,
+            canvasScale: 1,
+            setFillStyle() {},
+            setStrokeStyle() {},
+            setLineWidth() {},
+            clearCanvas() {},
+            drawPolyline() {},
+            drawFrame() {},
+            drawPolygon() {},
+            drawCircle,
+            drawRotatedText() {},
+        };
+
+        class TestStyle extends DefaultStyle {
+            public createCanvasWrapper() {
+                return fakeCanvas as any;
+            }
+        }
+
+        const style = new TestStyle({} as HTMLCanvasElement, {} as any, { ...baseScheme }) as any;
+        style.trafficParticles = [
+            {
+                center: new Vector(10, 10),
+                radiusPx: 0.75,
+                haloPx: 2.2,
+                alpha: 0.16,
+            },
+        ];
+
+        const domainController = DomainController.getInstance();
+        domainController.zoom = 0.45;
+
+        style.draw();
+
+        expect(drawCircle).toHaveBeenNthCalledWith(1, new Vector(10, 10), 3);
+        expect(drawCircle).toHaveBeenNthCalledWith(2, new Vector(10, 10), 1.4);
+    });
+
     test('draws styled map labels with per-label color and font scale', () => {
         const drawRotatedText = vi.fn();
         const setFillStyle = vi.fn();

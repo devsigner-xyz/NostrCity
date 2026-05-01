@@ -767,7 +767,7 @@ export function OccupantProfileDialog({
 
                                 <Separator className="nostr-profile-dialog-separator" />
 
-                                <TabsList variant="line" className="grid h-auto w-full grid-cols-4" aria-label={t('profile.dialog.tabs')}>
+                                <TabsList variant="line" className="flex h-auto w-full justify-start" aria-label={t('profile.dialog.tabs')}>
                                     <TabsTrigger value="info">{t('profile.dialog.tabInfo')}</TabsTrigger>
                                     <TabsTrigger value="feed">{t('profile.dialog.tabFeed')}</TabsTrigger>
                                     <TabsTrigger value="following">{t('profile.dialog.tabFollowing', { count: String(follows.length) })}</TabsTrigger>

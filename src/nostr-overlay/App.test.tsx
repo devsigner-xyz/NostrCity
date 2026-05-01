@@ -6008,6 +6008,25 @@ describe('Nostr overlay App', () => {
         ) as HTMLElement;
         expect(zapSubTrigger).toBeDefined();
 
+        const copyFollowingItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
+            (node.textContent || '').trim() === 'Copiar npub'
+        ) as HTMLElement;
+        expect(copyFollowingItem).toBeDefined();
+
+        await act(async () => {
+            copyFollowingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        expect(clipboardWriteText).toHaveBeenCalledTimes(1);
+        expect((clipboardWriteText.mock.calls[0]?.[0] as string | undefined)?.startsWith('npub1')).toBe(true);
+
+        await act(async () => {
+            actionsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).some((node) =>
+            (node.textContent || '').trim() === 'Ubicar en el mapa'
+        ));
+
         const locateFollowingItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
             (node.textContent || '').trim() === 'Ubicar en el mapa'
         ) as HTMLElement;
@@ -6020,24 +6039,6 @@ describe('Nostr overlay App', () => {
         expect((bridge.focusBuilding as any).mock.calls.length).toBeGreaterThan(focusCallsBeforeLocate);
         await waitFor(() => rendered.container.querySelector('.nostr-following-feed-surface') === null);
         expect(rendered.container.querySelector('[aria-label="Controles de zoom"]')).not.toBeNull();
-
-        await act(async () => {
-            actionsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        await waitFor(() => Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).some((node) =>
-            (node.textContent || '').trim() === 'Copiar npub'
-        ));
-
-        const copyFollowingItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
-            (node.textContent || '').trim() === 'Copiar npub'
-        ) as HTMLElement;
-
-        await act(async () => {
-            copyFollowingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-        expect(clipboardWriteText).toHaveBeenCalledTimes(1);
-        expect((clipboardWriteText.mock.calls[0]?.[0] as string | undefined)?.startsWith('npub1')).toBe(true);
     });
 
     test('allows following from followers tab and updates row state to following', async () => {

@@ -414,10 +414,12 @@ export class DefaultStyle extends Style {
         if (this.trafficParticles.length > 0) {
             for (const particle of this.trafficParticles) {
                 const haloAlpha = Math.max(0, Math.min(1, particle.alpha));
+                const particleRadius = Math.max(1.4, particle.radiusPx * this.domainController.zoom);
+                const particleHalo = Math.max(3, particle.haloPx * this.domainController.zoom);
                 canvas.setFillStyle(`rgba(0, 0, 0, ${haloAlpha})`);
-                canvas.drawCircle(particle.center, particle.haloPx * this.domainController.zoom);
+                canvas.drawCircle(particle.center, particleHalo);
                 canvas.setFillStyle('rgba(0, 0, 0, 0.82)');
-                canvas.drawCircle(particle.center, particle.radiusPx * this.domainController.zoom);
+                canvas.drawCircle(particle.center, particleRadius);
             }
         }
 

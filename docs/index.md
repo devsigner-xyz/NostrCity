@@ -9,5 +9,6 @@ No pretende ser una especificacion completa del protocolo ni una wiki tecnica ex
 ## Empieza por aqui
 
 - [Primeros pasos](/empezar/)
+- [Mapa y controles](/empezar/mapa-y-controles)
 - [Que es Nostr City](/conceptos/que-es-nostr-city)
 - [Acceso y login](/cuenta-y-acceso/acceso-y-login)

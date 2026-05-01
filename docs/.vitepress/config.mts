@@ -39,6 +39,7 @@ export default defineConfig({
           { text: 'Inicio', link: '/' },
           { text: 'Primeros pasos', link: '/empezar/' },
           { text: 'Recorrido rapido', link: '/empezar/primeros-pasos' },
+          { text: 'Mapa y controles', link: '/empezar/mapa-y-controles' },
           { text: 'Exportacion y STL', link: '/empezar/exportacion-y-stl' },
         ],
       },

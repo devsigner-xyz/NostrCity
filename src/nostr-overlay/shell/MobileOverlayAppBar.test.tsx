@@ -91,7 +91,7 @@ afterEach(async () => {
 });
 
 describe('MobileOverlayAppBar', () => {
-    test('renders Nostr City and a menu button when back is hidden', async () => {
+    test('renders Nostr City with a left menu button and no logo when back is hidden', async () => {
         setMobileViewport();
         const rendered = await renderAppBar({ showBack: false });
         mounted.push(rendered);
@@ -105,11 +105,10 @@ describe('MobileOverlayAppBar', () => {
         expect(appBar?.getAttribute('aria-label')).toBe('Navegación principal');
         expect(appBar?.textContent || '').toContain('Nostr City');
         expect(appBar?.classList.contains('nostr-mobile-app-bar-home')).toBe(true);
-        expect(logo).not.toBeNull();
-        expect(logo?.getAttribute('src')).toBe('/icon-light-48x48.png');
-        expect(logo?.getAttribute('alt')).toBe('');
+        expect(logo).toBeNull();
         expect(title?.classList.contains('nostr-mobile-app-bar-title-center')).toBe(true);
         expect(menuButton).not.toBeNull();
+        expect(appBar?.firstElementChild).toBe(menuButton);
         expect(rendered.container.querySelector('button[aria-label="Volver"]')).toBeNull();
     });
 

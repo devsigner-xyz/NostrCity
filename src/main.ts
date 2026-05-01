@@ -80,6 +80,7 @@ class Main {
     private leftMouseDown = false;
     private leftDragDetected = false;
     private leftMouseDownPosition: Vector | null = null;
+    private leftMouseLastPanPosition: Vector | null = null;
 
     // Force redraw of roads when switching from tensor vis to map vis
     private previousFrameDrawTensor = true;
@@ -657,10 +658,16 @@ class Main {
             this.leftMouseDown = true;
             this.leftDragDetected = false;
             this.leftMouseDownPosition = new Vector(event.clientX, event.clientY);
+            this.leftMouseLastPanPosition = this.leftMouseDownPosition.clone();
         });
 
-        this.canvas.addEventListener('mousemove', (event: MouseEvent): void => {
+        window.addEventListener('mousemove', (event: MouseEvent): void => {
             if (!this.leftMouseDown || !this.leftMouseDownPosition) {
+                if (event.target !== this.canvas) {
+                    this.mainGui.setHoveredBuildingIndex(undefined);
+                    return;
+                }
+
                 if (this.showTensorField() || this.isPanModeActive()) {
                     this.mainGui.setHoveredBuildingIndex(undefined);
                     return;
@@ -683,6 +690,17 @@ class Main {
                 return;
             }
 
+            if (this.leftDragDetected && this.leftMouseLastPanPosition) {
+                const currentPoint = new Vector(event.clientX, event.clientY);
+                const deltaScreen = currentPoint.clone().sub(this.leftMouseLastPanPosition);
+                this.leftMouseLastPanPosition = currentPoint;
+                this.domainController.zoomToWorld(deltaScreen);
+                this.domainController.pan(deltaScreen);
+                this.mainGui.setHoveredBuildingIndex(undefined);
+                event.preventDefault();
+                return;
+            }
+
             const hoverWorldPoint = this.domainController.screenToWorld(new Vector(event.clientX, event.clientY));
             const hoverHit = this.mainGui.getOccupiedBuildingAtWorldPoint(hoverWorldPoint);
             this.mainGui.setHoveredBuildingIndex(hoverHit?.index);
@@ -699,6 +717,14 @@ class Main {
 
             this.leftMouseDown = false;
             this.leftMouseDownPosition = null;
+            this.leftMouseLastPanPosition = null;
+        });
+
+        window.addEventListener('blur', (): void => {
+            this.leftMouseDown = false;
+            this.leftMouseDownPosition = null;
+            this.leftMouseLastPanPosition = null;
+            this.leftDragDetected = false;
         });
 
         this.canvas.addEventListener('click', (event: MouseEvent): void => {
