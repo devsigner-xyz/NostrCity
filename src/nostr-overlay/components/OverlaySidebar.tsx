@@ -81,6 +81,7 @@ interface OverlaySidebarProps {
     onOpenMap: () => void;
     onOpenCityStats: () => void;
     onOpenChat: () => void;
+    onOpenGroups: () => void;
     onOpenRelays: () => void;
     onOpenNotifications: () => void;
     onOpenFollowingFeed: () => void;
@@ -144,6 +145,7 @@ function SidebarActionsMenu({
     onOpenMap,
     onOpenCityStats,
     onOpenChat,
+    onOpenGroups,
     onOpenRelays,
     onOpenNotifications,
     onOpenFollowingFeed,
@@ -272,6 +274,20 @@ function SidebarActionsMenu({
                         </SigningRequiredTooltip>
                     </SidebarMenuItem>
                 ) : null}
+
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={activePath === '/groups'}>
+                        <button
+                            type="button"
+                            aria-label={t('sidebar.openGroups')}
+                            title={t('sidebar.groups')}
+                            onClick={() => runNavigationAction(onOpenGroups)}
+                        >
+                            <UsersIcon />
+                            <span>{t('sidebar.groups')}</span>
+                        </button>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
 
                 {showPrimaryActionsInSidebar ? (
                     <SidebarMenuItem>
@@ -708,6 +724,7 @@ export function OverlaySidebar({
     onOpenMap,
     onOpenCityStats,
     onOpenChat,
+    onOpenGroups,
     onOpenRelays,
     onOpenNotifications,
     onOpenFollowingFeed,
@@ -770,6 +787,7 @@ export function OverlaySidebar({
                         onOpenMap={onOpenMap}
                         onOpenCityStats={onOpenCityStats}
                         onOpenChat={onOpenChat}
+                        onOpenGroups={onOpenGroups}
                         onOpenRelays={onOpenRelays}
                         onOpenNotifications={onOpenNotifications}
                         onOpenFollowingFeed={onOpenFollowingFeed}

@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { createNostrConnectUri, generateNip46PairingSecret } from '../../nostr/auth/providers/nip46/runtime';
 import type { ProviderResolveInput } from '../../nostr/auth/providers/types';
 import type { LoginMethod } from '../../nostr/auth/session';
+import { getBootstrapRelays } from '../../nostr/relay-policy';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useI18n } from '@/i18n/useI18n';
 import { toast } from 'sonner';
 
@@ -25,33 +30,45 @@ interface LoginMethodSelectorProps {
 }
 
 type SelectorMethod = 'npub' | 'nip07' | 'nip46';
+type Nip46Action = 'bunker' | 'nostrconnect';
+type Nip46PairingState = 'idle' | 'pairing' | 'timed-out' | 'error';
+
+const NIP46_PAIRING_QR_SIZE_PX = 172;
+const NIP46_PAIRING_RELAYS = getBootstrapRelays().slice(0, 2);
 
 export function LoginMethodSelector({
     disabled = false,
     loadingText,
     onStartSession,
     initialMethod = 'npub',
-    restrictToNpubOnly = import.meta.env.PROD,
+    restrictToNpubOnly = false,
 }: LoginMethodSelectorProps) {
     const { t } = useI18n();
     const [method, setMethod] = useState<SelectorMethod>(restrictToNpubOnly ? 'npub' : initialMethod);
     const [npub, setNpub] = useState('');
     const [bunkerUri, setBunkerUri] = useState('');
+    const [nip46Action, setNip46Action] = useState<Nip46Action>('bunker');
+    const [nostrConnectUri, setNostrConnectUri] = useState('');
+    const [nostrConnectClientSecretKey, setNostrConnectClientSecretKey] = useState<Uint8Array | null>(null);
+    const [nip46PairingState, setNip46PairingState] = useState<Nip46PairingState>('idle');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const run = async (action: () => Promise<void> | void) => {
+    const run = async (action: () => Promise<void> | void, onError?: (error: unknown) => void): Promise<boolean> => {
         setIsSubmitting(true);
         try {
             await action();
+            return true;
         } catch (error) {
+            onError?.(error);
             const message = error instanceof Error ? error.message : t('auth.selector.genericError');
             toast.error(message, { duration: 2200 });
+            return false;
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleNpubSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleNpubSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const credential = npub.trim();
         if (!credential) {
@@ -73,7 +90,7 @@ export function LoginMethodSelector({
     };
     const selectorMethods: SelectorMethod[] = restrictToNpubOnly ? ['npub'] : ['npub', 'nip07', 'nip46'];
 
-    const handleNip46Submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleNip46Submit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const value = bunkerUri.trim();
         if (!value) {
@@ -83,6 +100,41 @@ export function LoginMethodSelector({
         await run(async () => {
             await onStartSession('nip46', { bunkerUri: value });
         });
+    };
+
+    const handleGenerateNostrConnect = () => {
+        const clientSecretKey = generateSecretKey();
+        const clientPubkey = getPublicKey(clientSecretKey);
+        setNostrConnectUri(createNostrConnectUri({
+            clientPubkey,
+            relays: NIP46_PAIRING_RELAYS,
+            secret: generateNip46PairingSecret(),
+            name: t('auth.selector.nip46ClientName'),
+        }));
+        setNostrConnectClientSecretKey(clientSecretKey);
+        setNip46PairingState('idle');
+    };
+
+    const handleCopyNostrConnect = async () => {
+        if (!nostrConnectUri || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+            return;
+        }
+
+        await navigator.clipboard.writeText(nostrConnectUri);
+    };
+
+    const handleStartNostrConnectPairing = async () => {
+        if (!nostrConnectUri || !nostrConnectClientSecretKey) {
+            return;
+        }
+
+        setNip46PairingState('pairing');
+        await run(async () => {
+            await onStartSession('nip46', {
+                bunkerUri: nostrConnectUri,
+                clientSecretKey: nostrConnectClientSecretKey,
+            });
+        }, (error) => setNip46PairingState(isTimeoutError(error) ? 'timed-out' : 'error'));
     };
 
     return (
@@ -151,29 +203,133 @@ export function LoginMethodSelector({
             ) : null}
 
             {method === 'nip46' ? (
-                <form className="grid gap-2" data-testid="login-method-form-nip46" onSubmit={handleNip46Submit}>
-                    <Label htmlFor="nostr-bunker-uri-input">{t('auth.selector.bunkerUri')}</Label>
-
-                    <Input
-                        id="nostr-bunker-uri-input"
-                        name="bunker-uri"
-                        placeholder="bunker://... o nostrconnect://..."
-                        value={bunkerUri}
+                <div className="grid gap-3">
+                    <ToggleGroup
+                        type="single"
+                        value={nip46Action}
+                        onValueChange={(value) => {
+                            if (value !== 'bunker' && value !== 'nostrconnect') {
+                                return;
+                            }
+                            setNip46Action(value);
+                            if (value === 'nostrconnect' && !nostrConnectUri) {
+                                handleGenerateNostrConnect();
+                            }
+                        }}
                         disabled={isBusy}
-                        onChange={(event) => setBunkerUri(event.target.value)}
-                    />
+                        variant="outline"
+                        className="grid w-full grid-cols-2"
+                    >
+                        <ToggleGroupItem value="bunker" className="w-full">
+                            {t('auth.selector.nip46PasteAction')}
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="nostrconnect" className="w-full">
+                            {t('auth.selector.nip46NostrConnectAction')}
+                        </ToggleGroupItem>
+                    </ToggleGroup>
 
-                    <Button type="submit" className="mt-2 w-full" data-testid="login-method-submit-nip46" disabled={isBusy || bunkerUri.trim().length === 0}>
-                        {isBusy ? (
-                            <>
-                                <Spinner data-icon="inline-start" />
-                                {busyLabel}
-                            </>
-                        ) : t('auth.selector.connectBunker')}
-                    </Button>
-                </form>
+                    {nip46Action === 'bunker' ? (
+                        <form className="grid gap-2" data-testid="login-method-form-nip46" onSubmit={handleNip46Submit}>
+                            <div className="grid gap-1">
+                                <Label htmlFor="nostr-bunker-uri-input">{t('auth.selector.bunkerUri')}</Label>
+                                <p className="text-xs text-muted-foreground">{t('auth.selector.nip46PasteDescription')}</p>
+                            </div>
+
+                            <Input
+                                id="nostr-bunker-uri-input"
+                                name="bunker-uri"
+                                placeholder={t('auth.selector.bunkerUriPlaceholder')}
+                                value={bunkerUri}
+                                disabled={isBusy}
+                                onChange={(event) => setBunkerUri(event.target.value)}
+                            />
+
+                            <Button type="submit" className="mt-2 w-full" data-testid="login-method-submit-nip46" disabled={isBusy || bunkerUri.trim().length === 0}>
+                                {isBusy ? (
+                                    <>
+                                        <Spinner data-icon="inline-start" />
+                                        {busyLabel}
+                                    </>
+                                ) : t('auth.selector.connectBunker')}
+                            </Button>
+                        </form>
+                    ) : null}
+
+                    {nip46Action === 'nostrconnect' ? (
+                        <div className="grid gap-3">
+                            <p className="text-xs text-muted-foreground">{t('auth.selector.nip46NostrConnectDescription')}</p>
+                            <Button type="button" variant="outline" onClick={handleGenerateNostrConnect} disabled={isBusy}>
+                                {t('auth.selector.nip46GenerateQr')}
+                            </Button>
+
+                            {nostrConnectUri ? (
+                                <div className="grid gap-3 rounded-lg border bg-card p-3 text-card-foreground">
+                                    {nip46PairingState === 'pairing' ? (
+                                        <p className="text-sm text-muted-foreground" role="status">
+                                            {t('auth.selector.nip46PairingWaiting')}
+                                        </p>
+                                    ) : null}
+                                    {nip46PairingState === 'error' ? (
+                                        <p className="text-sm text-destructive" role="status">
+                                            {t('auth.selector.nip46PairingError')}
+                                        </p>
+                                    ) : null}
+                                    {nip46PairingState === 'timed-out' ? (
+                                        <p className="text-sm text-destructive" role="status">
+                                            {t('auth.selector.nip46PairingTimedOut')}
+                                        </p>
+                                    ) : null}
+                                    <div
+                                        data-testid="nip46-nostrconnect-qr"
+                                        className="mx-auto rounded-lg bg-white p-2 shadow-xs"
+                                        aria-label={t('auth.selector.nip46QrAria')}
+                                    >
+                                        <QRCodeSVG
+                                            value={nostrConnectUri}
+                                            size={NIP46_PAIRING_QR_SIZE_PX}
+                                            level="M"
+                                            marginSize={1}
+                                            title={t('auth.selector.nip46QrAria')}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            aria-label={t('auth.selector.nip46CopyAria')}
+                                            onClick={() => void handleCopyNostrConnect()}
+                                            disabled={isBusy}
+                                        >
+                                            {t('auth.selector.nip46Copy')}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={() => void handleStartNostrConnectPairing()}
+                                            disabled={isBusy || nip46PairingState === 'pairing'}
+                                        >
+                                            {isBusy || nip46PairingState === 'pairing' ? (
+                                                <>
+                                                    <Spinner data-icon="inline-start" />
+                                                    {t('auth.selector.nip46PairingButtonBusy')}
+                                                </>
+                                            ) : t('auth.selector.nip46StartPairing')}
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : null}
+                </div>
             ) : null}
 
         </section>
     );
+}
+
+function isTimeoutError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+        return false;
+    }
+
+    return /\btime(?:d)?\s*out\b|timeout/i.test(error.message);
 }

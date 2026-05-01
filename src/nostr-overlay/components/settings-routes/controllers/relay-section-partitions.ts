@@ -6,6 +6,7 @@ export function buildConfiguredSectionRows(byType: RelaySettingsByType): {
     configuredRows: RelayRow[];
     dmConfiguredRows: RelayRow[];
     searchConfiguredRows: RelayRow[];
+    groupConfiguredRows: RelayRow[];
 } {
     return {
         configuredRows: buildRelayRowsByUrl({
@@ -29,6 +30,14 @@ export function buildConfiguredSectionRows(byType: RelaySettingsByType): {
             dmInbox: [],
             search: byType.search,
         }),
+        groupConfiguredRows: buildRelayRowsByUrl({
+            nip65Both: [],
+            nip65Read: [],
+            nip65Write: [],
+            dmInbox: [],
+            search: [],
+            groups: byType.groups,
+        }),
     };
 }
 
@@ -39,6 +48,7 @@ export function buildSuggestedSectionRows(input: {
     suggestedRows: RelayRow[];
     dmSuggestedRows: RelayRow[];
     searchSuggestedRows: RelayRow[];
+    groupSuggestedRows: RelayRow[];
 } {
     const { relaySettings, normalizedSuggestedByType } = input;
     const configuredNip65Read = new Set([
@@ -71,6 +81,14 @@ export function buildSuggestedSectionRows(input: {
             nip65Write: [],
             dmInbox: [],
             search: normalizedSuggestedByType.search.filter((relayUrl) => !relaySettings.byType.search.includes(relayUrl)),
+        }),
+        groupSuggestedRows: buildRelayRowsByUrl({
+            nip65Both: [],
+            nip65Read: [],
+            nip65Write: [],
+            dmInbox: [],
+            search: [],
+            groups: normalizedSuggestedByType.groups.filter((relayUrl) => !relaySettings.byType.groups.includes(relayUrl)),
         }),
     };
 }

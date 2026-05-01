@@ -104,7 +104,7 @@ export function parseNip46Response(payload: string): Nip46RpcResponse {
 }
 
 export function createNip46ResponseClassifier(
-    decrypt: (ciphertext: string) => Promise<string>
+    decrypt: (ciphertext: string) => Promise<string> | string
 ): (event: Nip46TransportEvent) => Promise<string | undefined> {
     return async (event: Nip46TransportEvent): Promise<string | undefined> => {
         try {
@@ -114,6 +114,12 @@ export function createNip46ResponseClassifier(
             return undefined;
         }
     };
+}
+
+export function createNip46EventResponseClassifier(input: {
+    decrypt: (ciphertext: string) => Promise<string> | string;
+}): (event: Nip46TransportEvent) => Promise<string | undefined> {
+    return createNip46ResponseClassifier((ciphertext) => input.decrypt(ciphertext));
 }
 
 export function createNip46RpcClient(input: CreateNip46RpcClientInput) {

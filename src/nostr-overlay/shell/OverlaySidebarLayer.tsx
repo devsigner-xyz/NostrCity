@@ -28,6 +28,7 @@ interface OverlaySidebarLayerProps {
     onOpenMap: () => void;
     onOpenCityStats: () => void;
     onOpenChat: () => void;
+    onOpenGroups: () => void;
     onOpenRelays: () => void;
     onOpenNotifications: () => void;
     onOpenFollowingFeed: () => void;
@@ -85,6 +86,7 @@ export function OverlaySidebarLayer({
     onOpenMap,
     onOpenCityStats,
     onOpenChat,
+    onOpenGroups,
     onOpenRelays,
     onOpenNotifications,
     onOpenFollowingFeed,
@@ -145,6 +147,7 @@ export function OverlaySidebarLayer({
             onOpenMap={onOpenMap}
             onOpenCityStats={onOpenCityStats}
             onOpenChat={onOpenChat}
+            onOpenGroups={onOpenGroups}
             onOpenRelays={onOpenRelays}
             onOpenNotifications={onOpenNotifications}
             onOpenFollowingFeed={onOpenFollowingFeed}

@@ -1,7 +1,8 @@
 import { createLocalKeyStorage, type LocalKeyStorage } from './local-key-storage';
 import { LocalKeyAuthProvider } from './providers/local-key-provider';
 import { Nip07AuthProvider } from './providers/nip07-provider';
-import { Nip46AuthProvider } from './providers/nip46-provider';
+import { Nip46AuthProvider, type Nip46Runtime, type Nip46RuntimeFactory } from './providers/nip46-provider';
+import { createNip46Runtime } from './providers/nip46/runtime';
 import { NpubAuthProvider } from './providers/npub-provider';
 import type { AuthProvider, ProviderResolveInput } from './providers/types';
 import {
@@ -22,6 +23,7 @@ interface AuthServiceOptions {
     now?: () => number;
     providers?: Partial<Record<LoginMethod, AuthProvider>>;
     localKeyStorage?: LocalKeyStorage;
+    createNip46Runtime?: Nip46RuntimeFactory;
 }
 
 type SessionListener = (session: AuthSessionState | undefined) => void;
@@ -41,11 +43,18 @@ interface AuthService {
     logout(): Promise<void>;
 }
 
-function buildDefaultProviders(): Record<LoginMethod, AuthProvider> {
+function buildDefaultProviders(options: { createNip46Runtime?: Nip46RuntimeFactory | undefined } = {}): Record<LoginMethod, AuthProvider> {
+    const createRuntime: Nip46RuntimeFactory = options.createNip46Runtime ?? (async (input) => createNip46Runtime({
+        parsedUri: input.parsedUri,
+        ...(input.clientSecretKey ? { clientSecretKey: input.clientSecretKey } : {}),
+        ...(input.relays ? { relays: input.relays } : {}),
+        ...(input.remoteSignerPubkey ? { remoteSignerPubkey: input.remoteSignerPubkey } : {}),
+    }) as Nip46Runtime);
+
     return {
         npub: new NpubAuthProvider(),
         nip07: new Nip07AuthProvider(),
-        nip46: new Nip46AuthProvider(),
+        nip46: new Nip46AuthProvider({ createRuntime }),
         local: new LocalKeyAuthProvider(),
     };
 }
@@ -68,7 +77,7 @@ export function createAuthService(options: AuthServiceOptions = {}): AuthService
     const storage = options.storage;
     const now = options.now ?? (() => Date.now());
     const providerMap: Record<LoginMethod, AuthProvider> = {
-        ...buildDefaultProviders(),
+        ...buildDefaultProviders({ createNip46Runtime: options.createNip46Runtime }),
         ...(options.providers ?? {}),
     };
     const localKeyStorage = options.localKeyStorage ?? createLocalKeyStorage({
@@ -93,7 +102,11 @@ export function createAuthService(options: AuthServiceOptions = {}): AuthService
             });
         }
 
-        saveStoredAuthSession(toStoredSession(session), storage);
+        if (session.method === 'nip46') {
+            clearStoredAuthSession(storage);
+        } else {
+            saveStoredAuthSession(toStoredSession(session), storage);
+        }
     };
 
     return {

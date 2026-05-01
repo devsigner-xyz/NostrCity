@@ -170,6 +170,7 @@ function createDefaultProps(overrides: Partial<ComponentProps<typeof OverlayDial
             nip65Write: [],
             dmInbox: [],
             search: [],
+            groups: [],
         },
         networkLoading: false,
         loadMorePosts: vi.fn(async () => {}),

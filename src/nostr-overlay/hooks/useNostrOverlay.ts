@@ -43,6 +43,8 @@ import { toast } from 'sonner';
 import type { SocialPublisher } from '../social-publisher';
 import { mergeUserSearchResults, searchLocalUsers } from '../search/local-user-search';
 import { useOverlaySessionController } from '../controllers/use-overlay-session-controller';
+import type { OverlaySessionAuthService } from '../controllers/use-overlay-session-controller';
+import type { OverlayGroupsService } from '../controllers/use-overlay-groups-controller';
 
 export type OverlayStatus =
     | 'idle'
@@ -101,6 +103,8 @@ export interface NostrOverlayServices {
     socialFeedService?: SocialFeedService;
     userSearchApiService?: UserSearchApiService;
     socialPublisher?: SocialPublisher;
+    authService?: OverlaySessionAuthService;
+    groupsService?: OverlayGroupsService;
     configureAuthHeaders?: (getAuthHeaders: ((context: HttpClientAuthContext) => Promise<Record<string, string> | undefined>) | undefined) => void;
     setOwnerPubkey?: (ownerPubkey: string | undefined) => void;
     setWriteGateway?: (writeGateway: ReturnType<typeof createWriteGateway> | undefined) => void;
@@ -123,6 +127,7 @@ const EMPTY_RELAY_SUGGESTIONS_BY_TYPE: RelaySettingsByType = {
     nip65Write: [],
     dmInbox: [],
     search: [],
+    groups: [],
 };
 
 const missingGraphApiService: GraphApiService = {
@@ -211,6 +216,7 @@ function createInitialData(): OverlayData {
             nip65Write: [],
             dmInbox: [],
             search: [],
+            groups: [],
         },
         selectedPubkey: undefined,
         ...createEmptyActiveProfileState(),
@@ -372,6 +378,7 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
     const occupancyAnimationTokenRef = useRef(0);
     const skipNextMapGeneratedRef = useRef(false);
     const sessionController = useOverlaySessionController({
+        authService: services?.authService,
         enabled: Boolean(mapBridge),
         configureAuthHeaders: services?.configureAuthHeaders,
         setWriteGateway: services?.setWriteGateway,
@@ -856,6 +863,7 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
                             nip65Write: [],
                             dmInbox: [],
                             search: [],
+                            groups: [],
                         },
                     }),
                 });
@@ -870,6 +878,7 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
                 nip65Write: [],
                 dmInbox: [],
                 search: [],
+                groups: [],
             };
             try {
                 const [relayListEvent, dmInboxRelayListEvent] = await Promise.all([
@@ -890,6 +899,7 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
                     ...nip65ByType,
                     dmInbox: dmInboxRelays,
                     search: [],
+                    groups: [],
                 };
                 suggestedRelays = relayListFromKind10002Event(relayListEvent);
             } catch {
@@ -900,6 +910,7 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
                     nip65Write: [],
                     dmInbox: [],
                     search: [],
+                    groups: [],
                 };
             }
 
@@ -1153,6 +1164,7 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
                 status: 'error',
                 error: message,
             }));
+            throw error;
         }
     };
 
@@ -1773,6 +1785,7 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
         directMessagesService,
         socialNotificationsService,
         socialFeedService,
+        groupsService: services.groupsService,
         submitNpub,
         regenerateMap,
         searchUsers,

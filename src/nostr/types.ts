@@ -24,6 +24,9 @@ export interface NostrFilter {
     '#p'?: string[];
     '#q'?: string[];
     '#t'?: string[];
+    '#h'?: string[];
+    '#d'?: string[];
+    '#a'?: string[];
     since?: number;
     until?: number;
     limit?: number;

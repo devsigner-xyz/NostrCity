@@ -32,6 +32,7 @@ async function renderElement() {
                     nip65Write: 'NIP-65 write',
                     dmInbox: 'NIP-17 DM inbox',
                     search: 'NIP-50 search',
+                    groups: 'NIP-29 groups',
                 }}
                 relayAvatarFallback={() => 'RL'}
                 relayConnectionBadge={() => <Badge variant="outline">Online</Badge>}

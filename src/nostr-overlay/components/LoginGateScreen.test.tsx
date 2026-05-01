@@ -51,9 +51,28 @@ beforeAll(() => {
     if (!Element.prototype.scrollIntoView) {
         Element.prototype.scrollIntoView = () => {};
     }
+
+    const htmlElementPrototype = HTMLElement.prototype as HTMLElement & {
+        hasPointerCapture?: (pointerId: number) => boolean;
+        setPointerCapture?: (pointerId: number) => void;
+        releasePointerCapture?: (pointerId: number) => void;
+    };
+
+    if (!htmlElementPrototype.hasPointerCapture) {
+        htmlElementPrototype.hasPointerCapture = () => false;
+    }
+
+    if (!htmlElementPrototype.setPointerCapture) {
+        htmlElementPrototype.setPointerCapture = () => {};
+    }
+
+    if (!htmlElementPrototype.releasePointerCapture) {
+        htmlElementPrototype.releasePointerCapture = () => {};
+    }
 });
 
 afterEach(async () => {
+    vi.unstubAllEnvs();
     window.localStorage.clear();
     for (const entry of mounted) {
         await act(async () => {
@@ -183,6 +202,27 @@ describe('LoginGateScreen', () => {
         expect(selectorSection).not.toBeNull();
         expect(actionGroup).not.toBeNull();
         expect(selectorSection?.parentElement).toBe(actionGroup);
+    });
+
+    test('keeps signed login methods available on the production login gate', async () => {
+        vi.stubEnv('PROD', true);
+
+        const rendered = await renderScreen();
+        mounted.push(rendered);
+
+        const methodSelectTrigger = rendered.container.querySelector('[data-testid="login-method-trigger"]') as HTMLButtonElement;
+        expect(methodSelectTrigger).toBeDefined();
+        expect(methodSelectTrigger.disabled).toBe(false);
+
+        await act(async () => {
+            methodSelectTrigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+            methodSelectTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+        });
+
+        const options = Array.from(document.body.querySelectorAll('[data-slot="select-item"]')).map((option) => (option.textContent || '').trim());
+        expect(options).toContain('npub (solo lectura)');
+        expect(options).toContain('Extensión (NIP-07)');
+        expect(options).toContain('Búnker (NIP-46)');
     });
 
     test('disables create account entry point when login gate is disabled', async () => {

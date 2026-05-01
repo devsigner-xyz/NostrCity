@@ -21,6 +21,7 @@ function emptyRelaySettingsByType(): RelaySettingsByType {
         nip65Write: [],
         dmInbox: [],
         search: [],
+        groups: [],
     };
 }
 
@@ -72,6 +73,7 @@ async function loadFromClient(input: { pubkey: string; client: NostrClient; time
         ...relaySuggestionsByTypeFromKind10002Event(relayListEvent),
         dmInbox: dmInboxRelayListFromKind10050Event(dmRelayListEvent),
         search: [],
+        groups: [],
     };
 }
 
@@ -93,5 +95,6 @@ export async function loadProfileRelaySuggestions(input: ProfileRelayDiscoveryIn
         nip65Write: fallback.nip65Write,
         dmInbox: primary.dmInbox.length > 0 ? primary.dmInbox : fallback.dmInbox,
         search: [],
+        groups: [],
     };
 }

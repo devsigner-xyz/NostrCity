@@ -3,12 +3,13 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath, URL } from 'node:url';
 import { resolveManualChunk } from './src/build/chunking';
+import { createAppHistoryFallbackPlugin } from './src/build/app-history-fallback';
 
 const landingEntry = fileURLToPath(new URL('./index.html', import.meta.url));
 const appEntry = fileURLToPath(new URL('./app/index.html', import.meta.url));
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [createAppHistoryFallbackPlugin(), react(), tailwindcss()],
   server: {
     proxy: {
       '/v1': {

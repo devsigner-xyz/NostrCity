@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import {
     addRelay,
+    DEFAULT_GROUP_RELAYS,
     DEFAULT_SEARCH_RELAYS,
     getDefaultDmInboxRelays,
     loadRelaySettings,
@@ -47,6 +48,8 @@ export interface RelaysSettingsController {
     dmSuggestedRows: ReturnType<typeof buildRelayRowsByUrl>;
     searchConfiguredRows: ReturnType<typeof buildRelayRowsByUrl>;
     searchSuggestedRows: ReturnType<typeof buildRelayRowsByUrl>;
+    groupConfiguredRows: ReturnType<typeof buildRelayRowsByUrl>;
+    groupSuggestedRows: ReturnType<typeof buildRelayRowsByUrl>;
     connectedConfiguredRelays: number;
     disconnectedConfiguredRelays: number;
     relayInfoByUrl: Record<string, { data?: RelayInformationDocument }>;
@@ -56,12 +59,15 @@ export interface RelaysSettingsController {
     newRelayInput: string;
     newDmRelayInput: string;
     newSearchRelayInput: string;
+    newGroupRelayInput: string;
     invalidRelayInputs: string[];
     invalidDmRelayInputs: string[];
     invalidSearchRelayInputs: string[];
+    invalidGroupRelayInputs: string[];
     onNewRelayInputChange: (value: string) => void;
     onNewDmRelayInputChange: (value: string) => void;
     onNewSearchRelayInputChange: (value: string) => void;
+    onNewGroupRelayInputChange: (value: string) => void;
     onAddRelays: () => void;
     onRemoveRelay: (relayUrl: string) => void;
     onSetConfiguredRelayNip65Access: (relayUrl: string, access: { read: boolean; write: boolean }) => void;
@@ -78,6 +84,11 @@ export interface RelaysSettingsController {
     onAddSuggestedSearchRelay: (relayUrl: string, relayTypes: RelayType[]) => void;
     onAddAllSuggestedSearchRelays: () => void;
     onResetSearchRelaysToDefault: () => void;
+    onAddGroupRelays: () => void;
+    onRemoveGroupRelay: (relayUrl: string) => void;
+    onAddSuggestedGroupRelay: (relayUrl: string, relayTypes: RelayType[]) => void;
+    onAddAllSuggestedGroupRelays: () => void;
+    onResetGroupRelaysToDefault: () => void;
     onOpenRelayActionsMenu: (event: MouseEvent<HTMLButtonElement>) => void;
     describeRelay: typeof describeRelay;
     relayAvatarFallback: typeof relayAvatarFallback;
@@ -99,9 +110,11 @@ export function useRelaysSettingsController(input: UseRelaysSettingsControllerIn
     const [newRelayInput, setNewRelayInput] = useState('');
     const [newDmRelayInput, setNewDmRelayInput] = useState('');
     const [newSearchRelayInput, setNewSearchRelayInput] = useState('');
+    const [newGroupRelayInput, setNewGroupRelayInput] = useState('');
     const [invalidRelayInputs, setInvalidRelayInputs] = useState<string[]>([]);
     const [invalidDmRelayInputs, setInvalidDmRelayInputs] = useState<string[]>([]);
     const [invalidSearchRelayInputs, setInvalidSearchRelayInputs] = useState<string[]>([]);
+    const [invalidGroupRelayInputs, setInvalidGroupRelayInputs] = useState<string[]>([]);
 
     const persistRelaySettings = (nextState: RelaySettingsState): void => {
         const savedState = saveRelaySettings(nextState, ownerPubkey ? { ownerPubkey } : undefined);
@@ -114,12 +127,17 @@ export function useRelaysSettingsController(input: UseRelaysSettingsControllerIn
     }, [ownerPubkey]);
 
     const normalizedSuggestedByType = useMemo<RelaySettingsByType>(() => {
+        const suggestedGroupRelays = suggestedRelaysByType?.groups?.length
+            ? suggestedRelaysByType.groups
+            : DEFAULT_GROUP_RELAYS;
+
         return {
             nip65Both: mergeRelaySets(suggestedRelaysByType?.nip65Both ?? [], suggestedRelays),
             nip65Read: mergeRelaySets(suggestedRelaysByType?.nip65Read ?? []),
             nip65Write: mergeRelaySets(suggestedRelaysByType?.nip65Write ?? []),
             dmInbox: mergeRelaySets(suggestedRelaysByType?.dmInbox ?? []),
             search: mergeRelaySets(suggestedRelaysByType?.search ?? DEFAULT_SEARCH_RELAYS),
+            groups: mergeRelaySets(suggestedGroupRelays),
         };
     }, [suggestedRelaysByType, suggestedRelays]);
 
@@ -127,12 +145,14 @@ export function useRelaysSettingsController(input: UseRelaysSettingsControllerIn
         configuredRows,
         dmConfiguredRows,
         searchConfiguredRows,
+        groupConfiguredRows,
     } = useMemo(() => buildConfiguredSectionRows(relaySettings.byType), [relaySettings.byType]);
 
     const {
         suggestedRows,
         dmSuggestedRows,
         searchSuggestedRows,
+        groupSuggestedRows,
     } = useMemo(() => buildSuggestedSectionRows({
         relaySettings,
         normalizedSuggestedByType,
@@ -145,14 +165,16 @@ export function useRelaysSettingsController(input: UseRelaysSettingsControllerIn
         configuredRows,
         dmConfiguredRows,
         searchConfiguredRows,
-    }), [configuredRows, dmConfiguredRows, searchConfiguredRows]);
+        groupConfiguredRows,
+    }), [configuredRows, dmConfiguredRows, searchConfiguredRows, groupConfiguredRows]);
 
     const suggestedRelayStatusTargets = useMemo(() => buildSuggestedRelayStatusTargets({
         configuredRelayStatusTargets: allConfiguredRelayStatusTargets,
         suggestedRows,
         dmSuggestedRows,
         searchSuggestedRows,
-    }), [allConfiguredRelayStatusTargets, suggestedRows, dmSuggestedRows, searchSuggestedRows]);
+        groupSuggestedRows,
+    }), [allConfiguredRelayStatusTargets, suggestedRows, dmSuggestedRows, searchSuggestedRows, groupSuggestedRows]);
 
     const { statusByRelay: configuredRelayConnectionStatusByRelay } = useRelayConnectionSummary(allConfiguredRelayStatusTargets, {
         enabled: true,
@@ -276,6 +298,7 @@ export function useRelaysSettingsController(input: UseRelaysSettingsControllerIn
                 nip65Write: bootstrap,
                 dmInbox: relaySettings.byType.dmInbox,
                 search: relaySettings.byType.search,
+                groups: relaySettings.byType.groups,
             },
         });
         setInvalidRelayInputs([]);
@@ -408,6 +431,69 @@ export function useRelaysSettingsController(input: UseRelaysSettingsControllerIn
         setNewSearchRelayInput('');
     };
 
+    const onAddGroupRelays = (): void => {
+        const lines = newGroupRelayInput
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+        if (lines.length === 0) {
+            setInvalidGroupRelayInputs([]);
+            return;
+        }
+
+        let nextState = relaySettings;
+        const invalid: string[] = [];
+
+        for (const line of lines) {
+            const normalized = normalizeRelayInput(line);
+            if (!normalized) {
+                invalid.push(line);
+                continue;
+            }
+
+            nextState = addRelay(nextState, normalized, 'groups');
+        }
+
+        persistRelaySettings(nextState);
+        setInvalidGroupRelayInputs(invalid);
+        setNewGroupRelayInput('');
+    };
+
+    const onRemoveGroupRelay = (relayUrl: string): void => {
+        persistRelaySettings(removeRelay(relaySettings, relayUrl, 'groups'));
+    };
+
+    const onAddSuggestedGroupRelay = (relayUrl: string, relayTypes: RelayType[]): void => {
+        let nextState = relaySettings;
+        for (const relayType of relayTypes) {
+            nextState = addRelay(nextState, relayUrl, relayType);
+        }
+        persistRelaySettings(nextState);
+    };
+
+    const onAddAllSuggestedGroupRelays = (): void => {
+        let nextState = relaySettings;
+        for (const row of groupSuggestedRows) {
+            for (const relayType of row.relayTypes) {
+                nextState = addRelay(nextState, row.relayUrl, relayType);
+            }
+        }
+        persistRelaySettings(nextState);
+    };
+
+    const onResetGroupRelaysToDefault = (): void => {
+        persistRelaySettings({
+            ...relaySettings,
+            byType: {
+                ...relaySettings.byType,
+                groups: [],
+            },
+        });
+        setInvalidGroupRelayInputs([]);
+        setNewGroupRelayInput('');
+    };
+
     const onOpenRelayActionsMenu = (event: MouseEvent<HTMLButtonElement>): void => {
         event.preventDefault();
         const rect = event.currentTarget.getBoundingClientRect();
@@ -426,6 +512,8 @@ export function useRelaysSettingsController(input: UseRelaysSettingsControllerIn
         dmSuggestedRows,
         searchConfiguredRows,
         searchSuggestedRows,
+        groupConfiguredRows,
+        groupSuggestedRows,
         connectedConfiguredRelays,
         disconnectedConfiguredRelays,
         relayInfoByUrl,
@@ -435,12 +523,15 @@ export function useRelaysSettingsController(input: UseRelaysSettingsControllerIn
         newRelayInput,
         newDmRelayInput,
         newSearchRelayInput,
+        newGroupRelayInput,
         invalidRelayInputs,
         invalidDmRelayInputs,
         invalidSearchRelayInputs,
+        invalidGroupRelayInputs,
         onNewRelayInputChange: setNewRelayInput,
         onNewDmRelayInputChange: setNewDmRelayInput,
         onNewSearchRelayInputChange: setNewSearchRelayInput,
+        onNewGroupRelayInputChange: setNewGroupRelayInput,
         onAddRelays,
         onRemoveRelay,
         onSetConfiguredRelayNip65Access,
@@ -457,6 +548,11 @@ export function useRelaysSettingsController(input: UseRelaysSettingsControllerIn
         onAddSuggestedSearchRelay,
         onAddAllSuggestedSearchRelays,
         onResetSearchRelaysToDefault,
+        onAddGroupRelays,
+        onRemoveGroupRelay,
+        onAddSuggestedGroupRelay,
+        onAddAllSuggestedGroupRelays,
+        onResetGroupRelaysToDefault,
         onOpenRelayActionsMenu,
         describeRelay,
         relayAvatarFallback,

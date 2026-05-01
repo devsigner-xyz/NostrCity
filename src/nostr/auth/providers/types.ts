@@ -32,6 +32,7 @@ export interface ProviderResolveInput {
     passphrase?: string;
     pubkey?: string;
     bunkerUri?: string;
+    clientSecretKey?: Uint8Array;
     secretKey?: Uint8Array;
     profile?: {
         name?: string;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadRelaySettings, type RelaySettingsByType, type RelayType } from '../../../../nostr/relay-settings';
 import { mergeRelaySets } from '../../../../nostr/relay-policy';
 import { useRelayConnectionSummary, type RelayConnectionProbe } from '../../../hooks/useRelayConnectionSummary';
+import { useRelayGroupsByRelayQuery } from '../../../query/relay-groups.query';
 import { useRelayMetadataByUrlQuery } from '../../../query/relay-metadata.query';
 import type { RelayDetailRouteParams } from '../../../settings/relay-detail-routing';
 import {
@@ -36,6 +37,9 @@ function getConfiguredActiveRelayTypes(byType: RelaySettingsByType, relayUrl: st
     }
     if (byType.search.includes(relayUrl)) {
         activeRelayTypes.push('search');
+    }
+    if (byType.groups.includes(relayUrl)) {
+        activeRelayTypes.push('groups');
     }
 
     return activeRelayTypes;
@@ -82,6 +86,7 @@ export function useRelayDetailController(input: UseRelayDetailControllerInput) {
             nip65Write: mergeRelaySets(suggestedRelaysByType?.nip65Write ?? []),
             dmInbox: mergeRelaySets(suggestedRelaysByType?.dmInbox ?? []),
             search: mergeRelaySets(suggestedRelaysByType?.search ?? []),
+            groups: mergeRelaySets(suggestedRelaysByType?.groups ?? []),
         };
     }, [suggestedRelaysByType, suggestedRelays]);
 
@@ -118,6 +123,11 @@ export function useRelayDetailController(input: UseRelayDetailControllerInput) {
 
         return getConfiguredActiveRelayTypes(relaySettings.byType, selectedRelay.relayUrl);
     }, [relaySettings.byType, selectedRelay]);
+    const hasGroupRelayUse = activeRelayTypes.includes('groups');
+    const availableGroupsState = useRelayGroupsByRelayQuery({
+        relayUrl: selectedRelay.relayUrl,
+        enabled: hasGroupRelayUse,
+    });
     const selectedRelayDetails = describeRelay(selectedRelay.relayUrl, selectedRelay.source);
     const selectedRelayInfo = relayInfoByUrl[selectedRelay.relayUrl];
     const selectedRelayDocument = selectedRelayInfo?.status === 'ready' ? selectedRelayInfo.data : undefined;
@@ -154,6 +164,7 @@ export function useRelayDetailController(input: UseRelayDetailControllerInput) {
     return {
         selectedRelay,
         activeRelayTypes,
+        availableGroupsState,
         selectedRelayDetails,
         selectedRelayInfo,
         selectedRelayDocument,

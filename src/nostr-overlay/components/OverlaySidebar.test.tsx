@@ -14,6 +14,7 @@ interface RenderResult {
     onOpenMap: ReturnType<typeof vi.fn>;
     onOpenFollowingFeed: ReturnType<typeof vi.fn>;
     onOpenChat: ReturnType<typeof vi.fn>;
+    onOpenGroups: ReturnType<typeof vi.fn>;
     onOpenRelays: ReturnType<typeof vi.fn>;
     onOpenNotifications: ReturnType<typeof vi.fn>;
     onOpenPublish: ReturnType<typeof vi.fn>;
@@ -65,6 +66,7 @@ async function renderSidebar({
         ...authSessionOverrides,
     };
     const onOpenChat = vi.fn();
+    const onOpenGroups = vi.fn();
     const onOpenNotifications = vi.fn();
     const onOpenPublish = vi.fn();
     const onOpenRelays = vi.fn();
@@ -93,6 +95,7 @@ async function renderSidebar({
                     onOpenMap={onOpenMap}
                     onOpenCityStats={vi.fn()}
                     onOpenChat={onOpenChat}
+                    onOpenGroups={onOpenGroups}
                     onOpenRelays={onOpenRelays}
                     onOpenNotifications={onOpenNotifications}
                     onOpenFollowingFeed={onOpenFollowingFeed}
@@ -122,7 +125,7 @@ async function renderSidebar({
         );
     });
 
-    return { container, root, onOpenMap, onOpenFollowingFeed, onOpenChat, onOpenRelays, onOpenNotifications, onOpenPublish, onOpenWallet, onOpenProfileEditor, onMobileAppBarBack };
+    return { container, root, onOpenMap, onOpenFollowingFeed, onOpenChat, onOpenGroups, onOpenRelays, onOpenNotifications, onOpenPublish, onOpenWallet, onOpenProfileEditor, onMobileAppBarBack };
 }
 
 function setMobileViewport(): void {
@@ -238,6 +241,28 @@ describe('OverlaySidebar', () => {
 
         expect(labels.slice(0, 4)).toEqual(['Abrir mapa', 'Abrir Ágora', 'Abrir artículos', 'Abrir chats']);
         expect(rendered.container.querySelector('button[aria-label="Abrir artículos"]')).not.toBeNull();
+    });
+
+    test('renders groups immediately below chats and opens the groups route', async () => {
+        const rendered = await renderSidebar({ pathname: '/groups' });
+        mounted.push(rendered);
+
+        const panelButtons = Array.from(rendered.container.querySelectorAll('.nostr-panel-toolbar > [data-slot="sidebar-menu-item"] button')) as HTMLButtonElement[];
+        const labels = panelButtons.map((button) => button.getAttribute('aria-label') || '').filter(Boolean);
+        const chatIndex = labels.indexOf('Abrir chats');
+        const groupsIndex = labels.indexOf('Abrir grupos');
+        const groupsButton = rendered.container.querySelector('button[aria-label="Abrir grupos"]') as HTMLButtonElement | null;
+
+        expect(chatIndex).toBeGreaterThanOrEqual(0);
+        expect(groupsIndex).toBe(chatIndex + 1);
+        expect(groupsButton).not.toBeNull();
+        expect(groupsButton?.getAttribute('data-active')).toBe('true');
+
+        await act(async () => {
+            groupsButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(rendered.onOpenGroups).toHaveBeenCalledTimes(1);
     });
 
     test('marks Agora active for note detail routes', async () => {

@@ -1,7 +1,13 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { I18nProvider } from '@/i18n/I18nProvider';
+import type { AppLocale } from '@/i18n/types';
+import type { ProviderResolveInput } from '../../nostr/auth/providers/types';
+import type { LoginMethod } from '../../nostr/auth/session';
 import { LoginMethodSelector } from './LoginMethodSelector';
+
+type StartSessionHandler = (method: LoginMethod, input: ProviderResolveInput) => Promise<void> | void;
 
 interface RenderResult {
     container: HTMLDivElement;
@@ -11,7 +17,9 @@ interface RenderResult {
 interface RenderSelectorInput {
     disabled?: boolean;
     initialMethod?: 'npub' | 'nip07' | 'nip46';
+    locale?: AppLocale;
     loadingText?: string;
+    onStartSession?: StartSessionHandler;
     restrictToNpubOnly?: boolean;
 }
 
@@ -20,7 +28,7 @@ async function renderSelector(input: RenderSelectorInput = {}): Promise<RenderRe
     document.body.appendChild(container);
     const root = createRoot(container);
 
-    const onStartSession = vi.fn().mockResolvedValue(undefined);
+    const onStartSession = input.onStartSession ?? vi.fn<StartSessionHandler>().mockResolvedValue(undefined);
     const selectorProps = {
         disabled: input.disabled ?? false,
         onStartSession,
@@ -31,7 +39,9 @@ async function renderSelector(input: RenderSelectorInput = {}): Promise<RenderRe
 
     await act(async () => {
         root.render(
-            <LoginMethodSelector {...selectorProps} />
+            <I18nProvider initialLocale={input.locale ?? 'es'}>
+                <LoginMethodSelector {...selectorProps} />
+            </I18nProvider>
         );
     });
 
@@ -40,6 +50,22 @@ async function renderSelector(input: RenderSelectorInput = {}): Promise<RenderRe
     };
 
     return { container, root };
+}
+
+function findButtonByText(container: HTMLElement, text: string): HTMLButtonElement {
+    const button = Array.from(container.querySelectorAll('button')).find((candidate) => (candidate.textContent || '').includes(text));
+    if (!(button instanceof HTMLButtonElement)) {
+        throw new Error(`Button with text "${text}" was not found`);
+    }
+
+    return button;
+}
+
+function fillInput(input: HTMLInputElement, value: string): void {
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    valueSetter?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 let mounted: RenderResult[] = [];
@@ -71,6 +97,7 @@ beforeAll(() => {
 });
 
 afterEach(async () => {
+    vi.unstubAllEnvs();
     for (const entry of mounted) {
         await act(async () => {
             entry.root.unmount();
@@ -100,6 +127,27 @@ describe('LoginMethodSelector', () => {
         expect(methodSelectTrigger).not.toBeNull();
         expect(npubInput).not.toBeNull();
         expect(methodSelectTrigger?.classList.contains('w-full')).toBe(true);
+    });
+
+    test('exposes npub, nip07, and nip46 by default in production', async () => {
+        vi.stubEnv('PROD', true);
+
+        const rendered = await renderSelector();
+        mounted.push(rendered);
+
+        const methodSelectTrigger = rendered.container.querySelector('[data-testid="login-method-trigger"]') as HTMLButtonElement;
+        expect(methodSelectTrigger).toBeDefined();
+        expect(methodSelectTrigger.disabled).toBe(false);
+
+        await act(async () => {
+            methodSelectTrigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+            methodSelectTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+        });
+
+        const options = Array.from(document.body.querySelectorAll('[data-slot="select-item"]')).map((option) => (option.textContent || '').trim());
+        expect(options).toContain('npub (solo lectura)');
+        expect(options).toContain('Extensión (NIP-07)');
+        expect(options).toContain('Búnker (NIP-46)');
     });
 
     test('renders stable test ids for the default login flow', async () => {
@@ -246,6 +294,108 @@ describe('LoginMethodSelector', () => {
         expect(submitButton?.classList.contains('mt-2')).toBe(true);
         expect(submitButton?.classList.contains('w-full')).toBe(true);
         expect(rendered.container.querySelector('[data-testid="login-method-form-nip46"]')).not.toBeNull();
+    });
+
+    test('renders localized nip46 paste and nostrconnect actions', async () => {
+        const spanish = await renderSelector({ initialMethod: 'nip46', locale: 'es' });
+        mounted.push(spanish);
+
+        expect(spanish.container.querySelector('[data-slot="toggle-group"]')).not.toBeNull();
+        expect(spanish.container.querySelectorAll('[data-slot="toggle-group-item"]')).toHaveLength(2);
+        expect(spanish.container.textContent || '').toContain('Pegar URI bunker://');
+        expect(spanish.container.textContent || '').toContain('Generar QR nostrconnect://');
+        expect(spanish.container.textContent || '').toContain('Pega un URI bunker:// de tu signer remoto.');
+
+        const english = await renderSelector({ initialMethod: 'nip46', locale: 'en' });
+        mounted.push(english);
+
+        expect(english.container.textContent || '').toContain('Paste bunker:// URI');
+        expect(english.container.textContent || '').toContain('Generate nostrconnect:// QR');
+        expect(english.container.textContent || '').toContain('Paste a bunker:// URI from your remote signer.');
+    });
+
+    test('submits pasted bunker uri through the nip46 paste action', async () => {
+        const rendered = await renderSelector({ initialMethod: 'nip46' });
+        mounted.push(rendered);
+
+        const handlers = (rendered.container as any).__handlers;
+        const bunkerInput = rendered.container.querySelector('input[name="bunker-uri"]') as HTMLInputElement;
+        const form = rendered.container.querySelector('[data-testid="login-method-form-nip46"]');
+
+        await act(async () => {
+            fillInput(bunkerInput, `bunker://${'a'.repeat(64)}?relay=wss://relay.example.com`);
+        });
+
+        await act(async () => {
+            form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        });
+
+        expect(handlers.onStartSession).toHaveBeenCalledWith('nip46', {
+            bunkerUri: `bunker://${'a'.repeat(64)}?relay=wss://relay.example.com`,
+        });
+    });
+
+    test('generates a nostrconnect QR, copies the uri, and redacts the secret while pairing', async () => {
+        const clipboardWriteText = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText: clipboardWriteText },
+        });
+        const onStartSession = vi.fn<StartSessionHandler>(() => new Promise<void>(() => {}));
+        const rendered = await renderSelector({ initialMethod: 'nip46', onStartSession });
+        mounted.push(rendered);
+
+        await act(async () => {
+            findButtonByText(rendered.container, 'Generar QR nostrconnect://').click();
+        });
+
+        const qrContainer = rendered.container.querySelector('[data-testid="nip46-nostrconnect-qr"]');
+        expect(qrContainer?.querySelector('svg')).not.toBeNull();
+        const copyButton = rendered.container.querySelector('[aria-label="Copiar URI nostrconnect://"]') as HTMLButtonElement | null;
+        expect(copyButton).not.toBeNull();
+
+        await act(async () => {
+            copyButton?.click();
+        });
+
+        expect(clipboardWriteText).toHaveBeenCalledTimes(1);
+        const generatedUri = clipboardWriteText.mock.calls[0]?.[0] as string;
+        expect(generatedUri.startsWith('nostrconnect://')).toBe(true);
+        const generatedSecret = new URL(generatedUri).searchParams.get('secret');
+        expect(generatedSecret).toBeTruthy();
+
+        await act(async () => {
+            findButtonByText(rendered.container, 'Esperar conexión').click();
+        });
+
+        expect(onStartSession).toHaveBeenCalledWith('nip46', expect.objectContaining({
+            bunkerUri: generatedUri,
+            clientSecretKey: expect.any(Uint8Array),
+        }));
+        const startInput = onStartSession.mock.calls[0]?.[1] as { clientSecretKey?: Uint8Array } | undefined;
+        expect(startInput?.clientSecretKey).toHaveLength(32);
+        expect(rendered.container.textContent || '').toContain('Esperando al signer remoto...');
+        expect(rendered.container.innerHTML).not.toContain(generatedUri);
+        expect(rendered.container.innerHTML).not.toContain(generatedSecret!);
+    });
+
+    test('shows timed-out state when nostrconnect pairing start times out', async () => {
+        const onStartSession = vi.fn<StartSessionHandler>(async () => {
+            throw new Error('NIP-46 pairing timed out');
+        });
+        const rendered = await renderSelector({ initialMethod: 'nip46', onStartSession });
+        mounted.push(rendered);
+
+        await act(async () => {
+            findButtonByText(rendered.container, 'Generar QR nostrconnect://').click();
+        });
+
+        await act(async () => {
+            findButtonByText(rendered.container, 'Esperar conexión').click();
+        });
+
+        expect(rendered.container.textContent || '').toContain('La solicitud de emparejamiento caducó');
+        expect(rendered.container.textContent || '').not.toContain('No se pudo conectar el signer remoto');
     });
 
     test('submits bunker uri through nip46 method in development mode', async () => {

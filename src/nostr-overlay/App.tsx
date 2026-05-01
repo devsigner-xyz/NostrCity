@@ -15,6 +15,7 @@ import { useOverlaySocialFeedController } from './controllers/use-overlay-social
 import { useOverlayArticlesController } from './controllers/use-overlay-articles-controller';
 import { useOverlayNotificationsController } from './controllers/use-overlay-notifications-controller';
 import { useOverlayDmController } from './controllers/use-overlay-dm-controller';
+import { useOverlayGroupsController } from './controllers/use-overlay-groups-controller';
 import { useWalletZapController, type ZapIntentInput } from './controllers/use-wallet-zap-controller';
 import { useEasterEggDiscoveryController } from './hooks/useEasterEggDiscoveryController';
 import { useFollowingFeedEngagementQuery } from './query/following-feed.query';
@@ -47,6 +48,7 @@ import { extractStreetLabelUsernames } from './domain/street-label-users';
 import { EASTER_EGG_MISSIONS } from './easter-eggs/missions';
 import {
     addRelay,
+    DEFAULT_GROUP_RELAYS,
     loadRelaySettings,
     saveRelaySettings,
     type RelaySettingsState,
@@ -1030,6 +1032,42 @@ export function App({ mapBridge, services }: AppProps) {
         writeGateway: overlay.writeGateway,
         relaySettingsSnapshot,
     });
+    const hasGroupRelaysConfigured = relaySettingsSnapshot.byType.groups.length > 0;
+    const addSuggestedGroupRelays = useCallback(() => {
+        let nextState = relaySettingsSnapshot;
+        for (const relay of DEFAULT_GROUP_RELAYS) {
+            nextState = addRelay(nextState, relay, 'groups');
+        }
+
+        const savedState = saveRelaySettings(nextState, relaySettingsOwnerPubkey ? { ownerPubkey: relaySettingsOwnerPubkey } : undefined);
+        setRelaySettingsSnapshot(savedState);
+    }, [relaySettingsOwnerPubkey, relaySettingsSnapshot]);
+    const openGroupRelaysSettings = useCallback(() => {
+        navigate('/relays');
+    }, [navigate]);
+    const selectedGroupAddress = useMemo(() => {
+        if (location.pathname !== '/groups') {
+            return undefined;
+        }
+
+        const params = new URLSearchParams(location.search);
+        const relay = params.get('relay');
+        const id = params.get('group');
+
+        return relay && id ? { relay, id } : undefined;
+    }, [location.pathname, location.search]);
+    const groupsController = useOverlayGroupsController({
+        enabled: location.pathname === '/groups',
+        ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
+        session: overlay.authSession ?? null,
+        ...(overlay.groupsService ? { service: overlay.groupsService } : {}),
+        hasGroupRelaysConfigured,
+        configuredGroupRelays: relaySettingsSnapshot.byType.groups,
+        ...(selectedGroupAddress ? { selectedGroupAddress } : {}),
+        onAddSuggestedGroupRelays: addSuggestedGroupRelays,
+        onManageGroupRelays: openGroupRelaysSettings,
+        errorFallbackMessage: translate(uiSettings.language, 'groups.errorDescription'),
+    });
     const requestDonationPayment = useCallback((input: { pubkey: string; amount: number }) => (
         requestZapPayment({ targetPubkey: input.pubkey, amount: input.amount })
     ), [requestZapPayment]);
@@ -1062,6 +1100,7 @@ export function App({ mapBridge, services }: AppProps) {
                     onOpenMap={() => navigate('/')}
                     onOpenCityStats={() => navigate('/city-stats')}
                     onOpenChat={openChatList}
+                    onOpenGroups={() => navigate('/groups')}
                     onOpenRelays={openRelaysPage}
                     onOpenNotifications={openNotifications}
                     onOpenFollowingFeed={openFollowingFeed}
@@ -1267,6 +1306,26 @@ export function App({ mapBridge, services }: AppProps) {
                         sendMessage: async (conversationId, plaintext) => {
                             await chatState.sendMessage(conversationId, plaintext);
                         },
+                    }}
+                    groups={{
+                        groups: groupsController.groups,
+                        selectedGroupId: groupsController.selectedGroupId,
+                        isLoading: groupsController.isLoading,
+                        error: groupsController.error,
+                        session: overlay.authSession ?? null,
+                        messageDraft: groupsController.messageDraft,
+                        timeline: groupsController.selectedTimeline,
+                        onSelectGroup: groupsController.selectGroup,
+                        onMessageDraftChange: groupsController.setMessageDraft,
+                        onPublishMessage: groupsController.publishMessage,
+                        onSaveGroup: groupsController.saveGroup,
+                        onSyncPublicGroups: groupsController.syncPublicGroups,
+                        onJoinGroup: groupsController.requestJoin,
+                        onLeaveGroup: groupsController.requestLeave,
+                        onRetry: groupsController.retry,
+                        hasGroupRelaysConfigured: groupsController.hasGroupRelaysConfigured,
+                        onAddSuggestedGroupRelays: groupsController.addSuggestedGroupRelays,
+                        onManageGroupRelays: groupsController.manageGroupRelays,
                     }}
                     relays={{
                         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),

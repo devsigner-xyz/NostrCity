@@ -47,7 +47,7 @@ function createFakeAuthService(input: {
 }
 
 function Harness(props: {
-    authService: OverlaySessionAuthService;
+    authService?: OverlaySessionAuthService;
     enabled?: boolean;
     configureAuthHeaders?: ((getAuthHeaders: ((context: HttpClientAuthContext) => Promise<Record<string, string> | undefined>) | undefined) => void) | undefined;
     onRestoredSession?: (session: AuthSessionState) => void | Promise<void>;
@@ -99,6 +99,15 @@ beforeAll(() => {
 });
 
 describe('useOverlaySessionController', () => {
+    test('creates a default auth service with an enabled NIP-46 provider', async () => {
+        let latest: OverlaySessionController | undefined;
+
+        await renderHarness(<Harness onController={(controller) => { latest = controller; }} />);
+        await flushEffects();
+
+        await expect(latest?.authService.startSession('nip46', {})).rejects.toThrow('Missing bunker URI for NIP-46 login');
+    });
+
     test('resolves to anonymous session state when no session is restored', async () => {
         let latest: OverlaySessionController | undefined;
         const authService = createFakeAuthService();

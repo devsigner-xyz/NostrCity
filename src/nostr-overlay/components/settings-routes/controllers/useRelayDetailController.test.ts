@@ -2,6 +2,9 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { saveRelaySettings, type RelaySettingsByType, type RelaySettingsState } from '../../../../nostr/relay-settings';
+import { UI_SETTINGS_STORAGE_KEY } from '../../../../nostr/ui-settings';
+import type { RelayGroupsState } from '../../../query/relay-groups.query';
+import { SettingsRelayDetailPage } from '../../settings-pages/SettingsRelayDetailPage';
 import { useRelayDetailController } from './useRelayDetailController';
 
 interface RenderResult {
@@ -16,9 +19,11 @@ interface ControllerHarnessProps {
     params: {
         relayUrl: string;
         source: 'configured' | 'suggested';
-        relayType: 'nip65Both' | 'nip65Read' | 'nip65Write' | 'dmInbox' | 'search';
+        relayType: 'nip65Both' | 'nip65Read' | 'nip65Write' | 'dmInbox' | 'search' | 'groups';
     };
 }
+
+const relayGroupsQueryMock = vi.fn<(input: unknown) => RelayGroupsState>(() => ({ status: 'idle', groups: [] }));
 
 vi.mock('../../../hooks/useRelayConnectionSummary', () => ({
     useRelayConnectionSummary: () => ({
@@ -32,6 +37,10 @@ vi.mock('../../../hooks/useRelayConnectionSummary', () => ({
 
 vi.mock('../../../query/relay-metadata.query', () => ({
     useRelayMetadataByUrlQuery: () => ({}),
+}));
+
+vi.mock('../../../query/relay-groups.query', () => ({
+    useRelayGroupsByRelayQuery: (input: unknown) => relayGroupsQueryMock(input),
 }));
 
 let mounted: RenderResult[] = [];
@@ -75,6 +84,8 @@ beforeAll(() => {
 beforeEach(() => {
     window.localStorage.clear();
     latestController = null;
+    relayGroupsQueryMock.mockReset();
+    relayGroupsQueryMock.mockReturnValue({ status: 'idle', groups: [] });
 });
 
 afterEach(async () => {
@@ -97,6 +108,7 @@ describe('useRelayDetailController', () => {
                 nip65Write: ['wss://relay.bootstrap.example'],
                 dmInbox: ['wss://relay.bootstrap.example'],
                 search: ['wss://relay.bootstrap.example'],
+                groups: [],
             },
         });
 
@@ -120,6 +132,7 @@ describe('useRelayDetailController', () => {
                 nip65Write: ['wss://relay.overlap.example'],
                 dmInbox: ['wss://relay.overlap.example'],
                 search: [],
+                groups: [],
             },
         });
 
@@ -143,6 +156,7 @@ describe('useRelayDetailController', () => {
                 nip65Write: [],
                 dmInbox: ['wss://relay.suggested.example'],
                 search: [],
+                groups: [],
             },
         });
 
@@ -158,5 +172,119 @@ describe('useRelayDetailController', () => {
         });
 
         expect(getController().activeRelayTypes).toEqual(['search']);
+    });
+
+    test('loads available groups for configured group relays only', async () => {
+        seedRelaySettings({
+            relays: [],
+            byType: {
+                nip65Both: [],
+                nip65Read: [],
+                nip65Write: [],
+                dmInbox: [],
+                search: [],
+                groups: ['wss://groups.example'],
+            },
+        });
+        relayGroupsQueryMock.mockReturnValue({
+            status: 'ready',
+            groups: [{ relay: 'wss://groups.example', id: 'maps', name: 'Map makers' }],
+        });
+
+        await renderController({
+            params: {
+                relayUrl: 'wss://groups.example',
+                source: 'configured',
+                relayType: 'groups',
+            },
+        });
+
+        expect(relayGroupsQueryMock).toHaveBeenCalledWith({
+            relayUrl: 'wss://groups.example',
+            enabled: true,
+        });
+        expect(getController().activeRelayTypes).toEqual(['groups']);
+        expect(getController().availableGroupsState).toEqual({
+            status: 'ready',
+            groups: [{ relay: 'wss://groups.example', id: 'maps', name: 'Map makers' }],
+        });
+    });
+
+    test('keeps available group discovery disabled for non-group relay detail pages', async () => {
+        await renderController({
+            params: {
+                relayUrl: 'wss://relay.example',
+                source: 'configured',
+                relayType: 'nip65Both',
+            },
+        });
+
+        expect(relayGroupsQueryMock).toHaveBeenCalledWith({
+            relayUrl: 'wss://relay.example',
+            enabled: false,
+        });
+    });
+
+    test('renders available groups with empty and error states', async () => {
+        window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
+        const openGroup = vi.fn();
+        const baseProps = {
+            selectedRelay: { relayUrl: 'wss://groups.example', source: 'configured' as const, relayType: 'groups' as const },
+            activeRelayTypes: ['groups' as const],
+            selectedRelayDetails: { relayUrl: 'wss://groups.example', source: 'configured' as const, host: 'groups.example' },
+            selectedRelayAdminIdentity: null,
+            selectedRelayConnectionStatus: undefined,
+            relayHasNip11Metadata: true,
+            relayHasFees: false,
+            copiedRelayIdentityKey: null,
+            relayTypeLabels: {
+                nip65Both: 'NIP-65 read+write',
+                nip65Read: 'NIP-65 read',
+                nip65Write: 'NIP-65 write',
+                dmInbox: 'NIP-17 DM inbox',
+                search: 'NIP-50 search',
+                groups: 'NIP-29 groups',
+            },
+            relayAvatarFallback: () => 'GR',
+            relayConnectionBadge: () => createElement('span', null, 'Unknown'),
+            formatRelayFee: () => '1 sat',
+            onCopyRelayIdentity: vi.fn(async () => {}),
+            onOpenGroup: openGroup,
+        };
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const root = createRoot(container);
+        mounted.push({ container, root });
+
+        await act(async () => {
+            root.render(createElement(SettingsRelayDetailPage, {
+                ...baseProps,
+                availableGroupsState: {
+                    status: 'ready' as const,
+                    groups: [{ relay: 'wss://groups.example', id: 'maps', name: 'Map makers', description: 'Cities and transit.' }],
+                },
+            }));
+        });
+        expect(container.textContent).toContain('Available groups');
+        expect(container.textContent).toContain('Map makers');
+        expect(container.textContent).toContain('maps');
+        expect(container.textContent).toContain('Cities and transit.');
+        expect(Array.from(container.querySelectorAll('button')).some((button) => button.textContent === 'Open group')).toBe(true);
+
+        await act(async () => {
+            root.render(createElement(SettingsRelayDetailPage, {
+                ...baseProps,
+                availableGroupsState: { status: 'ready' as const, groups: [] },
+            }));
+        });
+        expect(container.textContent).toContain('No groups are advertised by this relay yet.');
+
+        await act(async () => {
+            root.render(createElement(SettingsRelayDetailPage, {
+                ...baseProps,
+                availableGroupsState: { status: 'error' as const, groups: [] },
+            }));
+        });
+        expect(container.textContent).toContain('Could not load available groups for this relay.');
     });
 });

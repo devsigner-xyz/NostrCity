@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { EllipsisVerticalIcon } from 'lucide-react';
 import { OverlayPageHeader } from '../OverlayPageHeader';
 import { SettingsDmRelaysSection } from './SettingsDmRelaysSection';
+import { SettingsGroupRelaysSection } from './SettingsGroupRelaysSection';
 import type { RelayDetails, RelayInformationDocument, RelayRow, RelaySource } from './types';
 
 interface SettingsRelaysPageProps {
@@ -28,6 +29,8 @@ interface SettingsRelaysPageProps {
     dmSuggestedRows: RelayRow[];
     searchConfiguredRows: RelayRow[];
     searchSuggestedRows: RelayRow[];
+    groupConfiguredRows: RelayRow[];
+    groupSuggestedRows: RelayRow[];
     connectedConfiguredRelays: number;
     disconnectedConfiguredRelays: number;
     relayInfoByUrl: Record<string, { data?: RelayInformationDocument }>;
@@ -37,12 +40,15 @@ interface SettingsRelaysPageProps {
     newRelayInput: string;
     newDmRelayInput: string;
     newSearchRelayInput: string;
+    newGroupRelayInput: string;
     invalidRelayInputs: string[];
     invalidDmRelayInputs: string[];
     invalidSearchRelayInputs: string[];
+    invalidGroupRelayInputs: string[];
     onNewRelayInputChange: (value: string) => void;
     onNewDmRelayInputChange: (value: string) => void;
     onNewSearchRelayInputChange: (value: string) => void;
+    onNewGroupRelayInputChange: (value: string) => void;
     onAddRelays: () => void;
     onOpenRelayDetails: (relayUrl: string, source: RelaySource, relayType: RelayType) => void;
     onRemoveRelay: (relayUrl: string) => void;
@@ -55,6 +61,11 @@ interface SettingsRelaysPageProps {
     onAddSuggestedDmRelay: (relayUrl: string, relayTypes: RelayType[]) => void;
     onAddAllSuggestedDmRelays: () => void;
     onResetDmRelaysToDefault: () => void;
+    onAddGroupRelays: () => void;
+    onRemoveGroupRelay: (relayUrl: string) => void;
+    onAddSuggestedGroupRelay: (relayUrl: string, relayTypes: RelayType[]) => void;
+    onAddAllSuggestedGroupRelays: () => void;
+    onResetGroupRelaysToDefault: () => void;
     onAddSearchRelays: () => void;
     onRemoveSearchRelay: (relayUrl: string) => void;
     onAddSuggestedSearchRelay: (relayUrl: string, relayTypes: RelayType[]) => void;
@@ -107,6 +118,8 @@ export function SettingsRelaysPage({
     dmSuggestedRows,
     searchConfiguredRows,
     searchSuggestedRows,
+    groupConfiguredRows,
+    groupSuggestedRows,
     connectedConfiguredRelays,
     disconnectedConfiguredRelays,
     relayInfoByUrl,
@@ -116,12 +129,15 @@ export function SettingsRelaysPage({
     newRelayInput,
     newDmRelayInput,
     newSearchRelayInput,
+    newGroupRelayInput,
     invalidRelayInputs,
     invalidDmRelayInputs,
     invalidSearchRelayInputs,
+    invalidGroupRelayInputs,
     onNewRelayInputChange,
     onNewDmRelayInputChange,
     onNewSearchRelayInputChange,
+    onNewGroupRelayInputChange,
     onAddRelays,
     onOpenRelayDetails,
     onRemoveRelay,
@@ -134,6 +150,11 @@ export function SettingsRelaysPage({
     onAddSuggestedDmRelay,
     onAddAllSuggestedDmRelays,
     onResetDmRelaysToDefault,
+    onAddGroupRelays,
+    onRemoveGroupRelay,
+    onAddSuggestedGroupRelay,
+    onAddAllSuggestedGroupRelays,
+    onResetGroupRelaysToDefault,
     onAddSearchRelays,
     onRemoveSearchRelay,
     onAddSuggestedSearchRelay,
@@ -416,6 +437,26 @@ export function SettingsRelaysPage({
                                 describeRelay={describeRelay}
                                 relayAvatarFallback={relayAvatarFallback}
                                 relayConnectionBadge={relayConnectionBadge}
+                            />
+
+                            <SettingsGroupRelaysSection
+                                configuredRows={groupConfiguredRows}
+                                suggestedRows={groupSuggestedRows}
+                                relayInfoByUrl={relayInfoByUrl}
+                                relayConnectionStatusByRelay={relayConnectionStatusByRelay}
+                                relayTypeLabels={relayTypeLabels}
+                                newRelayInput={newGroupRelayInput}
+                                invalidRelayInputs={invalidGroupRelayInputs}
+                                onNewRelayInputChange={onNewGroupRelayInputChange}
+                                onAddRelays={onAddGroupRelays}
+                                onOpenRelayDetails={onOpenRelayDetails}
+                                onRemoveRelay={onRemoveGroupRelay}
+                                onAddSuggestedRelay={onAddSuggestedGroupRelay}
+                                onAddAllSuggestedRelays={onAddAllSuggestedGroupRelays}
+                                onResetRelaysToDefault={onResetGroupRelaysToDefault}
+                                onOpenRelayActionsMenu={onOpenRelayActionsMenu}
+                                describeRelay={describeRelay}
+                                relayAvatarFallback={relayAvatarFallback}
                             />
 
                             <Card size="sm" className="nostr-relay-search nostr-relays-panel gap-0 py-0">

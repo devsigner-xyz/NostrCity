@@ -12,7 +12,7 @@ test('loads map canvases and gui panel', async ({ page }) => {
   await expect(page.locator('#nostr-overlay-root [data-testid="login-gate-screen"]')).toBeVisible();
   await expect(page.locator('#nostr-overlay-root input[name="npub"]')).toBeVisible();
   await expect(page.locator('#nostr-overlay-root .nostr-login-screen-dialog')).toBeVisible();
-  await expect(page).toHaveURL(/#\/login$/);
+  await expect(page).toHaveURL(/\/app\/login$/);
 
   expect(pageErrors).toEqual([]);
 });

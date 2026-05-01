@@ -23,6 +23,7 @@ describe('relay-settings', () => {
         expect(getRelaySetByType(state, 'nip65Both').length).toBeGreaterThan(0);
         expect(getRelaySetByType(state, 'nip65Read').length).toBeGreaterThan(0);
         expect(getRelaySetByType(state, 'nip65Write').length).toBeGreaterThan(0);
+        expect(getRelaySetByType(state, 'groups')).toEqual([]);
         expect(getRelaySetByType(state, 'search')).toEqual([
             'wss://search.nos.today',
             'wss://relay.noswhere.com',
@@ -52,6 +53,7 @@ describe('relay-settings', () => {
                     nip65Write: ['wss://relay.damus.io'],
                     dmInbox: ['wss://nos.lol'],
                     search: ['wss://search.nos.today', 'wss://search.nos.today/'],
+                    groups: ['wss://groups.fiatjaf.com/', 'wss://groups.fiatjaf.com', 'https://invalid.example'],
                 },
             },
             window.localStorage
@@ -59,6 +61,7 @@ describe('relay-settings', () => {
 
         expect(saved.relays).toEqual(['wss://relay.damus.io', 'wss://nos.lol']);
         expect(saved.byType.search).toEqual(['wss://search.nos.today']);
+        expect(saved.byType.groups).toEqual(['wss://groups.fiatjaf.com']);
         expect(loadRelaySettings(window.localStorage)).toEqual(saved);
     });
 
@@ -71,6 +74,7 @@ describe('relay-settings', () => {
                 nip65Write: [] as string[],
                 dmInbox: [] as string[],
                 search: [] as string[],
+                groups: [] as string[],
             },
         };
 
@@ -92,6 +96,27 @@ describe('relay-settings', () => {
         expect(getRelaySetByType(afterSearchRemove, 'search')).toEqual([]);
     });
 
+    test('keeps group relays as a local category outside runtime relays', () => {
+        const initial = getDefaultRelaySettings();
+
+        const afterAdd = addRelay(initial, 'wss://groups.fiatjaf.com/', 'groups');
+        const afterRemove = removeRelay(afterAdd, 'wss://groups.fiatjaf.com', 'groups');
+
+        expect(afterAdd.byType.groups).toEqual(['wss://groups.fiatjaf.com']);
+        expect(afterAdd.relays).toEqual(initial.relays);
+        expect(afterRemove.byType.groups).toEqual([]);
+        expect(afterRemove.relays).toEqual(initial.relays);
+    });
+
+    test('global relay removal leaves group relays isolated', () => {
+        const relayUrl = 'wss://groups.fiatjaf.com';
+        const initial = addRelay(getDefaultRelaySettings(), relayUrl, 'groups');
+
+        const afterRemove = removeRelay(initial, relayUrl);
+
+        expect(afterRemove.byType.groups).toEqual([relayUrl]);
+    });
+
     test('rewrites a relay across NIP-65 access states', () => {
         const relayUrl = 'wss://relay.example';
         const initial = {
@@ -102,6 +127,7 @@ describe('relay-settings', () => {
                 nip65Write: [],
                 dmInbox: [],
                 search: [],
+                groups: [],
             },
         };
 
@@ -132,6 +158,7 @@ describe('relay-settings', () => {
                 nip65Write: [],
                 dmInbox: ['wss://dm.example'],
                 search: ['wss://search.example'],
+                groups: ['wss://groups.fiatjaf.com'],
             },
         };
 
@@ -142,6 +169,7 @@ describe('relay-settings', () => {
         expect(getRelaySetByType(nextState, 'nip65Write')).toEqual([]);
         expect(getRelaySetByType(nextState, 'dmInbox')).toEqual(['wss://dm.example']);
         expect(getRelaySetByType(nextState, 'search')).toEqual(['wss://search.example']);
+        expect(getRelaySetByType(nextState, 'groups')).toEqual(['wss://groups.fiatjaf.com']);
     });
 
     test('rewriting NIP-65 access preserves overlapping dmInbox relays', () => {
@@ -154,6 +182,7 @@ describe('relay-settings', () => {
                 nip65Write: [],
                 dmInbox: [relayUrl],
                 search: [],
+                groups: [],
             },
         };
 
@@ -174,6 +203,7 @@ describe('relay-settings', () => {
                 nip65Write: [],
                 dmInbox: [],
                 search: [],
+                groups: [],
             },
         };
 
@@ -205,6 +235,7 @@ describe('relay-settings', () => {
             'wss://relay.noswhere.com',
             'wss://filter.nostr.wine',
         ]);
+        expect(state.byType.groups).toEqual([]);
     });
 
     test('migrates v1 typed payload into protocol-aligned categories', () => {
@@ -225,6 +256,7 @@ describe('relay-settings', () => {
         expect(getRelaySetByType(state, 'nip65Read')).toEqual(['wss://relay.legacy.read.example']);
         expect(getRelaySetByType(state, 'nip65Write')).toEqual(['wss://relay.legacy.write.example']);
         expect(getRelaySetByType(state, 'dmInbox')).toEqual([]);
+        expect(state.byType.groups).toEqual([]);
     });
 
     test('keeps relay settings isolated per owner pubkey', () => {
@@ -239,6 +271,7 @@ describe('relay-settings', () => {
                 nip65Write: [],
                 dmInbox: [],
                 search: ['wss://search.nos.today'],
+                groups: [],
             },
         }, { ownerPubkey: ownerA });
 

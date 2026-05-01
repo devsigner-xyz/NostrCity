@@ -640,6 +640,7 @@ describe('OccupantProfileDialog', () => {
                         nip65Write: ['wss://relay.write.example'],
                         dmInbox: ['wss://relay.dm.example'],
                         search: [],
+                        groups: [],
                     },
                 })}
             />
@@ -695,6 +696,7 @@ describe('OccupantProfileDialog', () => {
                         nip65Write: ['wss://relay.both.example'],
                         dmInbox: ['wss://relay.dm.example'],
                         search: [],
+                        groups: [],
                     },
                     onAddRelaySuggestion,
                     onAddAllRelaySuggestions,

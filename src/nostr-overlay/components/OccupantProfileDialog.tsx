@@ -165,6 +165,7 @@ const RELAY_TYPE_LABELS: Record<RelayType, string> = {
     nip65Write: 'NIP-65 write',
     dmInbox: 'NIP-17 DM inbox',
     search: 'NIP-50 search',
+    groups: 'NIP-29 groups',
 };
 
 function createTabScrollTopState(): Record<OccupantProfileTab, number> {
@@ -182,7 +183,7 @@ function buildRelaySuggestionRows(relaySuggestionsByType?: RelaySettingsByType):
     }
 
     const relayTypesByUrl = new Map<string, Set<RelayType>>();
-    for (const relayType of RELAY_TYPES.filter((currentRelayType) => currentRelayType !== 'search')) {
+    for (const relayType of RELAY_TYPES.filter((currentRelayType) => currentRelayType !== 'search' && currentRelayType !== 'groups')) {
         const relaySet = relaySuggestionsByType[relayType] ?? [];
         for (const relayUrl of relaySet) {
             const current = relayTypesByUrl.get(relayUrl) ?? new Set<RelayType>();
@@ -194,7 +195,7 @@ function buildRelaySuggestionRows(relaySuggestionsByType?: RelaySettingsByType):
     return [...relayTypesByUrl.entries()]
         .map(([relayUrl, relayTypesSet]) => ({
             relayUrl,
-            relayTypes: RELAY_TYPES.filter((relayType) => relayType !== 'search' && relayTypesSet.has(relayType)),
+            relayTypes: RELAY_TYPES.filter((relayType) => relayType !== 'search' && relayType !== 'groups' && relayTypesSet.has(relayType)),
         }))
         .sort((left, right) => left.relayUrl.localeCompare(right.relayUrl));
 }

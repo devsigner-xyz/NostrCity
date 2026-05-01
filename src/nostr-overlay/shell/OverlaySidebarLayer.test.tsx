@@ -46,6 +46,7 @@ function createDefaultProps(overrides: Partial<ComponentProps<typeof OverlaySide
         onOpenMap: vi.fn(),
         onOpenCityStats: vi.fn(),
         onOpenChat: vi.fn(),
+        onOpenGroups: vi.fn(),
         onOpenRelays: vi.fn(),
         onOpenNotifications: vi.fn(),
         onOpenFollowingFeed: vi.fn(),

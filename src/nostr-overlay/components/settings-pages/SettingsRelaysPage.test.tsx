@@ -160,6 +160,7 @@ function buildProps() {
         nip65Write: 'NIP-65 escritura',
         dmInbox: 'NIP-17 buzón DM',
         search: 'Búsqueda NIP-50',
+        groups: 'NIP-29',
     } as const;
 
     return {
@@ -169,6 +170,8 @@ function buildProps() {
         dmSuggestedRows: [buildRelayRow({ relayUrl: 'wss://relay.dm-suggested', relayTypes: ['dmInbox'], primaryRelayType: 'dmInbox' })],
         searchConfiguredRows: [buildRelayRow({ relayUrl: 'wss://search.nos.today', relayTypes: ['search'], primaryRelayType: 'search' })],
         searchSuggestedRows: [buildRelayRow({ relayUrl: 'wss://relay.noswhere.com', relayTypes: ['search'], primaryRelayType: 'search' })],
+        groupConfiguredRows: [buildRelayRow({ relayUrl: 'wss://groups.example', relayTypes: ['groups'], primaryRelayType: 'groups' })],
+        groupSuggestedRows: [buildRelayRow({ relayUrl: 'wss://groups-suggested.example', relayTypes: ['groups'], primaryRelayType: 'groups' })],
         connectedConfiguredRelays: 1,
         disconnectedConfiguredRelays: 0,
         relayInfoByUrl: {} as Record<string, { data?: RelayInformationDocument }>,
@@ -178,12 +181,15 @@ function buildProps() {
         newRelayInput: '',
         newDmRelayInput: '',
         newSearchRelayInput: '',
+        newGroupRelayInput: '',
         invalidRelayInputs: [],
         invalidDmRelayInputs: [],
         invalidSearchRelayInputs: [],
+        invalidGroupRelayInputs: [],
         onNewRelayInputChange: vi.fn(),
         onNewDmRelayInputChange: vi.fn(),
         onNewSearchRelayInputChange: vi.fn(),
+        onNewGroupRelayInputChange: vi.fn(),
         onAddRelays: vi.fn(),
         onOpenRelayDetails: vi.fn(),
         onRemoveRelay: vi.fn(),
@@ -196,6 +202,11 @@ function buildProps() {
         onAddSuggestedDmRelay: vi.fn(),
         onAddAllSuggestedDmRelays: vi.fn(),
         onResetDmRelaysToDefault: vi.fn(),
+        onAddGroupRelays: vi.fn(),
+        onRemoveGroupRelay: vi.fn(),
+        onAddSuggestedGroupRelay: vi.fn(),
+        onAddAllSuggestedGroupRelays: vi.fn(),
+        onResetGroupRelaysToDefault: vi.fn(),
         onAddSearchRelays: vi.fn(),
         onRemoveSearchRelay: vi.fn(),
         onAddSuggestedSearchRelay: vi.fn(),
@@ -417,6 +428,38 @@ describe('SettingsRelaysPage', () => {
         expect(input?.getAttribute('aria-describedby')).toBe('dm-relay-input-error');
         expect(alert?.getAttribute('role')).toBe('alert');
         expect(alert?.textContent).toContain('Entradas inválidas: relay-dm-invalido');
+    });
+
+    test('renders the group relay section with NIP-29 copy and dedicated controls', async () => {
+        const props = buildProps();
+        const rendered = await renderElement(<SettingsRelaysPage {...props} />);
+        mounted.push(rendered);
+
+        const cardTitles = getCardTitles(rendered.container);
+        const groupCard = getCardByTitle(rendered.container, 'Relays de grupos');
+
+        expect(cardTitles.indexOf('Relays de grupos')).toBeGreaterThan(cardTitles.indexOf('Relays de mensajes'));
+        expect(cardTitles.indexOf('Relays de búsqueda')).toBeGreaterThan(cardTitles.indexOf('Relays de grupos'));
+        expect(groupCard.textContent).toContain('Se usan para descubrir y abrir grupos NIP-29. Añadirlos aquí no publica kind:10009.');
+        expect(groupCard.textContent).toContain('wss://groups.example');
+        expect(groupCard.textContent).toContain('wss://groups-suggested.example');
+        expect(groupCard.querySelector('input[aria-label="URLs de relay de grupos"]')).not.toBeNull();
+
+        const groupInput = groupCard.querySelector('input[aria-label="URLs de relay de grupos"]');
+        const addButton = Array.from(groupCard.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Añadir');
+        const addAllButton = Array.from(groupCard.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Agregar todos');
+
+        if (!(groupInput instanceof HTMLInputElement) || !(addButton instanceof HTMLElement) || !(addAllButton instanceof HTMLElement)) {
+            throw new Error('Group relay controls not found');
+        }
+
+        await changeInputValue(groupInput, 'wss://groups-manual.example');
+        await clickElement(addButton);
+        await clickElement(addAllButton);
+
+        expect(props.onNewGroupRelayInputChange).toHaveBeenCalledWith('wss://groups-manual.example');
+        expect(props.onAddGroupRelays).toHaveBeenCalledTimes(1);
+        expect(props.onAddAllSuggestedGroupRelays).toHaveBeenCalledTimes(1);
     });
 
     test('wires the search relay controls to their dedicated handlers', async () => {

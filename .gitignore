@@ -23,10 +23,7 @@ npm-debug.log*
 logs/
 *.log
 
-# Internal planning / agent material
-AGENTS.md
-.agents/
-.opencode/
+# Internal planning material
 /plans
 /context
 docs/superpowers/

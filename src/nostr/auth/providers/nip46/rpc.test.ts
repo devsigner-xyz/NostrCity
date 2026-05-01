@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import type { Nip46TransportEvent } from './transport';
 import { createNip46Cipher } from './crypto';
 import {
+    createNip46EventResponseClassifier,
     createNip46ResponseClassifier,
     createNip46RpcClient,
     parseNip46Response,
@@ -93,5 +94,24 @@ describe('NIP-46 RPC', () => {
                 params: [],
             })
         ).rejects.toThrow('NIP-46 response id mismatch');
+    });
+
+    test('event classifier ignores broken decrypt and JSON for non-matching events without failing pending requests', async () => {
+        const classifier = createNip46EventResponseClassifier({
+            decrypt: async (ciphertext) => {
+                if (ciphertext === 'broken-decrypt') throw new Error('decrypt failed with TEST_SECRET_DO_NOT_USE');
+                return ciphertext;
+            },
+        });
+
+        await expect(
+            classifier({ kind: 24133, pubkey: 'a'.repeat(64), tags: [['p', 'b'.repeat(64)]], content: 'broken-decrypt', created_at: 1 })
+        ).resolves.toBeUndefined();
+        await expect(
+            classifier({ kind: 24133, pubkey: 'a'.repeat(64), tags: [['p', 'b'.repeat(64)]], content: '{not-json', created_at: 1 })
+        ).resolves.toBeUndefined();
+        await expect(
+            classifier({ kind: 24133, pubkey: 'a'.repeat(64), tags: [['p', 'b'.repeat(64)]], content: '{"id":"req-1","result":"ok"}', created_at: 1 })
+        ).resolves.toBe('req-1');
     });
 });

@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
+import { GroupsPage } from '../components/GroupsPage';
 import { RelayDetailRoute } from '../components/RelayDetailRoute';
 import { RelaysRoute } from '../components/RelaysRoute';
 import { SettingsAboutRoute } from '../components/settings-routes/SettingsAboutRoute';
@@ -12,6 +13,7 @@ import { ArticlesRouteContainer, type ArticlesRouteContainerProps } from './Arti
 import { ChatsRouteContainer, type ChatsRouteContainerProps } from './ChatsRouteContainer';
 import { CityStatsRouteContainer, type CityStatsRouteContainerProps } from './CityStatsRouteContainer';
 import { DiscoverRouteContainer, type DiscoverRouteContainerProps } from './DiscoverRouteContainer';
+import { GroupsRouteContainer } from './GroupsRouteContainer';
 import { NotificationsRouteContainer, type NotificationsRouteContainerProps } from './NotificationsRouteContainer';
 import { ProfileRouteContainer, type ProfileRouteContainerProps } from './ProfileRouteContainer';
 import { SettingsRouteContainer, type SettingsRouteContainerProps } from './SettingsRouteContainer';
@@ -35,6 +37,7 @@ export interface OverlayRoutesProps {
     cityStats: CityStatsRouteContainerProps;
     notifications: NotificationsRouteContainerProps;
     chats: ChatsRouteContainerProps;
+    groups?: ComponentProps<typeof GroupsPage>;
     relays: ComponentProps<typeof RelaysRoute>;
     relayDetail: ComponentProps<typeof RelayDetailRoute>;
     discover: DiscoverRouteContainerProps;
@@ -55,6 +58,7 @@ export function OverlayRoutes({
     cityStats,
     notifications,
     chats,
+    groups,
     relays,
     relayDetail,
     discover,
@@ -83,6 +87,7 @@ export function OverlayRoutes({
                     <Route path="/city-stats" element={<CityStatsRouteContainer {...cityStats} />} />
                     <Route path="/notifications" element={notifications.canAccessSocialNotifications ? <NotificationsRouteContainer {...notifications} /> : <Navigate to="/" replace />} />
                     <Route path="/chats" element={chats.canDirectMessages ? <ChatsRouteContainer {...chats} /> : <Navigate to="/" replace />} />
+                    <Route path="/groups" element={groups ? <GroupsPage {...groups} /> : <GroupsRouteContainer />} />
                     <Route path="/relays" element={<RelaysRoute {...relays} />} />
                     <Route path="/relays/detail" element={<RelayDetailRoute {...relayDetail} />} />
                     <Route path="/discover" element={<DiscoverRouteContainer {...discover} />} />

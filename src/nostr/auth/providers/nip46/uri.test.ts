@@ -52,5 +52,58 @@ describe('parseNip46Uri', () => {
         expect(() => parseNip46Uri('bunker://invalid?relay=wss://relay.one.example')).toThrow(
             'NIP-46 URI pubkey must be 64-char lowercase hex'
         );
+        expect(() => parseNip46Uri(`bunker://${'A'.repeat(64)}?relay=wss://relay.one.example`)).toThrow(
+            'NIP-46 URI pubkey must be 64-char lowercase hex'
+        );
+    });
+
+    test('normalizes, dedupes, and limits relays to 8 wss URLs', () => {
+        const parsed = parseNip46Uri(
+            `bunker://${HEX64}?` +
+                [
+                    'relay=wss://relay1.example/',
+                    'relay=wss://relay1.example',
+                    'relay=wss://relay2.example/path/',
+                    'relay=wss://relay3.example',
+                    'relay=wss://relay4.example',
+                    'relay=wss://relay5.example',
+                    'relay=wss://relay6.example',
+                    'relay=wss://relay7.example',
+                    'relay=wss://relay8.example',
+                    'relay=wss://relay9.example',
+                ].join('&')
+        );
+
+        expect(parsed.relays).toEqual([
+            'wss://relay1.example',
+            'wss://relay2.example/path',
+            'wss://relay3.example',
+            'wss://relay4.example',
+            'wss://relay5.example',
+            'wss://relay6.example',
+            'wss://relay7.example',
+            'wss://relay8.example',
+        ]);
+    });
+
+    test('rejects relays with credentials, fragments, or insecure schemes', () => {
+        expect(() => parseNip46Uri(`bunker://${HEX64}?relay=ws://relay.example`)).toThrow(
+            'NIP-46 URI contains invalid relay URL'
+        );
+        expect(() => parseNip46Uri(`bunker://${HEX64}?relay=wss://user:pass@relay.example`)).toThrow(
+            'NIP-46 URI contains invalid relay URL'
+        );
+        expect(() => parseNip46Uri(`bunker://${HEX64}?relay=wss://relay.example/#frag`)).toThrow(
+            'NIP-46 URI contains invalid relay URL'
+        );
+    });
+
+    test('rejects top-level NIP-46 URIs with credentials', () => {
+        expect(() => parseNip46Uri(`bunker://user:pass@${HEX64}?relay=wss://relay.example`)).toThrow(
+            'NIP-46 URI must not contain credentials'
+        );
+        expect(() => parseNip46Uri(`nostrconnect://user:pass@${HEX64}?relay=wss://relay.example&secret=abc123`)).toThrow(
+            'NIP-46 URI must not contain credentials'
+        );
     });
 });

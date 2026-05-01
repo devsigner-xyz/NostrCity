@@ -2,6 +2,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+    DEFAULT_GROUP_RELAYS,
     getDefaultDmInboxRelays,
     RELAY_SETTINGS_STORAGE_KEY,
     saveRelaySettings,
@@ -156,6 +157,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: [],
                 search: [],
+                groups: [],
             },
         }, ownerPubkey);
 
@@ -173,6 +175,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: ['wss://relay.shared.example'],
                 dmInbox: ['wss://relay.dm-only.example', 'wss://relay.shared.example'],
                 search: ['wss://search.saved.example'],
+                groups: [],
             },
         });
 
@@ -203,6 +206,39 @@ describe('useRelaysSettingsController', () => {
         ]);
     });
 
+    test('partitions configured and suggested group relays into the group section', async () => {
+        seedRelaySettings({
+            relays: ['wss://relay.main.example', 'wss://relay.group.example'],
+            byType: {
+                nip65Both: ['wss://relay.main.example'],
+                nip65Read: [],
+                nip65Write: [],
+                dmInbox: [],
+                search: [],
+                groups: ['wss://relay.group.example'],
+            },
+        });
+
+        await renderController({
+            suggestedRelaysByType: {
+                groups: ['wss://relay.group.example', 'wss://relay.group-suggested.example'],
+            },
+        });
+
+        expect(getController().configuredRows.map(({ relayUrl }) => relayUrl)).toEqual(['wss://relay.main.example']);
+        expect(getController().groupConfiguredRows.map(({ relayUrl }) => relayUrl)).toEqual(['wss://relay.group.example']);
+        expect(getController().groupSuggestedRows.map(({ relayUrl }) => relayUrl)).toEqual(['wss://relay.group-suggested.example']);
+    });
+
+    test('shows default suggested group relays without configuring them automatically', async () => {
+        await renderController({ suggestedRelaysByType: { groups: [] } });
+
+        expect(getController().groupConfiguredRows).toEqual([]);
+        expect(getController().groupSuggestedRows.map(({ relayUrl }) => relayUrl)).toEqual(
+            [...DEFAULT_GROUP_RELAYS].sort((left, right) => left.localeCompare(right))
+        );
+    });
+
     test('hides suggested read and write rows when a relay is already configured as nip65Both', async () => {
         seedRelaySettings({
             relays: ['wss://relay.covered.example'],
@@ -212,6 +248,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: [],
                 search: [],
+                groups: [],
             },
         });
 
@@ -234,6 +271,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: ['wss://relay.split.example'],
                 dmInbox: [],
                 search: [],
+                groups: [],
             },
         });
 
@@ -255,6 +293,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: [],
                 search: [],
+                groups: [],
             },
         });
 
@@ -282,6 +321,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: ['wss://relay.custom-dm.example'],
                 search: [],
+                groups: [],
             },
         });
 
@@ -305,6 +345,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: ['wss://relay.shared.example'],
                 search: [],
+                groups: [],
             },
         });
 
@@ -333,6 +374,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: ['wss://relay.custom-dm.example'],
                 search: ['wss://search.custom.example'],
+                groups: [],
             },
         });
 
@@ -356,6 +398,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: ['wss://relay.dm.example'],
                 search: ['wss://search.saved.example'],
+                groups: [],
             },
         });
 
@@ -385,6 +428,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: ['wss://relay.dm-only.example'],
                 search: ['wss://search.saved.example'],
+                groups: [],
             },
         });
 
@@ -400,17 +444,50 @@ describe('useRelaysSettingsController', () => {
             'wss://relay.dm-only.example',
             'wss://search.saved.example',
         ]);
-        expect(lastSuggestedStatusTargets()).toEqual([
+        expect(lastSuggestedStatusTargets()).toEqual(expect.arrayContaining([
             'wss://relay.dm-suggested.example',
             'wss://search.suggested.example',
-        ]);
-        expect(lastRelayInfoTargets()).toEqual([
+            ...DEFAULT_GROUP_RELAYS,
+        ]));
+        expect(lastRelayInfoTargets()).toEqual(expect.arrayContaining([
             'wss://relay.main.example',
             'wss://relay.dm-only.example',
             'wss://search.saved.example',
             'wss://relay.dm-suggested.example',
             'wss://search.suggested.example',
+            ...DEFAULT_GROUP_RELAYS,
+        ]));
+    });
+
+    test('includes group relays in metadata and status target derivation', async () => {
+        seedRelaySettings({
+            relays: ['wss://relay.main.example', 'wss://relay.group-configured.example'],
+            byType: {
+                nip65Both: ['wss://relay.main.example'],
+                nip65Read: [],
+                nip65Write: [],
+                dmInbox: [],
+                search: [],
+                groups: ['wss://relay.group-configured.example'],
+            },
+        });
+
+        await renderController({
+            suggestedRelaysByType: {
+                groups: ['wss://relay.group-suggested.example'],
+            },
+        });
+
+        expect(lastConfiguredStatusTargets()).toEqual([
+            'wss://relay.main.example',
+            'wss://relay.group-configured.example',
         ]);
+        expect(lastSuggestedStatusTargets()).toEqual(expect.arrayContaining(['wss://relay.group-suggested.example']));
+        expect(lastRelayInfoTargets()).toEqual(expect.arrayContaining([
+            'wss://relay.main.example',
+            'wss://relay.group-configured.example',
+            'wss://relay.group-suggested.example',
+        ]));
     });
 
     test('keeps suggested probing disabled until all configured relays settle', async () => {
@@ -426,6 +503,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: ['wss://relay.dm-only.example'],
                 search: ['wss://search.saved.example'],
+                groups: [],
             },
         });
 
@@ -452,6 +530,7 @@ describe('useRelaysSettingsController', () => {
                 nip65Write: [],
                 dmInbox: ['wss://relay.dm-only.example'],
                 search: ['wss://search.saved.example'],
+                groups: [],
             },
         });
 

@@ -1,6 +1,5 @@
-import { normalizeRelayUrl } from '../../../relay-policy';
-
 const HEX64_LOWER = /^[a-f0-9]{64}$/;
+const MAX_NIP46_RELAYS = 8;
 
 export interface ParsedBunkerUri {
     type: 'bunker';
@@ -30,18 +29,41 @@ function parsePubkeyFromHost(url: URL): string {
     return pubkey;
 }
 
-function parseRelays(params: URLSearchParams): string[] {
+function normalizeNip46RelayUrl(relay: string): string | null {
+    try {
+        const parsed = new URL(relay);
+        if (parsed.protocol !== 'wss:') {
+            return null;
+        }
+        if (parsed.username || parsed.password || parsed.hash) {
+            return null;
+        }
+
+        parsed.search = '';
+        const normalized = parsed.toString();
+        return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
+    } catch {
+        return null;
+    }
+}
+
+function parseRelays(parsed: URL): string[] {
+    if (parsed.hash) {
+        throw new Error('NIP-46 URI contains invalid relay URL');
+    }
+
+    const params = parsed.searchParams;
     const relays = params.getAll('relay');
     if (relays.length === 0) {
         throw new Error('bunker uri requires at least one relay');
     }
 
-    const normalized = relays.map((relay) => normalizeRelayUrl(relay));
+    const normalized = relays.map((relay) => normalizeNip46RelayUrl(relay));
     if (normalized.some((value) => value === null)) {
         throw new Error('NIP-46 URI contains invalid relay URL');
     }
 
-    return [...new Set(normalized as string[])];
+    return [...new Set(normalized as string[])].slice(0, MAX_NIP46_RELAYS);
 }
 
 function parsePerms(params: URLSearchParams): string[] {
@@ -70,8 +92,12 @@ export function parseNip46Uri(input: string): ParsedNip46Uri {
         throw new Error('Unsupported NIP-46 URI scheme');
     }
 
+    if (parsed.username || parsed.password) {
+        throw new Error('NIP-46 URI must not contain credentials');
+    }
+
     const pubkey = parsePubkeyFromHost(parsed);
-    const relays = parseRelays(parsed.searchParams);
+    const relays = parseRelays(parsed);
 
     if (parsed.protocol === 'bunker:') {
         const secret = parsed.searchParams.get('secret') || undefined;

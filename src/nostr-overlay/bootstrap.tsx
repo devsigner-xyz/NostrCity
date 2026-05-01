@@ -1,9 +1,23 @@
 import { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { HashRouter } from 'react-router';
+import { BrowserRouter } from 'react-router';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { SimplePool } from 'nostr-tools/pool';
+import { createAuthService } from '../nostr/auth/auth-service';
 import { createRuntimeDirectMessagesService } from '../nostr/dm-runtime-service';
+import { GROUP_METADATA_KIND, isVerifiedPublicSavedGroupsEvent, parsePublicSavedGroupRelaysEvent, parsePublicSavedGroupsEvent, PUBLIC_SAVED_GROUPS_KIND } from '../nostr/groups';
+import {
+    discoverNip29GroupsFromRelays,
+    resolveNip29GroupDiscoveryRelays,
+    verifiedDiscoveredGroups,
+} from '../nostr/group-relay-discovery';
+import { createGroupsRuntimeService } from '../nostr/groups-runtime-service';
+import { fetchNip11RelayInfo } from '../nostr/groups-transport';
 import { createLazyNdkClient } from '../nostr/lazy-ndk-client';
+import { getBootstrapRelays } from '../nostr/relay-policy';
+import { loadRelaySettings } from '../nostr/relay-settings';
+import type { PublishResult } from '../nostr/dm-types';
+import type { NostrEvent } from '../nostr/types';
 import { createDmApiService } from '../nostr-api/dm-api-service';
 import { createGraphApiService } from '../nostr-api/graph-api-service';
 import { createHttpClient, type HttpClientAuthContext } from '../nostr-api/http-client';
@@ -16,6 +30,7 @@ import { createWindowMapBridge } from './map-bridge';
 import { getNostrOverlayQueryClient } from './query/query-client';
 import { createOverlayServices, type OverlayServices } from './services/overlay-services';
 import { createSocialPublisher } from './social-publisher';
+import { cleanLegacyHashRoutePath, overlayRouterBasenameFromPathname } from './legacy-hash-routing';
 import './styles.css';
 
 let overlayRoot: Root | null = null;
@@ -25,6 +40,36 @@ interface MountNostrOverlayOptions {
 }
 
 type OverlayWriteGateway = NonNullable<Parameters<NonNullable<OverlayServices['setWriteGateway']>>[0]>;
+
+async function publishSignedEventToRelays(event: NostrEvent, relayUrls: string[]): Promise<PublishResult> {
+    const pool = new SimplePool();
+    const attempts = await Promise.allSettled(
+        pool.publish(relayUrls, event as Parameters<typeof pool.publish>[1])
+    );
+    pool.close(relayUrls);
+
+    return publishAttemptsToResult(attempts, relayUrls);
+}
+
+function publishAttemptsToResult(attempts: PromiseSettledResult<string>[], relayUrls: string[]): PublishResult {
+    return attempts.reduce<PublishResult>((result, attempt, index) => {
+        const relay = relayUrls[index] ?? '';
+        if (attempt.status === 'fulfilled') {
+            if (attempt.value.startsWith('connection failure:')) {
+                result.failedRelays.push({ relay, reason: attempt.value });
+            } else {
+                result.ackedRelays.push(relay);
+            }
+        } else {
+            result.failedRelays.push({
+                relay,
+                reason: attempt.reason instanceof Error ? attempt.reason.message : 'unknown: publish failed',
+            });
+        }
+
+        return result;
+    }, { ackedRelays: [], failedRelays: [], timeoutRelays: [] });
+}
 
 function missingWriteGateway(): never {
     throw new Error('Overlay write gateway is not configured');
@@ -49,12 +94,51 @@ export function createBootstrapOverlayServices(): OverlayServices {
         decryptDm: (pubkey, ciphertext, scheme) => requireWriteGateway().decryptDm(pubkey, ciphertext, scheme),
     };
     let runtimeDirectMessagesService: ReturnType<typeof createRuntimeDirectMessagesService> | undefined;
+    let runtimeGroupsService: ReturnType<typeof createGroupsRuntimeService> | undefined;
+    let runtimeGroupsOwnerPubkey: string | undefined;
+    let savedGroupsClient: ReturnType<typeof createLazyNdkClient> | undefined;
+    const groupRelayClients = new Map<string, ReturnType<typeof createLazyNdkClient>>();
     const getRuntimeDirectMessagesService = () => {
         runtimeDirectMessagesService ??= createRuntimeDirectMessagesService({
             writeGateway: deferredWriteGateway,
             resolveRelays: () => directMessageRelays,
         });
         return runtimeDirectMessagesService;
+    };
+    const getRuntimeGroupsService = () => {
+        if (!runtimeGroupsService || runtimeGroupsOwnerPubkey !== ownerPubkey) {
+            runtimeGroupsOwnerPubkey = ownerPubkey;
+            runtimeGroupsService = createGroupsRuntimeService({
+                writeGateway: deferredWriteGateway,
+                ...(ownerPubkey ? { ownPubkey: ownerPubkey } : {}),
+                publishToGroupRelay: publishSignedEventToRelays,
+                transport: {
+                    fetchRelayInfo: (relay) => fetchNip11RelayInfo(relay),
+                    fetchGroupEvents: async (relay, filters) => {
+                        const relayClient = createLazyNdkClient({ relays: [relay] });
+                        await relayClient.connect();
+                        const results = await Promise.all(filters.map((filter) => relayClient.fetchEvents(filter)));
+                        return results.flat();
+                    },
+                },
+            });
+        }
+
+        return runtimeGroupsService;
+    };
+    const getSavedGroupsClient = () => {
+        savedGroupsClient ??= createLazyNdkClient({ relays: getBootstrapRelays() });
+        return savedGroupsClient;
+    };
+    const getGroupRelayClient = (relay: string) => {
+        const existing = groupRelayClients.get(relay);
+        if (existing) {
+            return existing;
+        }
+
+        const nextClient = createLazyNdkClient({ relays: [relay] });
+        groupRelayClients.set(relay, nextClient);
+        return nextClient;
     };
     const dmApiService = createDmApiService({
         client,
@@ -71,6 +155,7 @@ export function createBootstrapOverlayServices(): OverlayServices {
 
     return createOverlayServices({
         createClient: (relays: string[] = []) => createLazyNdkClient({ relays }),
+        authService: createAuthService(),
         graphApiService: createGraphApiService({ client }),
         socialFeedService: createSocialFeedApiService({
             client,
@@ -97,6 +182,40 @@ export function createBootstrapOverlayServices(): OverlayServices {
             client,
             resolveOwnerPubkey: () => ownerPubkey,
         }),
+        groupsService: {
+            async loadGroups(input) {
+                const relayClient = getSavedGroupsClient();
+                await relayClient.connect();
+                const rawSavedGroups = await relayClient.fetchLatestReplaceableEvent(input.ownerPubkey, PUBLIC_SAVED_GROUPS_KIND);
+                const savedGroups = rawSavedGroups && isVerifiedPublicSavedGroupsEvent(rawSavedGroups, input.ownerPubkey) ? rawSavedGroups : null;
+                const saved = savedGroups ? parsePublicSavedGroupsEvent(savedGroups) : [];
+                const publicRelayTags = savedGroups ? parsePublicSavedGroupRelaysEvent(savedGroups) : [];
+                const relaySettings = loadRelaySettings({ ownerPubkey: input.ownerPubkey });
+                const groupRelays = resolveNip29GroupDiscoveryRelays({
+                    configuredGroupRelays: relaySettings.byType.groups,
+                    savedGroups: saved,
+                    publicRelayTags,
+                });
+                const discovered = await discoverNip29GroupsFromRelays({
+                    relays: groupRelays,
+                    fetchRelayInfo: (relay) => fetchNip11RelayInfo(relay),
+                    fetchMetadataEvents: async (relay, author) => {
+                        const relayOnlyClient = getGroupRelayClient(relay);
+                        await relayOnlyClient.connect();
+                        return relayOnlyClient.fetchEvents({ kinds: [GROUP_METADATA_KIND], authors: [author] });
+                    },
+                });
+                return {
+                    saved,
+                    discovered,
+                };
+            },
+            loadGroup: (input) => getRuntimeGroupsService().loadGroup(input.group),
+            publishMessage: (input) => getRuntimeGroupsService().publishMessage(input),
+            requestJoin: (input) => getRuntimeGroupsService().requestJoin(input),
+            requestLeave: (input) => getRuntimeGroupsService().requestLeave(input),
+            savePublicGroups: (input) => getRuntimeGroupsService().savePublicGroups(input),
+        },
         configureAuthHeaders: (nextGetAuthHeaders) => {
             getAuthHeaders = nextGetAuthHeaders;
         },
@@ -112,15 +231,26 @@ export function createBootstrapOverlayServices(): OverlayServices {
     });
 }
 
+export const __bootstrapTestUtils = {
+    publishAttemptsToResult,
+    verifiedDiscoveredGroups,
+};
+
 export function mountNostrOverlay(win: Window = window, options: MountNostrOverlayOptions = {}): void {
     const container = win.document.getElementById('nostr-overlay-root');
     if (!container) {
         return;
     }
 
+    const cleanLegacyPath = cleanLegacyHashRoutePath(win.location.pathname, win.location.hash);
+    if (cleanLegacyPath) {
+        win.history.replaceState(win.history.state, '', cleanLegacyPath);
+    }
+
     const bridge = createWindowMapBridge(win);
     const queryClient = getNostrOverlayQueryClient();
     const services = options.services ?? createBootstrapOverlayServices();
+    const basename = overlayRouterBasenameFromPathname(win.location.pathname);
     if (!overlayRoot) {
         overlayRoot = createRoot(container);
     }
@@ -128,9 +258,9 @@ export function mountNostrOverlay(win: Window = window, options: MountNostrOverl
     overlayRoot.render(
         <StrictMode>
             <QueryClientProvider client={queryClient}>
-                <HashRouter>
+                <BrowserRouter {...(basename ? { basename } : {})}>
                     <App mapBridge={bridge} services={services} />
-                </HashRouter>
+                </BrowserRouter>
             </QueryClientProvider>
         </StrictMode>
     );

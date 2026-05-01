@@ -8,6 +8,7 @@ import type {
     EngagementQueryInput,
     FollowingFeedQueryInput,
     Nip05BatchQueryInput,
+    RelayGroupsQueryInput,
     NotificationsQueryInput,
     RelayMetadataQueryInput,
     ThreadQueryInput,
@@ -168,6 +169,12 @@ export const nostrOverlayQueryKeys = {
         'relay-metadata',
         { relayUrl: input.relayUrl },
     ] as const,
+    relayGroups: (input: RelayGroupsQueryInput) => [
+        ROOT_SCOPE,
+        SOCIAL_SCOPE,
+        'relay-groups',
+        { relayUrl: input.relayUrl },
+    ] as const,
     activeProfilePosts: (input: ActiveProfilePostsQueryInput) => [
         ROOT_SCOPE,
         SOCIAL_SCOPE,
@@ -204,6 +211,7 @@ export const nostrOverlayQueryKeys = {
         userSearch: () => [ROOT_SCOPE, SOCIAL_SCOPE, 'search'] as const,
         nip05: () => [ROOT_SCOPE, SOCIAL_SCOPE, 'nip05'] as const,
         relayMetadata: () => [ROOT_SCOPE, SOCIAL_SCOPE, 'relay-metadata'] as const,
+        relayGroups: () => [ROOT_SCOPE, SOCIAL_SCOPE, 'relay-groups'] as const,
         activeProfile: () => [ROOT_SCOPE, SOCIAL_SCOPE, 'active-profile'] as const,
     },
 };

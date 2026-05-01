@@ -9,7 +9,15 @@ export const DEFAULT_SEARCH_RELAYS = [
     'wss://filter.nostr.wine',
 ];
 
-export const RELAY_TYPES = ['nip65Both', 'nip65Read', 'nip65Write', 'dmInbox', 'search'] as const;
+export const DEFAULT_GROUP_RELAYS = [
+    'wss://groups.fiatjaf.com',
+    'wss://groups.0xchat.com',
+    'wss://relay.groups.nip29.com',
+    'wss://groups.hzrd149.com',
+    'wss://pyramid.fiatjaf.com',
+];
+
+export const RELAY_TYPES = ['nip65Both', 'nip65Read', 'nip65Write', 'dmInbox', 'search', 'groups'] as const;
 export type RelayType = (typeof RELAY_TYPES)[number];
 
 export interface RelaySettingsByType {
@@ -18,6 +26,7 @@ export interface RelaySettingsByType {
     nip65Write: string[];
     dmInbox: string[];
     search: string[];
+    groups: string[];
 }
 
 interface LegacyRelaySettingsByType {
@@ -94,7 +103,7 @@ function normalizeRelayList(relays: string[]): string[] {
 function isLegacyByType(byType: Partial<Record<RelayType, string[]>> | LegacyRelaySettingsByType): byType is LegacyRelaySettingsByType {
     return 'general' in byType
         || 'dmOutbox' in byType
-        || (!('nip65Both' in byType) && !('nip65Read' in byType) && !('nip65Write' in byType) && !('search' in byType));
+        || (!('nip65Both' in byType) && !('nip65Read' in byType) && !('nip65Write' in byType) && !('search' in byType) && !('groups' in byType));
 }
 
 function normalizeByType(byType: Partial<Record<RelayType, string[]>> | LegacyRelaySettingsByType): RelaySettingsByType {
@@ -107,6 +116,7 @@ function normalizeByType(byType: Partial<Record<RelayType, string[]>> | LegacyRe
         nip65Write: normalizeRelayList(typed.nip65Write ?? legacy?.dmOutbox ?? []),
         dmInbox: normalizeRelayList(typed.dmInbox ?? []),
         search: normalizeRelayList(typed.search ?? DEFAULT_SEARCH_RELAYS),
+        groups: normalizeRelayList(typed.groups ?? []),
     };
 }
 
@@ -183,10 +193,11 @@ export function getDefaultRelaySettings(): RelaySettingsState {
     const byType = normalizeByType({
         nip65Both: bootstrap,
         nip65Read: bootstrap,
-        nip65Write: bootstrap,
-        dmInbox: DEFAULT_DM_INBOX_RELAYS,
-        search: [...DEFAULT_SEARCH_RELAYS],
-    });
+            nip65Write: bootstrap,
+            dmInbox: DEFAULT_DM_INBOX_RELAYS,
+            search: [...DEFAULT_SEARCH_RELAYS],
+            groups: [],
+        });
 
     return {
         relays: buildAllRelays(byType),
@@ -283,7 +294,7 @@ export function addRelay(state: RelaySettingsState, relayUrl: string, relayType:
 
     const byType = normalizeByType({
         ...state.byType,
-        [relayType]: [...state.byType[relayType], normalized],
+        [relayType]: [...(state.byType[relayType] ?? []), normalized],
     });
 
     return {
@@ -336,7 +347,7 @@ export function removeRelay(state: RelaySettingsState, relayUrl: string, relayTy
     if (relayType) {
         const byType = normalizeByType({
             ...state.byType,
-            [relayType]: state.byType[relayType].filter((relay) => relay !== normalized),
+            [relayType]: (state.byType[relayType] ?? []).filter((relay) => relay !== normalized),
         });
         return {
             byType,
@@ -350,6 +361,7 @@ export function removeRelay(state: RelaySettingsState, relayUrl: string, relayTy
         nip65Write: state.byType.nip65Write.filter((relay) => relay !== normalized),
         dmInbox: state.byType.dmInbox.filter((relay) => relay !== normalized),
         search: state.byType.search.filter((relay) => relay !== normalized),
+        groups: state.byType.groups ?? [],
     });
 
     return {

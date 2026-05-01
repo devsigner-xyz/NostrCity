@@ -74,4 +74,8 @@ export interface RelayMetadataQueryInput {
     relayUrl: string;
 }
 
+export interface RelayGroupsQueryInput {
+    relayUrl: string;
+}
+
 export type NostrOverlayQueryKey = QueryKey & readonly ['nostr-overlay', ...readonly unknown[]];

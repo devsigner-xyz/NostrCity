@@ -47,6 +47,7 @@ export function useOverlayRouteState() {
     const isArticlesRoute = location.pathname === '/agora/articles';
     const isArticleDetailRoute = location.pathname.startsWith('/agora/articles/');
     const isChatsRoute = location.pathname === '/chats';
+    const isGroupsRoute = location.pathname === '/groups';
     const isNotificationsRoute = location.pathname === '/notifications';
 
     useEffect(() => {
@@ -119,6 +120,7 @@ export function useOverlayRouteState() {
         isArticlesRoute,
         isArticleDetailRoute,
         isChatsRoute,
+        isGroupsRoute,
         isNotificationsRoute,
         isUiSettingsDialogOpen,
         openUiSettingsDialog,

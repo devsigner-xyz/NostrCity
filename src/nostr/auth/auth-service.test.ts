@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { generateSecretKey } from 'nostr-tools/pure';
 import { createAuthService } from './auth-service';
 import { createLocalKeyStorage } from './local-key-storage';
+import { Nip46AuthProvider } from './providers/nip46-provider';
 import { AUTH_SESSION_STORAGE_KEY } from './secure-storage';
 import { AUTH_PROVIDER_ERROR } from './providers/types';
 
@@ -233,9 +234,104 @@ describe('createAuthService', () => {
         expect(storage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
     });
 
-    test('returns provider unavailable for nip46 when runtime adapter is not configured', async () => {
+    test('does not persist successful nip46 sessions because they require explicit reconnect', async () => {
         const storage = createMemoryStorage();
-        const auth = createAuthService({ storage });
+        const auth = createAuthService({
+            storage,
+            providers: {
+                nip46: {
+                    method: 'nip46',
+                    supports: {
+                        canSign: true,
+                        canEncrypt: true,
+                        encryptionSchemes: ['nip44'],
+                    },
+                    resolveSession: vi.fn().mockResolvedValue({
+                        method: 'nip46',
+                        pubkey: 'a'.repeat(64),
+                        readonly: false,
+                        locked: false,
+                        capabilities: {
+                            canSign: true,
+                            canEncrypt: true,
+                            encryptionSchemes: ['nip44'],
+                        },
+                    }),
+                    signEvent: vi.fn(),
+                    encrypt: vi.fn(),
+                    decrypt: vi.fn(),
+                    lock: vi.fn(),
+                },
+            },
+        });
+
+        const session = await auth.startSession('nip46', {
+            bunkerUri: `bunker://${'b'.repeat(64)}?relay=wss://relay.example.com`,
+        });
+
+        expect(session.method).toBe('nip46');
+        expect(storage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
+    });
+
+    test('clears stale persisted auth when starting a successful nip46 session', async () => {
+        const storage = createMemoryStorage();
+        storage.setItem(
+            AUTH_SESSION_STORAGE_KEY,
+            JSON.stringify({
+                method: 'npub',
+                pubkey: 'c'.repeat(64),
+                readonly: true,
+                locked: false,
+                createdAt: 123,
+            })
+        );
+        const auth = createAuthService({
+            storage,
+            providers: {
+                nip46: {
+                    method: 'nip46',
+                    supports: {
+                        canSign: true,
+                        canEncrypt: true,
+                        encryptionSchemes: ['nip44'],
+                    },
+                    resolveSession: vi.fn().mockResolvedValue({
+                        method: 'nip46',
+                        pubkey: 'a'.repeat(64),
+                        readonly: false,
+                        locked: false,
+                        capabilities: {
+                            canSign: true,
+                            canEncrypt: true,
+                            encryptionSchemes: ['nip44'],
+                        },
+                    }),
+                    signEvent: vi.fn(),
+                    encrypt: vi.fn(),
+                    decrypt: vi.fn(),
+                    lock: vi.fn(),
+                },
+            },
+        });
+
+        await auth.startSession('nip46', {
+            bunkerUri: `bunker://${'b'.repeat(64)}?relay=wss://relay.example.com`,
+        });
+
+        expect(storage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
+
+        const restored = await createAuthService({ storage }).restoreSession();
+        expect(restored).toBeUndefined();
+    });
+
+    test('returns provider unavailable for nip46 when an explicitly disabled runtime adapter is configured', async () => {
+        const storage = createMemoryStorage();
+        const auth = createAuthService({
+            storage,
+            providers: {
+                nip46: new Nip46AuthProvider(),
+            },
+        });
 
         await expect(
             auth.startSession('nip46', {
@@ -244,6 +340,29 @@ describe('createAuthService', () => {
         ).rejects.toMatchObject({
             code: AUTH_PROVIDER_ERROR.AUTH_PROVIDER_UNAVAILABLE,
         });
+    });
+
+    test('passes generated nostrconnect client secret key through the default nip46 runtime factory', async () => {
+        vi.resetModules();
+        const createNip46Runtime = vi.fn(() => {
+            throw new Error('stop after default runtime input capture');
+        });
+        vi.doMock('./providers/nip46/runtime', () => ({
+            createNip46Runtime,
+        }));
+        const { createAuthService: createAuthServiceWithMockedRuntime } = await import('./auth-service');
+        const clientSecretKey = new Uint8Array(32).fill(9);
+        const auth = createAuthServiceWithMockedRuntime({ storage: createMemoryStorage() });
+
+        await expect(auth.startSession('nip46', {
+            bunkerUri: `nostrconnect://${'a'.repeat(64)}?relay=wss://relay.example.com&secret=required-secret`,
+            clientSecretKey,
+        })).rejects.toThrow('stop after default runtime input capture');
+
+        expect(createNip46Runtime).toHaveBeenCalledWith(expect.objectContaining({
+            clientSecretKey,
+        }));
+        vi.doUnmock('./providers/nip46/runtime');
     });
 
     test('logout clears persisted session and notifies subscribers', async () => {

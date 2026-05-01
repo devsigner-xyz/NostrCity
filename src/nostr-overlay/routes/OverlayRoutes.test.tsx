@@ -389,6 +389,14 @@ describe('OverlayRoutes', () => {
         expect(lastLocation(rendered.locations)).toBe('/chats');
     });
 
+    test('renders Groups route for authenticated /groups requests', async () => {
+        const rendered = await renderOverlayRoutes('/groups');
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('[data-testid="groups-route"]')).not.toBeNull();
+        expect(lastLocation(rendered.locations)).toBe('/groups');
+    });
+
     test('renders Wallet route for /wallet', async () => {
         const rendered = await renderOverlayRoutes('/wallet');
         mounted.push(rendered);

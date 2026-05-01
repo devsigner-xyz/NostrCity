@@ -22,8 +22,8 @@ export default defineConfig({
   srcExclude: ['superpowers/**', 'migration/**', 'landing-routing.md', 'portfolio-backend-first.md'],
   themeConfig: {
     nav: [
-      { text: 'Documentacion', link: '/' },
-      { text: 'Aplicacion', link: appUrl },
+      { text: 'Documentación', link: '/' },
+      { text: 'Aplicación', link: appUrl },
       { text: 'GitHub', link: 'https://github.com/devsigner-xyz/NostrCity' },
     ],
     search: {
@@ -38,16 +38,16 @@ export default defineConfig({
         items: [
           { text: 'Inicio', link: '/' },
           { text: 'Primeros pasos', link: '/empezar/' },
-          { text: 'Recorrido rapido', link: '/empezar/primeros-pasos' },
+          { text: 'Recorrido rápido', link: '/empezar/primeros-pasos' },
           { text: 'Mapa y controles', link: '/empezar/mapa-y-controles' },
-          { text: 'Exportacion y STL', link: '/empezar/exportacion-y-stl' },
+          { text: 'Exportación y STL', link: '/empezar/exportacion-y-stl' },
         ],
       },
       {
-        text: 'Conceptos basicos',
+        text: 'Conceptos básicos',
         items: [
-          { text: 'Que es Nostr City', link: '/conceptos/que-es-nostr-city' },
-          { text: 'Que es Nostr', link: '/conceptos/que-es-nostr' },
+          { text: 'Qué es Nostr City', link: '/conceptos/que-es-nostr-city' },
+          { text: 'Qué es Nostr', link: '/conceptos/que-es-nostr' },
         ],
       },
       {
@@ -55,15 +55,19 @@ export default defineConfig({
         items: [
           { text: 'Acceso y login', link: '/cuenta-y-acceso/acceso-y-login' },
           { text: 'Crear cuenta', link: '/cuenta-y-acceso/crear-cuenta' },
-          { text: 'Relays y configuracion', link: '/cuenta-y-acceso/relays-y-configuracion' },
+          { text: 'Relays y configuración', link: '/cuenta-y-acceso/relays-y-configuracion' },
         ],
       },
       {
         text: 'Protocolo Nostr',
         items: [
           { text: 'NIPs usadas', link: '/protocolo/nips-usadas' },
-          { text: 'Aplicacion en Nostr City', link: '/protocolo/aplicacion-en-nostr-city' },
+          { text: 'Aplicación en Nostr City', link: '/protocolo/aplicacion-en-nostr-city' },
         ],
+      },
+      {
+        text: 'Grupos',
+        items: [{ text: 'Grupos', link: '/grupos/' }],
       },
       {
         text: 'Ayuda',
@@ -72,11 +76,11 @@ export default defineConfig({
     ],
     outline: {
       level: [2, 3],
-      label: 'En esta pagina',
+      label: 'En esta página',
     },
     docFooter: {
-      prev: 'Pagina anterior',
-      next: 'Pagina siguiente',
+      prev: 'Página anterior',
+      next: 'Página siguiente',
     },
   },
 });

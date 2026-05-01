@@ -1,12 +1,13 @@
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
-import { HashRouter, MemoryRouter, useLocation, useNavigate } from 'react-router';
+import { BrowserRouter, MemoryRouter, useLocation, useNavigate } from 'react-router';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { nip19 } from 'nostr-tools';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { createLocalKeyStorage } from '../nostr/auth/local-key-storage';
 import { LocalKeyAuthProvider } from '../nostr/auth/providers/local-key-provider';
+import { createAuthSession } from '../nostr/auth/session';
 import { AUTH_SESSION_STORAGE_KEY } from '../nostr/auth/secure-storage';
 import { loadRelaySettings, RELAY_SETTINGS_STORAGE_KEY, saveRelaySettings } from '../nostr/relay-settings';
 import { WALLET_SETTINGS_STORAGE_KEY } from '../nostr/wallet-settings';
@@ -42,6 +43,7 @@ import { nostrOverlayQueryKeys } from './query/keys';
 import { buildSocialLastReadStorageKey } from './query/read-state';
 import { buildFollowingFeedLastReadStorageKey } from './query/following-feed-read-state';
 import { buildRelayDetailPath } from './settings/relay-detail-routing';
+import type { OverlaySessionAuthService } from './controllers/use-overlay-session-controller';
 
 interface RenderResult {
     container: HTMLDivElement;
@@ -298,6 +300,17 @@ function createBasicOverlayServices(ownerPubkey: string = 'f'.repeat(64), overri
     };
 }
 
+function persistGroupRelaySettings(ownerPubkey: string, groups: string[] = ['wss://relay.example']): void {
+    const state = loadRelaySettings({ ownerPubkey });
+    saveRelaySettings({
+        ...state,
+        byType: {
+            ...state.byType,
+            groups,
+        },
+    }, { ownerPubkey });
+}
+
 function QueryProviderProbe() {
     useQueryClient();
     return <span data-testid="query-provider-probe">query provider ready</span>;
@@ -336,7 +349,7 @@ async function renderApp(element: ReactElement, options: RenderOptions = {}): Pr
     return { container, root, queryClient };
 }
 
-async function renderHashApp(element: ReactElement): Promise<RenderResult> {
+async function renderBrowserApp(element: ReactElement, basename?: string): Promise<RenderResult> {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -345,9 +358,9 @@ async function renderHashApp(element: ReactElement): Promise<RenderResult> {
     await act(async () => {
         root.render(
             <QueryClientProvider client={queryClient}>
-                <HashRouter>
+                <BrowserRouter {...(basename ? { basename } : {})}>
                     {element}
-                </HashRouter>
+                </BrowserRouter>
             </QueryClientProvider>
         );
     });
@@ -831,6 +844,96 @@ describe('Nostr overlay App', () => {
         expect(rendered.container.querySelector('.nostr-panel-toolbar')).not.toBeNull();
     });
 
+    test('uses injected NIP-46 auth service as a writable non-persisted session', async () => {
+        const ownerPubkey = 'e'.repeat(64);
+        const nip46Session = createAuthSession({
+            method: 'nip46',
+            pubkey: ownerPubkey,
+            locked: false,
+            createdAt: Date.now(),
+            capabilities: {
+                canSign: true,
+                canEncrypt: true,
+                encryptionSchemes: ['nip44'],
+            },
+        });
+        const authService: OverlaySessionAuthService = {
+            getSession: () => nip46Session,
+            getActiveProvider: () => ({
+                method: 'nip46',
+                supports: nip46Session.capabilities,
+                resolveSession: vi.fn(),
+                signEvent: vi.fn(),
+                encrypt: vi.fn(),
+                decrypt: vi.fn(),
+                lock: vi.fn(),
+            }),
+            getSavedLocalAccount: async () => undefined,
+            restoreSession: async () => nip46Session,
+            startSession: async () => nip46Session,
+            logout: async () => {},
+        };
+
+        const rendered = await renderApp(
+            <App
+                mapBridge={createMapBridgeStub(4).bridge}
+                services={createBasicOverlayServices(ownerPubkey, { authService })}
+            />,
+            { initialEntries: ['/login'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') === null);
+
+        expect(rendered.container.querySelector('[data-slot="sidebar-footer"] button[aria-label="Abrir publicar"]')).not.toBeNull();
+        expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
+    });
+
+    test('shows nostrconnect timeout state when NIP-46 session start times out', async () => {
+        const authService: OverlaySessionAuthService = {
+            getSession: () => undefined,
+            getActiveProvider: () => undefined,
+            getSavedLocalAccount: async () => undefined,
+            restoreSession: async () => undefined,
+            startSession: async () => {
+                throw new Error('NIP-46 pairing timed out');
+            },
+            logout: async () => {},
+        };
+
+        const rendered = await renderApp(
+            <App
+                mapBridge={createMapBridgeStub(4).bridge}
+                services={createBasicOverlayServices('f'.repeat(64), { authService })}
+            />,
+            { initialEntries: ['/login'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') !== null);
+        const methodSelectTrigger = rendered.container.querySelector('[data-testid="login-method-trigger"]') as HTMLButtonElement;
+        await act(async () => {
+            methodSelectTrigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+            methodSelectTrigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+        });
+        const nip46Option = Array.from(document.body.querySelectorAll('[data-slot="select-item"]')).find((option) => (option.textContent || '').includes('Búnker')) as HTMLElement;
+        await act(async () => {
+            nip46Option.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        const generateButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Generar QR nostrconnect://')) as HTMLButtonElement;
+        await act(async () => {
+            generateButton.click();
+        });
+
+        const pairButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Esperar conexión')) as HTMLButtonElement;
+        await act(async () => {
+            pairButton.click();
+        });
+
+        expect(rendered.container.textContent || '').toContain('La solicitud de emparejamiento caducó');
+        expect(rendered.container.textContent || '').not.toContain('No se pudo conectar el signer remoto');
+    });
+
     test('renders the mobile app bar on the map route without a back button', async () => {
         const rendered = await renderAuthenticatedMobileApp('/');
         mounted.push(rendered);
@@ -1066,8 +1169,8 @@ describe('Nostr overlay App', () => {
     });
 
     test('does not reopen note detail from browser history after desktop return to Agora', async () => {
-        window.history.replaceState(null, '', '/app/#/');
-        window.history.pushState(null, '', '/app/#/agora');
+        window.history.replaceState(null, '', '/app/');
+        window.history.pushState(null, '', '/app/agora');
         const noteId = 'focus-note-browser-history';
         const ownerPubkey = persistDmCapableSession();
         const socialFeed = createSocialFeedServiceMock();
@@ -1078,7 +1181,7 @@ describe('Nostr overlay App', () => {
         (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId, 'feed note browser history'));
         const { bridge } = createMapBridgeStub();
 
-        const rendered = await renderHashApp(
+        const rendered = await renderBrowserApp(
             <>
                 <App
                     mapBridge={bridge}
@@ -1093,7 +1196,8 @@ describe('Nostr overlay App', () => {
                 />
                 <LocationProbe />
                 <BrowserHistoryBackProbe />
-            </>
+            </>,
+            '/app',
         );
         mounted.push(rendered);
 
@@ -3570,6 +3674,579 @@ describe('Nostr overlay App', () => {
         await waitFor(() => (rendered.container.textContent || '').includes('Chats'));
     });
 
+    test('groups route renders for readonly npub sessions without signing actions enabled', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
+            method: 'npub',
+            pubkey: ownerPubkey,
+            readonly: true,
+            locked: false,
+            createdAt: Date.now(),
+            capabilities: {
+                canSign: false,
+                canEncrypt: false,
+                encryptionSchemes: [],
+            },
+        }));
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <>
+                <App mapBridge={bridge} services={createBasicOverlayServices(ownerPubkey)} />
+                <LocationProbe />
+            </>,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') === null);
+        await waitFor(() => (rendered.container.textContent || '').includes('Grupos'));
+
+        expect(getLocationText(rendered.container)).toBe('/groups');
+        expect(rendered.container.querySelector('button[aria-label="Abrir grupos"]')).not.toBeNull();
+        expect(rendered.container.textContent || '').toContain('Elige relays de grupos');
+    });
+
+    test('groups route loads saved groups and selected group detail when entering /groups', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey);
+        const loadGroups = vi.fn(async () => ([{ relay: 'wss://relay.example', id: 'maps' }]));
+        const loadGroup = vi.fn(async () => ({
+            group: { relay: 'wss://relay.example', id: 'maps', key: "wss://relay.example/'maps", external: "relay.example'maps" },
+            metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+            metadataVerified: true,
+            admins: undefined,
+            members: { id: 'maps', pubkeys: ['a'.repeat(64), 'b'.repeat(64)] },
+            roles: undefined,
+            timeline: [],
+        }));
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <>
+                <App
+                    mapBridge={bridge}
+                    services={createBasicOverlayServices(ownerPubkey, {
+                        groupsService: {
+                            loadGroups,
+                            loadGroup,
+                            publishMessage: vi.fn(),
+                            requestJoin: vi.fn(),
+                            requestLeave: vi.fn(),
+                            savePublicGroups: vi.fn(),
+                        },
+                    })}
+                />
+                <LocationProbe />
+            </>,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') === null);
+        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
+
+        expect(getLocationText(rendered.container)).toBe('/groups');
+        expect(loadGroups).toHaveBeenCalledWith({ ownerPubkey });
+        expect(loadGroup).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'maps' } });
+        expect(rendered.container.textContent || '').toContain('Coordinate city maps together.');
+        expect(rendered.container.textContent || '').toContain('2 miembros');
+    });
+
+    test('groups route selects group from relay and group query parameters', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey);
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ([
+                            { relay: 'wss://relay.example', id: 'maps' },
+                            { relay: 'wss://relay.example', id: 'parks' },
+                        ])),
+                        loadGroup: vi.fn(async ({ group }) => {
+                            const input = group as { relay: string; id: string };
+                            const names: Record<string, string> = {
+                                maps: 'Map Makers',
+                                parks: 'Park Planners',
+                            };
+                            return {
+                                group: { relay: input.relay, id: input.id, key: `${input.relay}'${input.id}`, external: `relay.example'${input.id}` },
+                                metadata: { id: input.id, name: names[input.id] ?? input.id, about: input.id === 'parks' ? 'Plan park districts.' : 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                                metadataVerified: true,
+                                admins: undefined,
+                                members: undefined,
+                                roles: undefined,
+                                timeline: [],
+                            };
+                        }),
+                        publishMessage: vi.fn(),
+                        requestJoin: vi.fn(),
+                        requestLeave: vi.fn(),
+                        savePublicGroups: vi.fn(),
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups?relay=wss%3A%2F%2Frelay.example&group=parks'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Park Planners'));
+
+        expect(rendered.container.textContent || '').toContain('Plan park districts.');
+    });
+
+    test('groups route gates publish and save through signing state', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey);
+        const publishMessage = vi.fn(async () => undefined);
+        const savePublicGroups = vi.fn(async () => undefined);
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ([{ relay: 'wss://relay.example', id: 'maps' }])),
+                        loadGroup: vi.fn(async () => ({
+                            group: { relay: 'wss://relay.example', id: 'maps', key: "wss://relay.example/'maps", external: "relay.example'maps" },
+                            metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                            metadataVerified: true,
+                            admins: undefined,
+                            members: undefined,
+                            roles: undefined,
+                            timeline: [],
+                        })),
+                        publishMessage,
+                        requestJoin: vi.fn(),
+                        requestLeave: vi.fn(),
+                        savePublicGroups,
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
+        const textarea = rendered.container.querySelector('textarea[aria-label="Mensaje para Map Makers"]') as HTMLTextAreaElement;
+        expect(textarea.disabled).toBe(false);
+        await fillTextarea(textarea, 'Hello group');
+
+        const publishButton = rendered.container.querySelector('button[aria-label="Publicar mensaje en Map Makers"]') as HTMLButtonElement;
+        const saveButton = rendered.container.querySelector('button[aria-label="Guardar Map Makers"]') as HTMLButtonElement;
+        await act(async () => {
+            publishButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(publishMessage).toHaveBeenCalledWith({
+            group: { relay: 'wss://relay.example', id: 'maps' },
+            content: 'Hello group',
+            recentTimeline: [],
+        });
+        expect(savePublicGroups).toHaveBeenCalledWith({ groups: [{ relay: 'wss://relay.example', id: 'maps' }] });
+    });
+
+    test('groups route explicitly syncs saved groups with configured group relay tags', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey, ['wss://relay.example', 'wss://groups.0xchat.com/']);
+        const savePublicGroups = vi.fn(async () => undefined);
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ([{ relay: 'wss://relay.example', id: 'maps' }])),
+                        loadGroup: vi.fn(async () => ({
+                            group: { relay: 'wss://relay.example', id: 'maps', key: "wss://relay.example/'maps", external: "relay.example'maps" },
+                            metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                            metadataVerified: true,
+                            admins: undefined,
+                            members: undefined,
+                            roles: undefined,
+                            timeline: [],
+                        })),
+                        publishMessage: vi.fn(),
+                        requestJoin: vi.fn(),
+                        requestLeave: vi.fn(),
+                        savePublicGroups,
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
+        expect(rendered.container.textContent || '').toContain('Los relays y grupos sincronizados son datos públicos de Nostr.');
+        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar grupos públicos: los grupos guardados y relays de grupos son datos públicos de Nostr"]') as HTMLButtonElement;
+        await act(async () => {
+            syncButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(savePublicGroups).toHaveBeenCalledWith({
+            groups: [{ relay: 'wss://relay.example', id: 'maps' }],
+            relays: ['wss://relay.example', 'wss://groups.0xchat.com'],
+            publishRelays: ['wss://relay.example', 'wss://groups.0xchat.com'],
+        });
+    });
+
+    test('groups route preserves saved groups without saving unrelated discovered groups', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey);
+        const savePublicGroups = vi.fn(async () => undefined);
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ({
+                            saved: [{ relay: 'wss://relay.example', id: 'maps' }],
+                            discovered: [
+                                { relay: 'wss://relay.example/', id: 'parks' },
+                                { relay: 'wss://relay.example', id: 'artists' },
+                            ],
+                        } as never)),
+                        loadGroup: vi.fn(async ({ group }) => {
+                            const input = group as { relay: string; id: string };
+                            const names: Record<string, string> = {
+                                artists: 'Artist Guild',
+                                maps: 'Map Makers',
+                                parks: 'Park Planners',
+                            };
+                            return {
+                                group: { relay: input.relay.replace(/\/$/, ''), id: input.id, key: `${input.relay.replace(/\/$/, '')}'${input.id}`, external: `relay.example'${input.id}` },
+                                metadata: { id: input.id, name: names[input.id] ?? input.id, about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                                metadataVerified: true,
+                                admins: undefined,
+                                members: undefined,
+                                roles: undefined,
+                                timeline: [],
+                            };
+                        }),
+                        publishMessage: vi.fn(),
+                        requestJoin: vi.fn(),
+                        requestLeave: vi.fn(),
+                        savePublicGroups,
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Park Planners'));
+        const parksButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Park Planners')) as HTMLButtonElement;
+        await act(async () => {
+            parksButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const saveButton = rendered.container.querySelector('button[aria-label="Guardar Park Planners"]') as HTMLButtonElement;
+        await act(async () => {
+            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(savePublicGroups).toHaveBeenCalledWith({
+            groups: [
+                { relay: 'wss://relay.example', id: 'maps' },
+                { relay: 'wss://relay.example/', id: 'parks' },
+            ],
+        });
+    });
+
+    test('groups route dedupes when saving an already saved group', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey);
+        const savePublicGroups = vi.fn(async () => undefined);
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ({
+                            saved: [{ relay: 'wss://relay.example', id: 'maps' }],
+                            discovered: [{ relay: 'wss://relay.example', id: 'parks' }],
+                        } as never)),
+                        loadGroup: vi.fn(async ({ group }) => {
+                            const input = group as { relay: string; id: string };
+                            return {
+                                group: { relay: input.relay, id: input.id, key: `${input.relay}'${input.id}`, external: `relay.example'${input.id}` },
+                                metadata: { id: input.id, name: input.id === 'maps' ? 'Map Makers' : 'Park Planners', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                                metadataVerified: true,
+                                admins: undefined,
+                                members: undefined,
+                                roles: undefined,
+                                timeline: [],
+                            };
+                        }),
+                        publishMessage: vi.fn(),
+                        requestJoin: vi.fn(),
+                        requestLeave: vi.fn(),
+                        savePublicGroups,
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
+        const saveButton = rendered.container.querySelector('button[aria-label="Guardar Map Makers"]') as HTMLButtonElement;
+        await act(async () => {
+            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(savePublicGroups).toHaveBeenCalledWith({
+            groups: [{ relay: 'wss://relay.example', id: 'maps' }],
+        });
+    });
+
+    test('groups route accumulates sequential discovered group saves before reload', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey);
+        const savePublicGroups = vi.fn(async () => undefined);
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ({
+                            saved: [{ relay: 'wss://relay.example', id: 'maps' }],
+                            discovered: [
+                                { relay: 'wss://relay.example', id: 'parks' },
+                                { relay: 'wss://relay.example', id: 'artists' },
+                            ],
+                        } as never)),
+                        loadGroup: vi.fn(async ({ group }) => {
+                            const input = group as { relay: string; id: string };
+                            const names: Record<string, string> = {
+                                artists: 'Artist Guild',
+                                maps: 'Map Makers',
+                                parks: 'Park Planners',
+                            };
+                            return {
+                                group: { relay: input.relay, id: input.id, key: `${input.relay}'${input.id}`, external: `relay.example'${input.id}` },
+                                metadata: { id: input.id, name: names[input.id] ?? input.id, about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                                metadataVerified: true,
+                                admins: undefined,
+                                members: undefined,
+                                roles: undefined,
+                                timeline: [],
+                            };
+                        }),
+                        publishMessage: vi.fn(),
+                        requestJoin: vi.fn(),
+                        requestLeave: vi.fn(),
+                        savePublicGroups,
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Artist Guild'));
+        const parksButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Park Planners')) as HTMLButtonElement;
+        await act(async () => {
+            parksButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        const saveParksButton = rendered.container.querySelector('button[aria-label="Guardar Park Planners"]') as HTMLButtonElement;
+        await act(async () => {
+            saveParksButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const artistsButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Artist Guild')) as HTMLButtonElement;
+        await act(async () => {
+            artistsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        const saveArtistsButton = rendered.container.querySelector('button[aria-label="Guardar Artist Guild"]') as HTMLButtonElement;
+        await act(async () => {
+            saveArtistsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(savePublicGroups).toHaveBeenNthCalledWith(1, {
+            groups: [
+                { relay: 'wss://relay.example', id: 'maps' },
+                { relay: 'wss://relay.example', id: 'parks' },
+            ],
+        });
+        expect(savePublicGroups).toHaveBeenNthCalledWith(2, {
+            groups: [
+                { relay: 'wss://relay.example', id: 'maps' },
+                { relay: 'wss://relay.example', id: 'parks' },
+                { relay: 'wss://relay.example', id: 'artists' },
+            ],
+        });
+    });
+
+    test('groups route gates join and leave through signing state', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey);
+        const requestJoin = vi.fn(async () => undefined);
+        const requestLeave = vi.fn(async () => undefined);
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ([{ relay: 'wss://relay.example', id: 'maps' }])),
+                        loadGroup: vi.fn(async () => ({
+                            group: { relay: 'wss://relay.example', id: 'maps', key: "wss://relay.example/'maps", external: "relay.example'maps" },
+                            metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                            metadataVerified: true,
+                            admins: undefined,
+                            members: undefined,
+                            roles: undefined,
+                            timeline: [],
+                        })),
+                        publishMessage: vi.fn(),
+                        requestJoin,
+                        requestLeave,
+                        savePublicGroups: vi.fn(),
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
+        const joinButton = rendered.container.querySelector('button[aria-label="Unirse a Map Makers"]') as HTMLButtonElement;
+        const leaveButton = rendered.container.querySelector('button[aria-label="Salir de Map Makers"]') as HTMLButtonElement;
+        await act(async () => {
+            joinButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            leaveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(requestJoin).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'maps' } });
+        expect(requestLeave).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'maps' } });
+    });
+
+    test('groups route does not call write actions for readonly sessions', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        persistGroupRelaySettings(ownerPubkey);
+        window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
+            method: 'npub',
+            pubkey: ownerPubkey,
+            readonly: true,
+            locked: false,
+            createdAt: Date.now(),
+            capabilities: {
+                canSign: false,
+                canEncrypt: false,
+                encryptionSchemes: [],
+            },
+        }));
+        const publishMessage = vi.fn(async () => undefined);
+        const savePublicGroups = vi.fn(async () => undefined);
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ([{ relay: 'wss://relay.example', id: 'maps' }])),
+                        loadGroup: vi.fn(async () => ({
+                            group: { relay: 'wss://relay.example', id: 'maps', key: "wss://relay.example/'maps", external: "relay.example'maps" },
+                            metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                            metadataVerified: true,
+                            admins: undefined,
+                            members: undefined,
+                            roles: undefined,
+                            timeline: [],
+                        })),
+                        publishMessage,
+                        requestJoin: vi.fn(),
+                        requestLeave: vi.fn(),
+                        savePublicGroups,
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
+        const publishButton = rendered.container.querySelector('button[aria-label="Publicar mensaje en Map Makers"]') as HTMLButtonElement;
+        const saveButton = rendered.container.querySelector('button[aria-label="Guardar Map Makers"]') as HTMLButtonElement;
+        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar grupos públicos: los grupos guardados y relays de grupos son datos públicos de Nostr"]') as HTMLButtonElement;
+
+        expect(publishButton.disabled).toBe(true);
+        expect(saveButton.disabled).toBe(true);
+        expect(syncButton.disabled).toBe(true);
+        const joinButton = rendered.container.querySelector('button[aria-label="Unirse a Map Makers"]') as HTMLButtonElement;
+        const leaveButton = rendered.container.querySelector('button[aria-label="Salir de Map Makers"]') as HTMLButtonElement;
+        expect(joinButton.disabled).toBe(true);
+        expect(leaveButton.disabled).toBe(true);
+        await act(async () => {
+            publishButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            syncButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            joinButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            leaveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(publishMessage).not.toHaveBeenCalled();
+        expect(savePublicGroups).not.toHaveBeenCalled();
+        expect(rendered.container.textContent || '').toContain('Unirse al grupo');
+        expect(rendered.container.textContent || '').toContain('Salir del grupo');
+    });
+
+    test('groups route passes deterministic created_at desc and id asc timeline to publish', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey);
+        const publishMessage = vi.fn(async () => undefined);
+        const olderA = { id: 'a'.repeat(64), pubkey: '1'.repeat(64), kind: 9, created_at: 99, tags: [['h', 'maps']], content: 'older' };
+        const newerB = { id: 'b'.repeat(64), pubkey: '2'.repeat(64), kind: 9, created_at: 100, tags: [['h', 'maps']], content: 'newer b' };
+        const newerA = { id: 'a'.repeat(63) + 'b', pubkey: '3'.repeat(64), kind: 9, created_at: 100, tags: [['h', 'maps']], content: 'newer a' };
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ([{ relay: 'wss://relay.example', id: 'maps' }])),
+                        loadGroup: vi.fn(async () => ({
+                            group: { relay: 'wss://relay.example', id: 'maps', key: "wss://relay.example/'maps", external: "relay.example'maps" },
+                            metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                            metadataVerified: true,
+                            admins: undefined,
+                            members: undefined,
+                            roles: undefined,
+                            timeline: [olderA, newerB, newerA],
+                        })),
+                        publishMessage,
+                        requestJoin: vi.fn(),
+                        requestLeave: vi.fn(),
+                        savePublicGroups: vi.fn(),
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
+        const textarea = rendered.container.querySelector('textarea[aria-label="Mensaje para Map Makers"]') as HTMLTextAreaElement;
+        await fillTextarea(textarea, 'Sorted timeline');
+        const publishButton = rendered.container.querySelector('button[aria-label="Publicar mensaje en Map Makers"]') as HTMLButtonElement;
+        await act(async () => {
+            publishButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(publishMessage).toHaveBeenCalledWith({
+            group: { relay: 'wss://relay.example', id: 'maps' },
+            content: 'Sorted timeline',
+            recentTimeline: [newerA, newerB, olderA],
+        });
+    });
+
     test('wallet entry is available in the authenticated shell', async () => {
         const ownerPubkey = 'f'.repeat(64);
         window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
@@ -4374,6 +5051,7 @@ describe('Nostr overlay App', () => {
             'Abrir mapa',
             'Abrir Ágora',
             'Abrir chats',
+            'Abrir grupos',
             'Abrir relays',
             'Abrir notificaciones',
             'Abrir buscador global de usuarios',
@@ -9038,6 +9716,7 @@ describe('Nostr overlay App', () => {
                 nip65Write: [],
                 dmInbox: [],
                 search: [],
+                groups: [],
             },
         });
 
@@ -9826,10 +10505,6 @@ describe('Nostr overlay App', () => {
             !rendered.container.querySelector('button[aria-label="Abrir acciones sugeridas para wss://relay.suggested.example (NIP-65 read+write)"]')
         );
 
-        const addAllButton = Array.from(rendered.container.querySelectorAll('button')).find(button =>
-            (button.textContent || '').includes('Agregar todos')
-        );
-        expect(addAllButton).toBeUndefined();
     });
 
     test('shows extension prompt close errors as sonner toast instead of inline sidebar error', async () => {

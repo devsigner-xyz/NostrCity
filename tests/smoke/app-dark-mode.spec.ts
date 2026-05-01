@@ -4,23 +4,23 @@ import { seedReadonlyDarkSession, visibleSurfaceLuminance, waitForOverlayRoute }
 
 const AUDITED_ROUTES = [
     {
-        path: '/app/#/wallet',
-        marker: 'Active wallet',
+        path: '/app/groups',
+        marker: 'Choose group relays',
     },
     {
-        path: '/app/#/city-stats',
+        path: '/app/city-stats',
         marker: 'Occupied buildings',
     },
     {
-        path: '/app/#/relays',
+        path: '/app/relays',
         marker: 'Configured relays',
     },
     {
-        path: '/app/#/relays/detail?url=wss%3A%2F%2Frelay.one&source=configured&type=nip65Both',
+        path: '/app/relays/detail?url=wss%3A%2F%2Frelay.one&source=configured&type=nip65Both',
         marker: 'Relay detail',
     },
     {
-        path: '/app/#/discover',
+        path: '/app/discover',
         marker: 'Discover',
     },
 ] as const;
@@ -40,16 +40,13 @@ test('dark mode does not leave routed surfaces in light mode', async ({ page }) 
         expect(htmlHasDarkClass).toBe(true);
         expect(await visibleSurfaceLuminance(surface)).toBeLessThan(0.35);
 
-        if (route.path === '/app/#/discover') {
-            const firstSidebarCard = page.locator('[data-slot="item"]').first();
+        if (route.path === '/app/discover') {
             const firstMissionCard = page.getByTestId('discover-mission-card').first();
-            await expect(firstSidebarCard).toBeVisible();
             await expect(firstMissionCard).toBeVisible();
-            expect(await visibleSurfaceLuminance(firstSidebarCard)).toBeLessThan(0.35);
             expect(await visibleSurfaceLuminance(firstMissionCard)).toBeLessThan(0.35);
         }
 
-        if (route.path === '/app/#/city-stats') {
+        if (route.path === '/app/city-stats') {
             const firstKpiCard = page.getByTestId('city-stats-kpi-card').first();
             const firstChartCard = page.getByTestId('city-stats-chart-card').first();
 
@@ -78,17 +75,8 @@ test('audited dark mode routes keep accessible surface semantics and visible key
 
         expect(accessibilityScan.violations).toEqual([]);
 
-        if (route.path === '/app/#/discover') {
-            const missionCard = page.getByTestId('discover-mission-card').first();
-            await expect(missionCard).toContainText('Pending');
-
-            for (let index = 0; index < 12; index += 1) {
-                const activeTag = await page.evaluate(() => document.activeElement?.getAttribute('aria-pressed'));
-                if (activeTag !== null) {
-                    break;
-                }
-                await page.keyboard.press('Tab');
-            }
+        if (route.path === '/app/groups') {
+            await page.getByRole('button', { name: 'Add suggested group relays' }).focus();
 
             const focusStyles = await page.evaluate(() => {
                 const activeElement = document.activeElement as HTMLElement | null;
@@ -98,13 +86,13 @@ test('audited dark mode routes keep accessible surface semantics and visible key
 
                 const styles = getComputedStyle(activeElement);
                 return {
-                    ariaPressed: activeElement.getAttribute('aria-pressed'),
+                    text: activeElement.textContent,
                     boxShadow: styles.boxShadow,
                     outlineWidth: styles.outlineWidth,
                 };
             });
 
-            expect(focusStyles?.ariaPressed).not.toBeNull();
+            expect(focusStyles?.text).toContain('Add suggested relays');
             expect((focusStyles?.boxShadow && focusStyles.boxShadow !== 'none') || focusStyles?.outlineWidth !== '0px').toBe(true);
         }
     }

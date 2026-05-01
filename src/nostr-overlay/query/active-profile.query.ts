@@ -70,6 +70,7 @@ const EMPTY_NETWORK: ActiveProfileNetworkResult = {
         nip65Write: [],
         dmInbox: [],
         search: [],
+        groups: [],
     },
 };
 

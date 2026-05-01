@@ -29,6 +29,8 @@ export function SettingsRelaysRoute() {
             dmSuggestedRows={relays.dmSuggestedRows}
             searchConfiguredRows={relays.searchConfiguredRows}
             searchSuggestedRows={relays.searchSuggestedRows}
+            groupConfiguredRows={relays.groupConfiguredRows}
+            groupSuggestedRows={relays.groupSuggestedRows}
             connectedConfiguredRelays={relays.connectedConfiguredRelays}
             disconnectedConfiguredRelays={relays.disconnectedConfiguredRelays}
             relayInfoByUrl={relays.relayInfoByUrl}
@@ -38,12 +40,15 @@ export function SettingsRelaysRoute() {
             newRelayInput={relays.newRelayInput}
             newDmRelayInput={relays.newDmRelayInput}
             newSearchRelayInput={relays.newSearchRelayInput}
+            newGroupRelayInput={relays.newGroupRelayInput}
             invalidRelayInputs={relays.invalidRelayInputs}
             invalidDmRelayInputs={relays.invalidDmRelayInputs}
             invalidSearchRelayInputs={relays.invalidSearchRelayInputs}
+            invalidGroupRelayInputs={relays.invalidGroupRelayInputs}
             onNewRelayInputChange={relays.onNewRelayInputChange}
             onNewDmRelayInputChange={relays.onNewDmRelayInputChange}
             onNewSearchRelayInputChange={relays.onNewSearchRelayInputChange}
+            onNewGroupRelayInputChange={relays.onNewGroupRelayInputChange}
             onAddRelays={relays.onAddRelays}
             onOpenRelayDetails={(relayUrl, source, relayType) => {
                 navigate(buildRelayDetailPath({ relayUrl, source, relayType }));
@@ -58,6 +63,11 @@ export function SettingsRelaysRoute() {
             onAddSuggestedDmRelay={relays.onAddSuggestedDmRelay}
             onAddAllSuggestedDmRelays={relays.onAddAllSuggestedDmRelays}
             onResetDmRelaysToDefault={relays.onResetDmRelaysToDefault}
+            onAddGroupRelays={relays.onAddGroupRelays}
+            onRemoveGroupRelay={relays.onRemoveGroupRelay}
+            onAddSuggestedGroupRelay={relays.onAddSuggestedGroupRelay}
+            onAddAllSuggestedGroupRelays={relays.onAddAllSuggestedGroupRelays}
+            onResetGroupRelaysToDefault={relays.onResetGroupRelaysToDefault}
             onAddSearchRelays={relays.onAddSearchRelays}
             onRemoveSearchRelay={relays.onRemoveSearchRelay}
             onAddSuggestedSearchRelay={relays.onAddSuggestedSearchRelay}

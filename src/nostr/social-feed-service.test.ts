@@ -166,6 +166,9 @@ describe('social-feed-service contracts', () => {
             '#p'?: string[];
             '#t'?: string[];
             '#q'?: string[];
+            '#h'?: string[];
+            '#d'?: string[];
+            '#a'?: string[];
             since?: number;
             until?: number;
             limit?: number;

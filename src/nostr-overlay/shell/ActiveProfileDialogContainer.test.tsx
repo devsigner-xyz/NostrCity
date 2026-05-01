@@ -103,6 +103,7 @@ function createDefaultProps(overrides: Partial<ComponentProps<typeof ActiveProfi
             nip65Write: [],
             dmInbox: ['wss://dm.example'],
             search: [],
+            groups: [],
         },
         networkLoading: false,
         networkError: 'network failed',

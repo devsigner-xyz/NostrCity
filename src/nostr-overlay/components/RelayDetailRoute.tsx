@@ -49,11 +49,12 @@ export function RelayDetailRoute({
 
     return (
         <OverlaySurface ariaLabel={t('relayRoute.aria')}>
-                <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="nostr-settings-page nostr-routed-surface-panel nostr-page-layout nostr-settings-page-relays">
+            <div className="flex min-h-0 flex-1 flex-col">
+                <div className="nostr-settings-page nostr-routed-surface-panel nostr-page-layout nostr-settings-page-relays">
                     <SettingsRelayDetailPage
                         selectedRelay={relayDetail.selectedRelay}
                         activeRelayTypes={relayDetail.activeRelayTypes}
+                        availableGroupsState={relayDetail.availableGroupsState}
                         selectedRelayDetails={relayDetail.selectedRelayDetails}
                         {...(relayDetail.selectedRelayInfo ? { selectedRelayInfo: relayDetail.selectedRelayInfo } : {})}
                         {...(relayDetail.selectedRelayDocument ? { selectedRelayDocument: relayDetail.selectedRelayDocument } : {})}
@@ -68,6 +69,10 @@ export function RelayDetailRoute({
                         relayConnectionBadge={relayDetail.relayConnectionBadge}
                         formatRelayFee={relayDetail.formatRelayFee}
                         onCopyRelayIdentity={relayDetail.onCopyRelayIdentity}
+                        onOpenGroup={(group) => {
+                            const params = new URLSearchParams({ relay: group.relay, group: group.id });
+                            navigate(`/groups?${params.toString()}`);
+                        }}
                     />
 
                     <DialogFooter className="sm:justify-start">

@@ -15,13 +15,14 @@ export const RELAY_TYPE_LABELS: Record<RelayType, string> = {
     nip65Write: 'NIP-65 escritura',
     dmInbox: 'NIP-17 buzón DM',
     search: 'Búsqueda NIP-50',
+    groups: 'NIP-29',
 };
 
-export function buildRelayRowsByUrl(byType: Record<RelayType, string[]>): RelayRow[] {
+export function buildRelayRowsByUrl(byType: Partial<Record<RelayType, string[]>>): RelayRow[] {
     const relayTypesByUrl = new Map<string, Set<RelayType>>();
 
     for (const relayType of RELAY_TYPES) {
-        for (const relayUrl of byType[relayType]) {
+        for (const relayUrl of byType[relayType] ?? EMPTY_RELAYS) {
             const relayTypes = relayTypesByUrl.get(relayUrl) ?? new Set<RelayType>();
             relayTypes.add(relayType);
             relayTypesByUrl.set(relayUrl, relayTypes);

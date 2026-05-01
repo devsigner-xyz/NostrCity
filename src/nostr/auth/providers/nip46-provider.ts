@@ -1,7 +1,8 @@
+import { verifyEvent } from 'nostr-tools/pure';
 import { normalizeRelayUrl } from '../../relay-policy';
 import type { NostrEvent } from '../../types';
 import type { EncryptionScheme, SessionCapabilities } from '../session';
-import { createNip46ResponseClassifier, createNip46RpcClient, type Nip46RpcResponse } from './nip46/rpc';
+import { createNip46ResponseClassifier, createNip46RpcClient, parseNip46Response, type Nip46RpcResponse } from './nip46/rpc';
 import type { Nip46Cipher } from './nip46/crypto';
 import {
     capabilitiesFromNip46Permissions,
@@ -9,7 +10,7 @@ import {
     parseNip46Permissions,
     type Nip46Permission,
 } from './nip46/permissions';
-import { createNip46Transport, type Nip46TransportIo } from './nip46/transport';
+import { createNip46Transport, validateNip46ResponseEvent, type Nip46TransportIo } from './nip46/transport';
 import { parseNip46Uri, type ParsedNip46Uri } from './nip46/uri';
 import {
     AUTH_PROVIDER_ERROR,
@@ -23,14 +24,18 @@ import {
 
 export interface Nip46Runtime {
     localPubkey: string;
-    remoteSignerPubkey: string;
+    remoteSignerPubkey?: string;
     transport: Nip46TransportIo;
-    cipher: Nip46Cipher;
+    cipher?: Nip46Cipher;
+    createCipher?: (remoteSignerPubkey: string) => Nip46Cipher;
     close?: () => Promise<void> | void;
 }
 
 export interface Nip46RuntimeFactoryInput {
     parsedUri: ParsedNip46Uri;
+    clientSecretKey?: Uint8Array;
+    relays?: string[];
+    remoteSignerPubkey?: string | undefined;
 }
 
 export type Nip46RuntimeFactory = (input: Nip46RuntimeFactoryInput) => Promise<Nip46Runtime>;
@@ -48,6 +53,14 @@ interface ActiveNip46Session {
     capabilities: SessionCapabilities;
     callRpc: (method: string, params?: string[]) => Promise<Nip46RpcResponse>;
     close: () => Promise<void>;
+}
+
+interface Nip46Connection {
+    runtime: Nip46Runtime;
+    transport: ReturnType<typeof createNip46Transport>;
+    rpc: ReturnType<typeof createNip46RpcClient>;
+    cipher: Nip46Cipher;
+    remoteSignerPubkey: string | undefined;
 }
 
 function normalizeHexPubkey(pubkey: string): string {
@@ -74,12 +87,18 @@ function parseRelayList(result?: string): string[] | null {
             return null;
         }
 
-        const normalized = parsed
-            .filter((value): value is string => typeof value === 'string')
-            .map((relay) => normalizeRelayUrl(relay))
-            .filter((relay): relay is string => relay !== null);
+        if (parsed.some((value) => typeof value !== 'string')) {
+            return null;
+        }
 
-        return [...new Set(normalized)];
+        const normalized = parsed
+            .map((relay) => normalizeRelayUrl(relay))
+        if (normalized.some((relay) => relay === null)) {
+            return null;
+        }
+
+        const unique = [...new Set(normalized as string[])];
+        return unique.length > 0 ? unique : null;
     } catch {
         return null;
     }
@@ -110,6 +129,26 @@ function ensureSignedEventShape(event: NostrEvent, expectedPubkey: string): void
         throw new AuthProviderError(
             AUTH_PROVIDER_ERROR.AUTH_PROVIDER_UNAVAILABLE,
             'NIP-46 signer pubkey does not match user pubkey'
+        );
+    }
+    if (!verifyEvent(event as Parameters<typeof verifyEvent>[0])) {
+        throw new AuthProviderError(
+            AUTH_PROVIDER_ERROR.AUTH_PROVIDER_UNAVAILABLE,
+            'NIP-46 signer returned invalid event signature'
+        );
+    }
+}
+
+function ensureSignedEventMatchesRequest(signed: NostrEvent, requested: UnsignedNostrEvent): void {
+    if (
+        signed.kind !== requested.kind ||
+        signed.content !== requested.content ||
+        signed.created_at !== requested.created_at ||
+        JSON.stringify(signed.tags) !== JSON.stringify(requested.tags)
+    ) {
+        throw new AuthProviderError(
+            AUTH_PROVIDER_ERROR.AUTH_PROVIDER_UNAVAILABLE,
+            'NIP-46 signer returned event payload that does not match request'
         );
     }
 }
@@ -162,8 +201,8 @@ export class Nip46AuthProvider implements AuthProvider {
         }
     }
 
-    private buildConnectParams(parsedUri: ParsedNip46Uri, remoteSignerPubkey: string): string[] {
-        const params: string[] = [remoteSignerPubkey];
+    private buildConnectParams(parsedUri: ParsedNip46Uri, remoteSignerPubkey: string | undefined): string[] {
+        const params: string[] = [remoteSignerPubkey ?? (parsedUri.type === 'nostrconnect' ? parsedUri.clientPubkey : parsedUri.remoteSignerPubkey)];
         const requestedPerms = parsedUri.type === 'nostrconnect' && parsedUri.perms.length > 0
             ? parsedUri.perms.join(',')
             : undefined;
@@ -194,6 +233,148 @@ export class Nip46AuthProvider implements AuthProvider {
         }
     }
 
+    private getRuntimeCipher(runtime: Nip46Runtime, remoteSignerPubkey: string | undefined): Nip46Cipher {
+        if (remoteSignerPubkey && runtime.createCipher) {
+            return runtime.createCipher(remoteSignerPubkey);
+        }
+        if (runtime.cipher) {
+            return runtime.cipher;
+        }
+
+        throw new AuthProviderError(
+            AUTH_PROVIDER_ERROR.AUTH_PROVIDER_UNAVAILABLE,
+            'NIP-46 signer cipher is not available before remote signer discovery'
+        );
+    }
+
+    private async createConnection(
+        parsedUri: ParsedNip46Uri,
+        relays: string[],
+        remoteSignerPubkey?: string,
+        clientSecretKey?: Uint8Array
+    ): Promise<Nip46Connection> {
+        const runtime = await this.createRuntime!({
+            parsedUri,
+            ...(clientSecretKey ? { clientSecretKey } : {}),
+            relays,
+            remoteSignerPubkey,
+        });
+        const signerPubkey = remoteSignerPubkey ?? runtime.remoteSignerPubkey;
+        const cipher = this.getRuntimeCipher(runtime, signerPubkey);
+        const transport = createNip46Transport(runtime.transport, {
+            localPubkey: runtime.localPubkey,
+            remoteSignerPubkey: signerPubkey,
+            timeoutMs: this.timeoutMs,
+            now: () => Math.floor(this.now() / 1000),
+            classifyResponse: createNip46ResponseClassifier((ciphertext) => cipher.decrypt(ciphertext)),
+        });
+
+        return {
+            runtime,
+            transport,
+            cipher,
+            remoteSignerPubkey: signerPubkey,
+            rpc: createNip46RpcClient({
+                transport,
+                cipher,
+            }),
+        };
+    }
+
+    private async closeConnection(connection: Nip46Connection): Promise<void> {
+        connection.transport.close();
+        await connection.runtime.close?.();
+    }
+
+    private async callRpcWithEvent(connection: Nip46Connection, method: string, params: string[]) {
+        const id = this.nextRequestId();
+        const encryptedRequest = await connection.cipher.encrypt(JSON.stringify({ id, method, params }));
+        const responseEvent = await connection.transport.sendRequest({ requestId: id, content: encryptedRequest });
+        const responsePlaintext = await connection.cipher.decrypt(responseEvent.content);
+        const response = parseNip46Response(responsePlaintext);
+        if (response.id !== id) {
+            throw new Error('NIP-46 response id mismatch');
+        }
+
+        return { response, event: responseEvent };
+    }
+
+    private async waitForNostrConnectResponse(parsedUri: Extract<ParsedNip46Uri, { type: 'nostrconnect' }>, clientSecretKey?: Uint8Array): Promise<{
+        remoteSignerPubkey: string;
+    }> {
+        const runtime = await this.createRuntime!({
+            parsedUri,
+            ...(clientSecretKey ? { clientSecretKey } : {}),
+            relays: parsedUri.relays,
+        });
+
+        try {
+            return await new Promise<{ remoteSignerPubkey: string }>((resolve, reject) => {
+                const timeoutId = setTimeout(() => {
+                    unsubscribe();
+                    reject(new AuthProviderError(AUTH_PROVIDER_ERROR.AUTH_PROVIDER_UNAVAILABLE, 'NIP-46 nostrconnect response timed out'));
+                }, this.timeoutMs);
+
+                const finish = (callback: () => void) => {
+                    clearTimeout(timeoutId);
+                    unsubscribe();
+                    callback();
+                };
+
+                const unsubscribe = runtime.transport.subscribe((event) => {
+                    void (async () => {
+                        try {
+                            validateNip46ResponseEvent(event, { localPubkey: runtime.localPubkey });
+                            const cipher = this.getRuntimeCipher(runtime, event.pubkey);
+                            const response = parseNip46Response(await cipher.decrypt(event.content));
+                            this.validateConnectResult(parsedUri, response);
+                            finish(() => resolve({ remoteSignerPubkey: event.pubkey }));
+                        } catch (error) {
+                            if (error instanceof AuthProviderError && error.code === AUTH_PROVIDER_ERROR.AUTH_INVALID_INPUT) {
+                                finish(() => reject(error));
+                            }
+                        }
+                    })();
+                });
+            });
+        } finally {
+            await runtime.close?.();
+        }
+    }
+
+    private async maybeSwitchRelays(
+        parsedUri: ParsedNip46Uri,
+        connection: Nip46Connection,
+        remoteSignerPubkey: string,
+        initialRelays: string[],
+        clientSecretKey?: Uint8Array
+    ): Promise<{ connection: Nip46Connection; relays: string[] }> {
+        let switchRelaysResponse: Nip46RpcResponse;
+        try {
+            switchRelaysResponse = await connection.rpc.call({
+                id: this.nextRequestId(),
+                method: 'switch_relays',
+                params: [],
+            });
+        } catch {
+            return { connection, relays: initialRelays };
+        }
+
+        if (switchRelaysResponse.error) {
+            return { connection, relays: initialRelays };
+        }
+
+        const switchedRelays = parseRelayList(switchRelaysResponse.result);
+        if (!switchedRelays) {
+            return { connection, relays: initialRelays };
+        }
+
+        const nextConnection = await this.createConnection(parsedUri, switchedRelays, remoteSignerPubkey, clientSecretKey);
+        await this.closeConnection(connection);
+
+        return { connection: nextConnection, relays: switchedRelays };
+    }
+
     async resolveSession(input: ProviderResolveInput): Promise<ProviderResolvedSession> {
         if (!this.createRuntime) {
             throw new AuthProviderError(
@@ -210,30 +391,25 @@ export class Nip46AuthProvider implements AuthProvider {
         }
 
         const parsedUri = parseNip46Uri(input.bunkerUri);
-        const runtime = await this.createRuntime({ parsedUri });
-
-        const transport = createNip46Transport(runtime.transport, {
-            localPubkey: runtime.localPubkey,
-            remoteSignerPubkey: runtime.remoteSignerPubkey,
-            timeoutMs: this.timeoutMs,
-            now: () => Math.floor(this.now() / 1000),
-            classifyResponse: createNip46ResponseClassifier((ciphertext) => runtime.cipher.decrypt(ciphertext)),
-        });
-
-        const rpc = createNip46RpcClient({
-            transport,
-            cipher: runtime.cipher,
-        });
+        let connection: Nip46Connection | undefined;
 
         try {
-            const connectResponse = await rpc.call({
-                id: this.nextRequestId(),
-                method: 'connect',
-                params: this.buildConnectParams(parsedUri, runtime.remoteSignerPubkey),
-            });
-            this.validateConnectResult(parsedUri, connectResponse);
+            let remoteSignerPubkey: string;
+            if (parsedUri.type === 'nostrconnect') {
+                ({ remoteSignerPubkey } = await this.waitForNostrConnectResponse(parsedUri, input.clientSecretKey));
+                connection = await this.createConnection(parsedUri, parsedUri.relays, remoteSignerPubkey, input.clientSecretKey);
+            } else {
+                connection = await this.createConnection(parsedUri, parsedUri.relays, parsedUri.remoteSignerPubkey);
+                remoteSignerPubkey = parsedUri.remoteSignerPubkey;
+                const { response: connectResponse } = await this.callRpcWithEvent(
+                    connection,
+                    'connect',
+                    this.buildConnectParams(parsedUri, connection.remoteSignerPubkey)
+                );
+                this.validateConnectResult(parsedUri, connectResponse);
+            }
 
-            const userPubkeyResponse = await rpc.call({
+            const userPubkeyResponse = await connection.rpc.call({
                 id: this.nextRequestId(),
                 method: 'get_public_key',
                 params: [],
@@ -242,35 +418,29 @@ export class Nip46AuthProvider implements AuthProvider {
 
             const userPubkey = normalizeHexPubkey(userPubkeyResponse.result ?? '');
 
-            const switchRelaysResponse = await rpc.call({
-                id: this.nextRequestId(),
-                method: 'switch_relays',
-                params: [],
-            });
-            throwOnRpcError(switchRelaysResponse, 'switch_relays');
-
-            const switchedRelays = parseRelayList(switchRelaysResponse.result);
-            const effectiveRelays = switchedRelays ?? parsedUri.relays;
+            const switched = await this.maybeSwitchRelays(parsedUri, connection, remoteSignerPubkey, parsedUri.relays, input.clientSecretKey);
+            connection = switched.connection;
+            const effectiveRelays = switched.relays;
 
             const permissionTokens = parsedUri.type === 'nostrconnect' ? parsedUri.perms : [];
             const permissions = parseNip46Permissions(permissionTokens);
             const capabilities = capabilitiesFromNip46Permissions(permissionTokens);
             this.supports = capabilities;
+            const activeConnection = connection;
 
             this.activeSession = {
                 pubkey: userPubkey,
                 permissions,
                 capabilities,
                 callRpc: async (method: string, params: string[] = []) => {
-                    return rpc.call({
+                    return activeConnection.rpc.call({
                         id: this.nextRequestId(),
                         method,
                         params,
                     });
                 },
                 close: async () => {
-                    transport.close();
-                    await runtime.close?.();
+                    await this.closeConnection(activeConnection);
                 },
             };
 
@@ -281,13 +451,14 @@ export class Nip46AuthProvider implements AuthProvider {
                 locked: false,
                 capabilities,
                 metadata: {
-                    remoteSignerPubkey: runtime.remoteSignerPubkey,
+                    remoteSignerPubkey,
                     relays: JSON.stringify(effectiveRelays),
                 },
             };
         } catch (error) {
-            transport.close();
-            await runtime.close?.();
+            if (connection) {
+                await this.closeConnection(connection);
+            }
             if (error instanceof AuthProviderError) {
                 throw error;
             }
@@ -324,6 +495,7 @@ export class Nip46AuthProvider implements AuthProvider {
         }
 
         ensureSignedEventShape(signed, session.pubkey);
+        ensureSignedEventMatchesRequest(signed, event);
         return signed;
     }
 

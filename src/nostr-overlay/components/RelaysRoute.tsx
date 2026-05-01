@@ -37,8 +37,8 @@ export function RelaysRoute({
 
     return (
         <OverlaySurface ariaLabel={t('relaysRoute.aria')}>
-                <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="nostr-settings-page nostr-routed-surface-panel nostr-page-layout nostr-settings-page-relays">
+            <div className="flex min-h-0 flex-1 flex-col">
+                <div className="nostr-settings-page nostr-routed-surface-panel nostr-page-layout nostr-settings-page-relays">
                     <SettingsRelaysPage
                         configuredRows={relays.configuredRows}
                         suggestedRows={relays.suggestedRows}
@@ -46,6 +46,8 @@ export function RelaysRoute({
                         dmSuggestedRows={relays.dmSuggestedRows}
                         searchConfiguredRows={relays.searchConfiguredRows}
                         searchSuggestedRows={relays.searchSuggestedRows}
+                        groupConfiguredRows={relays.groupConfiguredRows}
+                        groupSuggestedRows={relays.groupSuggestedRows}
                         connectedConfiguredRelays={relays.connectedConfiguredRelays}
                         disconnectedConfiguredRelays={relays.disconnectedConfiguredRelays}
                         relayInfoByUrl={relays.relayInfoByUrl}
@@ -55,12 +57,15 @@ export function RelaysRoute({
                         newRelayInput={relays.newRelayInput}
                         newDmRelayInput={relays.newDmRelayInput}
                         newSearchRelayInput={relays.newSearchRelayInput}
+                        newGroupRelayInput={relays.newGroupRelayInput}
                         invalidRelayInputs={relays.invalidRelayInputs}
                         invalidDmRelayInputs={relays.invalidDmRelayInputs}
                         invalidSearchRelayInputs={relays.invalidSearchRelayInputs}
+                        invalidGroupRelayInputs={relays.invalidGroupRelayInputs}
                         onNewRelayInputChange={relays.onNewRelayInputChange}
                         onNewDmRelayInputChange={relays.onNewDmRelayInputChange}
                         onNewSearchRelayInputChange={relays.onNewSearchRelayInputChange}
+                        onNewGroupRelayInputChange={relays.onNewGroupRelayInputChange}
                         onAddRelays={relays.onAddRelays}
                         onOpenRelayDetails={(relayUrl, source, relayType) => {
                             navigate(buildRelayDetailPath({ relayUrl, source, relayType }));
@@ -75,6 +80,11 @@ export function RelaysRoute({
                         onAddSuggestedDmRelay={relays.onAddSuggestedDmRelay}
                         onAddAllSuggestedDmRelays={relays.onAddAllSuggestedDmRelays}
                         onResetDmRelaysToDefault={relays.onResetDmRelaysToDefault}
+                        onAddGroupRelays={relays.onAddGroupRelays}
+                        onRemoveGroupRelay={relays.onRemoveGroupRelay}
+                        onAddSuggestedGroupRelay={relays.onAddSuggestedGroupRelay}
+                        onAddAllSuggestedGroupRelays={relays.onAddAllSuggestedGroupRelays}
+                        onResetGroupRelaysToDefault={relays.onResetGroupRelaysToDefault}
                         onAddSearchRelays={relays.onAddSearchRelays}
                         onRemoveSearchRelay={relays.onRemoveSearchRelay}
                         onAddSuggestedSearchRelay={relays.onAddSuggestedSearchRelay}
