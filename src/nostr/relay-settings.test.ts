@@ -108,6 +108,20 @@ describe('relay-settings', () => {
         expect(afterRemove.relays).toEqual(initial.relays);
     });
 
+    test('removes retired group relays from persisted settings', () => {
+        window.localStorage.setItem(
+            RELAY_SETTINGS_STORAGE_KEY,
+            JSON.stringify({
+                relays: [],
+                byType: {
+                    groups: ['wss://pyramid.fiatjaf.com', 'wss://groups.0xchat.com'],
+                },
+            })
+        );
+
+        expect(loadRelaySettings(window.localStorage).byType.groups).toEqual(['wss://groups.0xchat.com']);
+    });
+
     test('global relay removal leaves group relays isolated', () => {
         const relayUrl = 'wss://groups.fiatjaf.com';
         const initial = addRelay(getDefaultRelaySettings(), relayUrl, 'groups');

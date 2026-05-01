@@ -61,6 +61,24 @@ function buildMessage(overrides: Partial<ChatDetailMessage> = {}): ChatDetailMes
     };
 }
 
+function setViewportWidth(width: number): void {
+    Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: width,
+    });
+
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('max-width') ? width <= 767 : width >= 768,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    }));
+}
+
 describe('ChatsPage', () => {
     test('query surface exposes data-chat-source marker', async () => {
         const rendered = await renderElement(
@@ -276,6 +294,8 @@ describe('ChatsPage', () => {
     });
 
     test('renders routed page container for wide chat layout', async () => {
+        setViewportWidth(1024);
+
         const rendered = await renderElement(
             <ChatsPage
                 hasUnreadGlobal={false}
@@ -301,6 +321,51 @@ describe('ChatsPage', () => {
         expect(listPanel?.className).toContain('shadow-none');
         expect(detailPanel?.className).toContain('h-full');
         expect(detailPanel?.className).toContain('shadow-none');
+        expect(rendered.container.querySelector('[data-slot="dialog-content"]')).toBeNull();
+    });
+
+    test('renders only the conversation list on mobile before a chat is selected', async () => {
+        setViewportWidth(390);
+
+        const rendered = await renderElement(
+            <ChatsPage
+                hasUnreadGlobal={false}
+                conversations={[buildConversation()]}
+                messages={[]}
+                activeConversationId={null}
+                onOpenConversation={() => {}}
+                onSendMessage={async () => {}}
+            />
+        );
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('.nostr-chat-list-panel')).not.toBeNull();
+        expect(rendered.container.querySelector('.nostr-chat-detail-panel')).toBeNull();
+        expect(rendered.container.querySelector('.nostr-chat-empty-state')).toBeNull();
+        expect(rendered.container.querySelector('.nostr-chat-layout')?.className).toContain('nostr-chat-layout-mobile-list');
+    });
+
+    test('renders only the active conversation as a dedicated mobile page', async () => {
+        setViewportWidth(390);
+
+        const rendered = await renderElement(
+            <ChatsPage
+                hasUnreadGlobal={false}
+                conversations={[buildConversation()]}
+                messages={[buildMessage()]}
+                activeConversationId="peer-1"
+                onOpenConversation={() => {}}
+                onSendMessage={async () => {}}
+            />
+        );
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('.nostr-chat-list-panel')).toBeNull();
+        expect(rendered.container.querySelector('.nostr-chat-detail-panel')).not.toBeNull();
+        expect(rendered.container.querySelector('.nostr-chat-detail-title')).toBeNull();
+        expect(rendered.container.querySelector('.nostr-chat-layout')?.className).toContain('nostr-chat-layout-mobile-detail');
+        expect(rendered.container.textContent || '').toContain('Alice');
+        expect(rendered.container.textContent || '').toContain('hola');
         expect(rendered.container.querySelector('[data-slot="dialog-content"]')).toBeNull();
     });
 

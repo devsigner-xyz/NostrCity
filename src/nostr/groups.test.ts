@@ -68,9 +68,17 @@ describe('groups', () => {
         expect(canonicalizeGroupAddress({ relay: 'wss://one.example', id: 'maps' }).key).toBe("wss://one.example'maps");
         expect(canonicalizeGroupAddress({ relay: 'wss://two.example', id: 'maps' }).key).toBe("wss://two.example'maps");
 
-        expect(() => canonicalizeGroupAddress({ relay: 'wss://one.example', id: 'Bad' })).toThrow('Invalid group id');
         expect(() => canonicalizeGroupAddress({ relay: 'wss://one.example', id: 'bad.id' })).toThrow('Invalid group id');
         expect(() => canonicalizeGroupAddress({ relay: 'https://one.example', id: 'maps' })).toThrow('Invalid group relay');
+    });
+
+    test('preserves practical group ids while rejecting unsafe values', () => {
+        expect(canonicalizeGroupAddress({ relay: 'wss://groups.0xchat.com', id: 'BitcoinTalk' }).id).toBe('BitcoinTalk');
+        expect(canonicalizeGroupAddress({ relay: 'wss://groups.0xchat.com', id: 'maps-2026_A' }).key).toBe("wss://groups.0xchat.com'maps-2026_A");
+
+        expect(() => canonicalizeGroupAddress({ relay: 'wss://one.example', id: '' })).toThrow('Invalid group id');
+        expect(() => canonicalizeGroupAddress({ relay: 'wss://one.example', id: "bad'id" })).toThrow('Invalid group id');
+        expect(() => canonicalizeGroupAddress({ relay: 'wss://one.example', id: 'bad id' })).toThrow('Invalid group id');
     });
 
     test('builds group messages with h and up to three previous tags excluding own events', () => {
@@ -241,7 +249,7 @@ describe('groups', () => {
                 ['group', "relay.example'maps"],
                 ['group', 'parks', 'wss://relay-two.example', 'Parks'],
                 ['group', 'relay.example'],
-                ['group', "relay.example'Bad"],
+                ['group', "relay.example'bad.id"],
                 ['group', "https://bad.example'parks"],
                 ['r', 'wss://relay.example'],
             ],

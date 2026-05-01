@@ -14,8 +14,11 @@ interface ResolveNip29GroupDiscoveryRelaysInput {
 interface DiscoverNip29GroupsFromRelaysInput {
     relays: string[];
     fetchRelayInfo: (relay: string) => Promise<GroupRelayInfo>;
-    fetchMetadataEvents: (relay: string, author: string) => Promise<NostrEvent[]>;
+    fetchMetadataEvents: (relay: string, author?: string) => Promise<NostrEvent[]>;
+    timeoutMs?: number;
 }
+
+const DEFAULT_DISCOVERY_TIMEOUT_MS = 5_000;
 
 function firstTagValue(tags: string[][], name: string): string | undefined {
     return tags.find((tag) => tag[0] === name && Boolean(tag[1]))?.[1];
@@ -67,16 +70,65 @@ export function verifiedDiscoveredGroups(relay: string, relayInfo: GroupRelayInf
     });
 }
 
+function signatureValidDiscoveredGroups(relay: string, events: NostrEvent[]): GroupAddressInput[] {
+    return events.flatMap((event) => {
+        if (event.kind !== GROUP_METADATA_KIND || !verifyEvent(event as Parameters<typeof verifyEvent>[0])) {
+            return [];
+        }
+
+        const id = firstTagValue(event.tags, 'd');
+        if (!id) {
+            return [];
+        }
+
+        const group = { relay, id };
+        try {
+            canonicalizeGroupAddress(group);
+            return [group];
+        } catch {
+            return [];
+        }
+    });
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('Group relay discovery timed out')), timeoutMs);
+    });
+
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+    });
+}
+
+async function discoverNip29GroupsFromRelay(input: DiscoverNip29GroupsFromRelaysInput, relay: string): Promise<GroupAddressInput[]> {
+    try {
+        const relayInfo = await input.fetchRelayInfo(relay);
+        if (!relayInfo.self || !isHexKey(relayInfo.self)) {
+            const events = await input.fetchMetadataEvents(relay, undefined);
+            return signatureValidDiscoveredGroups(relay, events);
+        }
+
+        const events = await input.fetchMetadataEvents(relay, relayInfo.self);
+        return verifiedDiscoveredGroups(relay, relayInfo, events);
+    } catch {
+        try {
+            const events = await input.fetchMetadataEvents(relay, undefined);
+            return signatureValidDiscoveredGroups(relay, events);
+        } catch {
+            return [];
+        }
+    }
+}
+
 export async function discoverNip29GroupsFromRelays(input: DiscoverNip29GroupsFromRelaysInput): Promise<GroupAddressInput[]> {
+    const timeoutMs = input.timeoutMs ?? DEFAULT_DISCOVERY_TIMEOUT_MS;
     const results = await Promise.all(input.relays.map(async (relay): Promise<GroupAddressInput[]> => {
         try {
-            const relayInfo = await input.fetchRelayInfo(relay);
-            if (!relayInfo.self || !isHexKey(relayInfo.self)) {
-                return [];
-            }
-
-            const events = await input.fetchMetadataEvents(relay, relayInfo.self);
-            return verifiedDiscoveredGroups(relay, relayInfo, events);
+            return await withTimeout(discoverNip29GroupsFromRelay(input, relay), timeoutMs);
         } catch {
             return [];
         }

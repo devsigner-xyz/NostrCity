@@ -15,7 +15,9 @@ El mismo `id` en otro relay no tiene por qué ser el mismo grupo. Puede ser una 
 
 ## Qué muestra Nostr City
 
-La página `/groups` consulta los relays de grupos configurados y carga los grupos disponibles en ellos. Si todavía no hay relays de grupos configurados, muestra una guía de inicio con relays sugeridos que puedes añadir localmente antes de buscar comunidades.
+La página `/groups` empieza por los relays de grupos. Puedes elegir un relay configurado, añadir uno personalizado de forma local o pegar un enlace de invitación que incluya `relay`, `group` y un `code` opcional. NIP-29 define el uso del tag `code` en la solicitud `kind:9021`, pero no define un formato único de URL para invitaciones; Nostr City acepta estos parámetros para poder abrir el grupo y usar el código solo al solicitar unirse. El código no se guarda.
+
+Si todavía no hay relays de grupos configurados, `/groups` muestra una guía de inicio con relays sugeridos que puedes añadir localmente antes de buscar comunidades.
 
 Cuando hay relays configurados, Nostr City muestra la información que cada relay publica y que puede verificarse para ese relay:
 
@@ -23,13 +25,15 @@ Cuando hay relays configurados, Nostr City muestra la información que cada rela
 - Número de miembros cuando el relay publica una lista `kind:39002` accesible.
 - Mensajes recientes `kind:9` etiquetados con `h` para ese grupo.
 
-Nostr City solo trata como metadata de grupo confiable la metadata NIP-29 `kind:39000` firmada por la clave `self` que el relay anuncia en su información NIP-11. No todos los relays publican la misma información. Algunos grupos pueden ser privados, restringidos, ocultos o cerrados. En esos casos, la app puede mostrar menos datos o no poder publicar aunque tengas una identidad válida.
+Nostr City solo trata como metadata de grupo confiable la metadata NIP-29 `kind:39000` firmada por la clave `self` que el relay anuncia en su información NIP-11. Si un relay real tiene NIP-11 ausente o roto, la app puede mostrar metadata `kind:39000` con firma válida como **no verificada**, pero no confía en listas de administradores, miembros o roles (`kind:39001`, `kind:39002`, `kind:39003`) sin `self` verificable. Algunos grupos pueden ser privados, restringidos, ocultos o cerrados. En esos casos, la app puede mostrar menos datos o no poder publicar aunque tengas una identidad válida.
 
 También puedes explorar grupos desde el detalle de un relay de grupos en `/relays`. Esa vista lista los grupos anunciados por ese relay y, al abrir uno, enlaza con `/groups?relay=...&group=...`. Si el grupo está entre los grupos cargados, queda seleccionado directamente.
 
 ## Grupos guardados y privacidad
 
 Por defecto, configurar relays de grupos y añadir relays sugeridos es local. No publica un evento `kind:10009` ni comparte tus relays de grupos con otros clientes.
+
+Unirse a un grupo envía una solicitud `kind:9021` al relay del grupo. Si la solicitud se publica correctamente, Nostr City recuerda el grupo localmente para la clave pública activa en ese dispositivo. Recordar un grupo localmente no publica `kind:10009`, no guarda códigos de invitación y no prueba membresía pública.
 
 Guardar un grupo sí publica una lista NIP-51 `kind:10009` con etiquetas `group` para tus grupos guardados y etiquetas `r` para los relays de esos grupos. Esa lista funciona como marcadores o favoritos públicos asociados a tu identidad.
 
@@ -42,6 +46,8 @@ Importante:
 
 - `kind:10009` es público.
 - Guardar un grupo no demuestra que seas miembro.
+- Un grupo recordado localmente solo vive en el almacenamiento del navegador para la clave pública activa.
+- Los códigos de invitación no se guardan en la configuración local ni en la lista pública.
 - Quitar o cambiar una lista guardada no borra necesariamente copias antiguas que otros relays o clientes hayan visto.
 - La membresía real depende del relay del grupo y de los eventos o reglas que ese relay acepte.
 

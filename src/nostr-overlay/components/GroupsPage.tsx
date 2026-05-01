@@ -8,7 +8,10 @@ import type { NostrEvent } from '../../nostr/types';
 import { OverlayPageHeader } from './OverlayPageHeader';
 import { OverlaySurface } from './OverlaySurface';
 import { GroupDetail } from './GroupDetail';
+import { GroupInviteDialog } from './GroupInviteDialog';
 import { GroupList } from './GroupList';
+import { GroupRelayList, type NostrGroupRelaySummary } from './GroupRelayList';
+import type { ParsedGroupInviteLink } from '../../nostr/group-invite-links';
 
 export interface NostrGroupSummary {
     id: string;
@@ -16,16 +19,22 @@ export interface NostrGroupSummary {
     relayUrl: string;
     description: string;
     memberCount: number;
+    isSaved?: boolean;
+    isRemembered?: boolean;
+    metadataVerified?: boolean;
 }
 
 export interface GroupsPageProps {
     groups: NostrGroupSummary[];
+    relays?: NostrGroupRelaySummary[];
+    selectedRelayUrl?: string | null;
     selectedGroupId: string | null;
     isLoading: boolean;
     error: string | null;
     session: AuthSessionState | null;
     messageDraft: string;
     timeline: NostrEvent[];
+    onSelectRelay?: (relayUrl: string) => void;
     onSelectGroup: (groupId: string) => void;
     onMessageDraftChange: (message: string) => void;
     onPublishMessage: (groupId: string, message: string) => void;
@@ -33,6 +42,8 @@ export interface GroupsPageProps {
     onSyncPublicGroups: () => void;
     onJoinGroup: (groupId: string) => void;
     onLeaveGroup: (groupId: string) => void;
+    onAddCustomGroupRelay?: (relayUrl: string) => void;
+    onOpenInvite?: (invite: ParsedGroupInviteLink) => void;
     onRetry: () => Promise<void> | void;
     hasGroupRelaysConfigured: boolean;
     onAddSuggestedGroupRelays: () => void;
@@ -69,12 +80,15 @@ function writeDisabledReason(session: AuthSessionState | null, t: ReturnType<typ
 
 export function GroupsPage({
     groups,
+    relays,
+    selectedRelayUrl,
     selectedGroupId,
     isLoading,
     error,
     session,
     messageDraft,
     timeline,
+    onSelectRelay = () => {},
     onSelectGroup,
     onMessageDraftChange,
     onPublishMessage,
@@ -82,20 +96,34 @@ export function GroupsPage({
     onSyncPublicGroups,
     onJoinGroup,
     onLeaveGroup,
+    onAddCustomGroupRelay = () => {},
+    onOpenInvite = () => {},
     onRetry,
     hasGroupRelaysConfigured,
     onAddSuggestedGroupRelays,
     onManageGroupRelays,
 }: GroupsPageProps) {
     const { t } = useI18n();
-    const group = selectedGroup(groups, selectedGroupId);
+    const relayGroups = selectedRelayUrl ? groups.filter((item) => item.relayUrl === selectedRelayUrl) : groups;
+    const group = selectedGroup(relayGroups, selectedGroupId);
     const disabledReason = writeDisabledReason(session, t);
     const canWrite = !disabledReason;
+    const relaySummaries = relays ?? [...new Set(groups.map((item) => item.relayUrl))].map((relayUrl) => ({
+        relayUrl,
+        groupCount: groups.filter((item) => item.relayUrl === relayUrl).length,
+        savedCount: groups.filter((item) => item.relayUrl === relayUrl && item.isSaved).length,
+        rememberedCount: groups.filter((item) => item.relayUrl === relayUrl && item.isRemembered).length,
+        isConfigured: true,
+    }));
 
     return (
         <OverlaySurface ariaLabel={t('groups.title')}>
             <div className="nostr-groups-page nostr-routed-surface-panel nostr-page-layout flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-3">
-                <OverlayPageHeader title={t('groups.title')} description={t('groups.description')} />
+                <OverlayPageHeader
+                    title={t('groups.title')}
+                    description={t('groups.description')}
+                    actions={<GroupInviteDialog onOpenInvite={onOpenInvite} />}
+                />
 
                 {isLoading ? (
                     <Empty className="min-h-[18rem] self-stretch" role="status" aria-label={t('groups.loadingTitle')}>
@@ -149,9 +177,15 @@ export function GroupsPage({
                 ) : (
                     <div
                         data-testid="groups-page-layout"
-                        className="flex min-h-0 flex-1 flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]"
+                        className="flex min-h-0 flex-1 flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,18rem)_minmax(0,20rem)_minmax(0,1fr)] lg:overflow-hidden"
                     >
-                        <GroupList groups={groups} selectedGroupId={group?.id ?? null} onSelectGroup={onSelectGroup} />
+                        <GroupRelayList
+                            relays={relaySummaries}
+                            selectedRelayUrl={selectedRelayUrl ?? relaySummaries[0]?.relayUrl ?? null}
+                            onSelectRelay={onSelectRelay}
+                            onAddCustomGroupRelay={onAddCustomGroupRelay}
+                        />
+                        <GroupList groups={relayGroups} selectedGroupId={group?.id ?? null} onSelectGroup={onSelectGroup} />
                         <GroupDetail
                             group={group}
                             canWrite={canWrite}

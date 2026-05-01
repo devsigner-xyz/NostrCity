@@ -45,6 +45,18 @@ function isTrustedRelayMetadataEvent(event: NostrEvent, relaySelf: string, verif
     }
 }
 
+function isSignatureValidMetadataEvent(event: NostrEvent, verify: (event: NostrEvent) => boolean): boolean {
+    if (event.kind !== GROUP_METADATA_KIND) {
+        return false;
+    }
+
+    try {
+        return verify(event);
+    } catch {
+        return false;
+    }
+}
+
 function toRelayGroupSummary(relay: string, event: NostrEvent): RelayGroupSummary | null {
     const metadata = parseGroupMetadataEvent(event);
     if (!metadata) {
@@ -73,17 +85,17 @@ function dedupeGroups(groups: RelayGroupSummary[]): RelayGroupSummary[] {
 export async function fetchRelayGroupsForRelay(input: FetchRelayGroupsForRelayInput): Promise<RelayGroupSummary[]> {
     const relayInfo = await (input.fetchRelayInfo ?? fetchNip11RelayInfo)(input.relayUrl);
     const self = relayInfo.self;
-    if (!self || !isHexKey(self)) {
-        return [];
-    }
-
     const client = (input.createClient ?? ((relayUrls: string[]) => createLazyNdkClient({ relays: relayUrls })))([input.relayUrl]);
     await client.connect();
-    const events = await client.fetchEvents({ kinds: [GROUP_METADATA_KIND], authors: [self] });
+    const hasVerifiedSelf = Boolean(self && isHexKey(self));
+    const events = await client.fetchEvents(hasVerifiedSelf ? { kinds: [GROUP_METADATA_KIND], authors: [self as string] } : { kinds: [GROUP_METADATA_KIND] });
     const verify = input.verifyEvent ?? ((event: NostrEvent) => verifyEvent(event as Parameters<typeof verifyEvent>[0]));
 
     return dedupeGroups(events.flatMap((event) => {
-        if (!isTrustedRelayMetadataEvent(event, self, verify)) {
+        const isValid = hasVerifiedSelf
+            ? isTrustedRelayMetadataEvent(event, self as string, verify)
+            : isSignatureValidMetadataEvent(event, verify);
+        if (!isValid) {
             return [];
         }
 

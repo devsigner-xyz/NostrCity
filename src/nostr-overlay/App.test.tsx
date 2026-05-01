@@ -1024,6 +1024,46 @@ describe('Nostr overlay App', () => {
         await waitFor(() => getLocationText(rendered.container) === '/chats');
     });
 
+    test('uses the active chat participant as the mobile app bar title', async () => {
+        const peerPubkey = 'a'.repeat(64);
+        const rendered = await renderAuthenticatedMobileApp(`/chats?peer=${peerPubkey}`, {
+            directMessagesService: {
+                subscribeInbox: vi.fn(() => () => {}),
+                loadInitialConversations: vi.fn(async () => [{
+                    id: 'chat-inbox-1',
+                    clientMessageId: 'chat-inbox-1',
+                    conversationId: peerPubkey,
+                    peerPubkey,
+                    direction: 'incoming' as const,
+                    createdAt: 1700000100,
+                    plaintext: 'hola alice',
+                    deliveryState: 'sent' as const,
+                }]),
+                loadConversationMessages: vi.fn(async () => [{
+                    id: 'chat-thread-1',
+                    clientMessageId: 'chat-thread-1',
+                    conversationId: peerPubkey,
+                    peerPubkey,
+                    direction: 'incoming' as const,
+                    createdAt: 1700000101,
+                    plaintext: 'hola alice',
+                    deliveryState: 'sent' as const,
+                }]),
+                sendDm: vi.fn(),
+            },
+            fetchProfilesFn: vi.fn().mockResolvedValue({
+                [SAMPLE_AUTH_PUBKEY]: { pubkey: SAMPLE_AUTH_PUBKEY, displayName: 'Owner' },
+                [peerPubkey]: { pubkey: peerPubkey, displayName: 'Alice' },
+            }),
+        });
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('hola alice'));
+
+        const appBarTitle = rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"] .nostr-mobile-app-bar-title');
+        expect(appBarTitle?.textContent).toBe('Alice');
+    });
+
     test('loads a direct Agora note detail route as the active thread', async () => {
         const noteId = 'd'.repeat(64);
         const ownerPubkey = persistDmCapableSession();
@@ -3880,8 +3920,8 @@ describe('Nostr overlay App', () => {
         mounted.push(rendered);
 
         await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
-        expect(rendered.container.textContent || '').toContain('Los relays y grupos sincronizados son datos públicos de Nostr.');
-        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar grupos públicos: los grupos guardados y relays de grupos son datos públicos de Nostr"]') as HTMLButtonElement;
+        expect(rendered.container.textContent || '').not.toContain('Los relays y grupos sincronizados son datos públicos de Nostr.');
+        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar grupos públicos"]') as HTMLButtonElement;
         await act(async () => {
             syncButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -3938,6 +3978,11 @@ describe('Nostr overlay App', () => {
         );
         mounted.push(rendered);
 
+        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
+        const othersTab = rendered.container.querySelector('button[role="tab"][aria-controls="groups-others-panel"]') as HTMLButtonElement;
+        await act(async () => {
+            othersTab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
         await waitFor(() => (rendered.container.textContent || '').includes('Park Planners'));
         const parksButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Park Planners')) as HTMLButtonElement;
         await act(async () => {
@@ -4050,6 +4095,11 @@ describe('Nostr overlay App', () => {
         );
         mounted.push(rendered);
 
+        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
+        const othersTab = rendered.container.querySelector('button[role="tab"][aria-controls="groups-others-panel"]') as HTMLButtonElement;
+        await act(async () => {
+            othersTab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
         await waitFor(() => (rendered.container.textContent || '').includes('Artist Guild'));
         const parksButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Park Planners')) as HTMLButtonElement;
         await act(async () => {
@@ -4128,6 +4178,50 @@ describe('Nostr overlay App', () => {
         expect(requestLeave).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'maps' } });
     });
 
+    test('groups route join with invite code remembers locally without saving public groups', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        persistGroupRelaySettings(ownerPubkey);
+        const requestJoin = vi.fn(async () => undefined);
+        const savePublicGroups = vi.fn(async () => undefined);
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    groupsService: {
+                        loadGroups: vi.fn(async () => ({ saved: [], remembered: [], discovered: [{ relay: 'wss://relay.example', id: 'parks' }] } as never)),
+                        loadGroup: vi.fn(async () => ({
+                            group: { relay: 'wss://relay.example', id: 'parks', key: "wss://relay.example'parks", external: "relay.example'parks" },
+                            metadata: { id: 'parks', name: 'Park Planners', about: 'Plan park districts.', private: false, restricted: false, hidden: false, closed: false },
+                            metadataVerified: true,
+                            admins: undefined,
+                            members: undefined,
+                            roles: undefined,
+                            timeline: [],
+                        })),
+                        publishMessage: vi.fn(),
+                        requestJoin,
+                        requestLeave: vi.fn(),
+                        savePublicGroups,
+                    },
+                })}
+            />,
+            { initialEntries: ['/groups?relay=wss%3A%2F%2Frelay.example&group=parks&code=invite-code'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Park Planners'));
+        const joinButton = rendered.container.querySelector('button[aria-label="Unirse a Park Planners"]') as HTMLButtonElement;
+        await act(async () => {
+            joinButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(requestJoin).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'parks' }, code: 'invite-code' });
+        expect(savePublicGroups).not.toHaveBeenCalled();
+        expect(window.localStorage.getItem(`nostr.overlay.groups.remembered.v1:user:${ownerPubkey}`)).toContain("parks");
+        expect(window.localStorage.getItem(`nostr.overlay.groups.remembered.v1:user:${ownerPubkey}`)).not.toContain('invite-code');
+    });
+
     test('groups route does not call write actions for readonly sessions', async () => {
         const ownerPubkey = 'f'.repeat(64);
         persistGroupRelaySettings(ownerPubkey);
@@ -4175,7 +4269,7 @@ describe('Nostr overlay App', () => {
         await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
         const publishButton = rendered.container.querySelector('button[aria-label="Publicar mensaje en Map Makers"]') as HTMLButtonElement;
         const saveButton = rendered.container.querySelector('button[aria-label="Guardar Map Makers"]') as HTMLButtonElement;
-        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar grupos públicos: los grupos guardados y relays de grupos son datos públicos de Nostr"]') as HTMLButtonElement;
+        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar grupos públicos"]') as HTMLButtonElement;
 
         expect(publishButton.disabled).toBe(true);
         expect(saveButton.disabled).toBe(true);

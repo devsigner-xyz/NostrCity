@@ -69,6 +69,8 @@ const RELAY_AUTHORED_METADATA_KINDS: RelayAuthoredGroupMetadataKind[] = [
     GROUP_ROLES_KIND,
 ];
 
+const DISPLAY_METADATA_KINDS: RelayAuthoredGroupMetadataKind[] = [GROUP_METADATA_KIND, GROUP_MEMBERS_KIND];
+
 function emptyPublishResult(): PublishResult {
     return { ackedRelays: [], failedRelays: [], timeoutRelays: [] };
 }
@@ -142,6 +144,14 @@ function isValidRelayAuthoredEvent(event: NostrEvent, self: string, verifyEvent:
     }
 }
 
+function isSignatureValidEvent(event: NostrEvent, verifyEvent: (event: NostrEvent) => boolean): boolean {
+    try {
+        return verifyEvent(event);
+    } catch {
+        return false;
+    }
+}
+
 function isValidGroupMessageEvent(event: NostrEvent, groupId: string, verifyEvent: (event: NostrEvent) => boolean): boolean {
     if (event.kind !== GROUP_MESSAGE_KIND || firstTagValue(event.tags, 'h') !== groupId) {
         return false;
@@ -158,8 +168,9 @@ export function createGroupsRuntimeService(options: CreateGroupsRuntimeServiceOp
     async function loadGroup(groupInput: GroupAddressInput | string): Promise<GroupsRuntimeSnapshot> {
         const group = canonicalizeGroupAddress(groupInput);
         const relayInfo = await options.transport.fetchRelayInfo(group.relay).catch(() => ({ self: undefined }));
+        const relayAuthoredKinds = relayInfo.self && isHexKey(relayInfo.self) ? RELAY_AUTHORED_METADATA_KINDS : DISPLAY_METADATA_KINDS;
         const metadataEvents = await fetchSafely(options.transport, group.relay, [
-            { kinds: RELAY_AUTHORED_METADATA_KINDS, '#d': [group.id], limit: 20 },
+            { kinds: relayAuthoredKinds, '#d': [group.id], limit: 20 },
         ]);
         const rawTimeline = await fetchSafely(options.transport, group.relay, [
             { kinds: [GROUP_MESSAGE_KIND], '#h': [group.id], limit: 50 },
@@ -172,9 +183,14 @@ export function createGroupsRuntimeService(options: CreateGroupsRuntimeServiceOp
         const timeline = sortTimeline(rawTimeline.filter((event) => isValidGroupMessageEvent(event, group.id, verifyEvent)));
         const trustedEvents = metadataVerified ? groupMetadataEvents.filter((event) => isValidRelayAuthoredEvent(event, self, verifyEvent)) : [];
         const trustedDecisionEvents = metadataVerified ? trustedEvents : [];
-        const metadataEvent = newestByKind(trustedEvents, GROUP_METADATA_KIND);
+        const displayEvents = metadataVerified
+            ? trustedEvents
+            : groupMetadataEvents.filter((event) => (DISPLAY_METADATA_KINDS as number[]).includes(event.kind) && isSignatureValidEvent(event, verifyEvent));
+        const trustedOrDisplayMemberEvents = metadataVerified ? trustedDecisionEvents : displayEvents;
+        const displayMetadataEvents = displayEvents.filter((event) => event.kind === GROUP_METADATA_KIND);
+        const metadataEvent = newestByKind(displayMetadataEvents, GROUP_METADATA_KIND);
         const adminsEvent = newestByKind(trustedDecisionEvents, GROUP_ADMINS_KIND);
-        const membersEvent = newestByKind(trustedDecisionEvents, GROUP_MEMBERS_KIND);
+        const membersEvent = newestByKind(trustedOrDisplayMemberEvents, GROUP_MEMBERS_KIND);
         const rolesEvent = newestByKind(trustedDecisionEvents, GROUP_ROLES_KIND);
 
         return {

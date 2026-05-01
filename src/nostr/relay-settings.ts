@@ -14,8 +14,9 @@ export const DEFAULT_GROUP_RELAYS = [
     'wss://groups.0xchat.com',
     'wss://relay.groups.nip29.com',
     'wss://groups.hzrd149.com',
-    'wss://pyramid.fiatjaf.com',
 ];
+
+const RETIRED_GROUP_RELAYS = new Set(['wss://pyramid.fiatjaf.com']);
 
 export const RELAY_TYPES = ['nip65Both', 'nip65Read', 'nip65Write', 'dmInbox', 'search', 'groups'] as const;
 export type RelayType = (typeof RELAY_TYPES)[number];
@@ -100,6 +101,10 @@ function normalizeRelayList(relays: string[]): string[] {
     return mergeRelaySets(relays);
 }
 
+function normalizeGroupRelayList(relays: string[]): string[] {
+    return normalizeRelayList(relays).filter((relay) => !RETIRED_GROUP_RELAYS.has(relay));
+}
+
 function isLegacyByType(byType: Partial<Record<RelayType, string[]>> | LegacyRelaySettingsByType): byType is LegacyRelaySettingsByType {
     return 'general' in byType
         || 'dmOutbox' in byType
@@ -116,7 +121,7 @@ function normalizeByType(byType: Partial<Record<RelayType, string[]>> | LegacyRe
         nip65Write: normalizeRelayList(typed.nip65Write ?? legacy?.dmOutbox ?? []),
         dmInbox: normalizeRelayList(typed.dmInbox ?? []),
         search: normalizeRelayList(typed.search ?? DEFAULT_SEARCH_RELAYS),
-        groups: normalizeRelayList(typed.groups ?? []),
+        groups: normalizeGroupRelayList(typed.groups ?? []),
     };
 }
 

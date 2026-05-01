@@ -16,6 +16,7 @@ import { useOverlayArticlesController } from './controllers/use-overlay-articles
 import { useOverlayNotificationsController } from './controllers/use-overlay-notifications-controller';
 import { useOverlayDmController } from './controllers/use-overlay-dm-controller';
 import { useOverlayGroupsController } from './controllers/use-overlay-groups-controller';
+import { addRememberedGroup } from '../nostr/group-remembered-storage';
 import { useWalletZapController, type ZapIntentInput } from './controllers/use-wallet-zap-controller';
 import { useEasterEggDiscoveryController } from './hooks/useEasterEggDiscoveryController';
 import { useFollowingFeedEngagementQuery } from './query/following-feed.query';
@@ -167,10 +168,6 @@ export function App({ mapBridge, services }: AppProps) {
     );
     const loginDisabled = overlay.status !== 'idle' && overlay.status !== 'success' && overlay.status !== 'error';
     const mapLoaderText = selectMapLoaderStageLabel(overlay.mapLoaderStage, uiSettings.language);
-    const mobileAppBarTitle = resolveMobileAppBarTitle({
-        pathname: location.pathname,
-        language: uiSettings.language,
-    });
     const mobileAppBarShowBack = shouldShowMobileBack(location.pathname);
     const agoraReturnFocusEventId = location.pathname === '/agora'
         ? routeReturnStateFromUnknown(location.state).returnFocusEventId
@@ -448,6 +445,14 @@ export function App({ mapBridge, services }: AppProps) {
         conversations: chatState.conversations,
         activeConversationId: chatActiveConversationId,
     }), [chatState.conversations, chatActiveConversationId]);
+
+    const activeChatMobileTitle = location.pathname === '/chats'
+        ? chatConversations.find((conversation) => conversation.id === chatActiveConversationId)?.title
+        : undefined;
+    const mobileAppBarTitle = activeChatMobileTitle ?? resolveMobileAppBarTitle({
+        pathname: location.pathname,
+        language: uiSettings.language,
+    });
 
     const canAccessFollowingFeed = socialFeed.canAccessFollowingFeed;
     const relayStatusTargets = relaySettingsSnapshot.relays;
@@ -1042,6 +1047,11 @@ export function App({ mapBridge, services }: AppProps) {
         const savedState = saveRelaySettings(nextState, relaySettingsOwnerPubkey ? { ownerPubkey: relaySettingsOwnerPubkey } : undefined);
         setRelaySettingsSnapshot(savedState);
     }, [relaySettingsOwnerPubkey, relaySettingsSnapshot]);
+    const addCustomGroupRelay = useCallback((relay: string) => {
+        const nextState = addRelay(relaySettingsSnapshot, relay, 'groups');
+        const savedState = saveRelaySettings(nextState, relaySettingsOwnerPubkey ? { ownerPubkey: relaySettingsOwnerPubkey } : undefined);
+        setRelaySettingsSnapshot(savedState);
+    }, [relaySettingsOwnerPubkey, relaySettingsSnapshot]);
     const openGroupRelaysSettings = useCallback(() => {
         navigate('/relays');
     }, [navigate]);
@@ -1056,6 +1066,28 @@ export function App({ mapBridge, services }: AppProps) {
 
         return relay && id ? { relay, id } : undefined;
     }, [location.pathname, location.search]);
+    const selectedInviteCode = useMemo(() => {
+        if (location.pathname !== '/groups') {
+            return undefined;
+        }
+
+        return new URLSearchParams(location.search).get('code')?.trim() || undefined;
+    }, [location.pathname, location.search]);
+    const rememberGroup = useCallback((group: Parameters<typeof addRememberedGroup>[0]['group']) => {
+        if (!overlay.ownerPubkey) {
+            return;
+        }
+
+        addRememberedGroup({ ownerPubkey: overlay.ownerPubkey, group });
+    }, [overlay.ownerPubkey]);
+    const openGroupInvite = useCallback((invite: { relay: string; group: string; code?: string }) => {
+        const params = new URLSearchParams({ relay: invite.relay, group: invite.group });
+        if (invite.code) {
+            params.set('code', invite.code);
+        }
+
+        navigate(`/groups?${params.toString()}`);
+    }, [navigate]);
     const groupsController = useOverlayGroupsController({
         enabled: location.pathname === '/groups',
         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
@@ -1064,6 +1096,9 @@ export function App({ mapBridge, services }: AppProps) {
         hasGroupRelaysConfigured,
         configuredGroupRelays: relaySettingsSnapshot.byType.groups,
         ...(selectedGroupAddress ? { selectedGroupAddress } : {}),
+        ...(selectedInviteCode ? { selectedInviteCode } : {}),
+        onRememberGroup: rememberGroup,
+        onAddCustomGroupRelay: addCustomGroupRelay,
         onAddSuggestedGroupRelays: addSuggestedGroupRelays,
         onManageGroupRelays: openGroupRelaysSettings,
         errorFallbackMessage: translate(uiSettings.language, 'groups.errorDescription'),
@@ -1309,12 +1344,15 @@ export function App({ mapBridge, services }: AppProps) {
                     }}
                     groups={{
                         groups: groupsController.groups,
+                        relays: groupsController.relays,
+                        selectedRelayUrl: groupsController.selectedRelayUrl,
                         selectedGroupId: groupsController.selectedGroupId,
                         isLoading: groupsController.isLoading,
                         error: groupsController.error,
                         session: overlay.authSession ?? null,
                         messageDraft: groupsController.messageDraft,
                         timeline: groupsController.selectedTimeline,
+                        onSelectRelay: groupsController.selectRelay,
                         onSelectGroup: groupsController.selectGroup,
                         onMessageDraftChange: groupsController.setMessageDraft,
                         onPublishMessage: groupsController.publishMessage,
@@ -1322,6 +1360,8 @@ export function App({ mapBridge, services }: AppProps) {
                         onSyncPublicGroups: groupsController.syncPublicGroups,
                         onJoinGroup: groupsController.requestJoin,
                         onLeaveGroup: groupsController.requestLeave,
+                        onAddCustomGroupRelay: groupsController.addCustomGroupRelay,
+                        onOpenInvite: openGroupInvite,
                         onRetry: groupsController.retry,
                         hasGroupRelaysConfigured: groupsController.hasGroupRelaysConfigured,
                         onAddSuggestedGroupRelays: groupsController.addSuggestedGroupRelays,

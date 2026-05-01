@@ -88,16 +88,21 @@ describe('fetchRelayGroupsForRelay', () => {
         ]);
     });
 
-    test('does not fetch group metadata when NIP-11 self is missing or invalid', async () => {
-        const client = createClient([signedMetadataEvent({ id: 'maps' })]);
+    test('falls back to unfiltered group metadata when NIP-11 self is missing or invalid', async () => {
+        const client = createClient([
+            signedMetadataEvent({ id: 'maps', name: 'Maps' }),
+            unsignedEvent({ pubkey: SELF_PUBKEY, tags: [['d', 'unsigned']] }),
+        ]);
 
         await expect(fetchRelayGroupsForRelay({
             relayUrl: 'wss://groups.example',
             fetchRelayInfo: async () => ({ self: 'not-a-hex-key' }),
             createClient: () => client,
-        })).resolves.toEqual([]);
+        })).resolves.toEqual([
+            { relay: 'wss://groups.example', id: 'maps', name: 'Maps' },
+        ]);
 
-        expect(client.connect).not.toHaveBeenCalled();
-        expect(client.fetchEvents).not.toHaveBeenCalled();
+        expect(client.connect).toHaveBeenCalledTimes(1);
+        expect(client.fetchEvents).toHaveBeenCalledWith({ kinds: [39000] });
     });
 });

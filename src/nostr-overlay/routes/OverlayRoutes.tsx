@@ -87,6 +87,7 @@ export function OverlayRoutes({
                     <Route path="/city-stats" element={<CityStatsRouteContainer {...cityStats} />} />
                     <Route path="/notifications" element={notifications.canAccessSocialNotifications ? <NotificationsRouteContainer {...notifications} /> : <Navigate to="/" replace />} />
                     <Route path="/chats" element={chats.canDirectMessages ? <ChatsRouteContainer {...chats} /> : <Navigate to="/" replace />} />
+                    <Route path="/open" element={<Navigate to={`/groups${locationSearch}`} replace />} />
                     <Route path="/groups" element={groups ? <GroupsPage {...groups} /> : <GroupsRouteContainer />} />
                     <Route path="/relays" element={<RelaysRoute {...relays} />} />
                     <Route path="/relays/detail" element={<RelayDetailRoute {...relayDetail} />} />

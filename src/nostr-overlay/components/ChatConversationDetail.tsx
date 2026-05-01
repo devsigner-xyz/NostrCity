@@ -12,6 +12,7 @@ interface ChatConversationDetailProps {
     composerAutoFocusKey?: string;
     canSend?: boolean;
     disabledReason?: string;
+    showHeader?: boolean;
 }
 
 function deliveryStatusLabel(state: 'pending' | 'sent' | 'failed', t: ReturnType<typeof useI18n>['t']): string {
@@ -40,6 +41,7 @@ export function ChatConversationDetail({
     composerAutoFocusKey,
     canSend = true,
     disabledReason,
+    showHeader = true,
 }: ChatConversationDetailProps) {
     const { t, locale } = useI18n();
     const [draft, setDraft] = useState('');
@@ -68,9 +70,11 @@ export function ChatConversationDetail({
 
     return (
         <div className="nostr-chat-detail">
-            <div className="nostr-chat-detail-header">
-                <p className="nostr-chat-detail-title">{conversation.title}</p>
-            </div>
+            {showHeader ? (
+                <div className="nostr-chat-detail-header">
+                    <p className="nostr-chat-detail-title">{conversation.title}</p>
+                </div>
+            ) : null}
 
             <ul className="nostr-chat-messages">
                 {messages.length === 0 ? (

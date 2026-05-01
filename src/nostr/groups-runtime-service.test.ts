@@ -171,7 +171,7 @@ describe('groups runtime service', () => {
         }));
     });
 
-    test('marks metadata unverified and withholds trust lists when relay self is missing', async () => {
+    test('displays unverified metadata and member count when relay self is missing', async () => {
         const transport = createTransport({
             metadataEvents: [
                 relayAuthoredEvent(GROUP_METADATA_KIND, { content: '{"name":"Private maps"}', tags: [['d', 'maps'], ['private']] }),
@@ -186,11 +186,28 @@ describe('groups runtime service', () => {
         const result = await service.loadGroup({ relay: 'wss://relay.example', id: 'maps' });
 
         expect(result.metadataVerified).toBe(false);
-        expect(result.metadata).toBeUndefined();
+        expect(result.metadata?.name).toBe('Private maps');
+        expect(result.metadata?.private).toBe(true);
         expect(result.admins).toBeUndefined();
-        expect(result.members).toBeUndefined();
+        expect(result.members?.pubkeys).toEqual([OTHER_PUBKEY]);
         expect(result.roles).toBeUndefined();
         expect(result.timeline.map((item) => item.id)).toEqual(['msg']);
+    });
+
+    test('uses newest valid unverified metadata for the target group only', async () => {
+        const transport = createTransport({
+            metadataEvents: [
+                relayAuthoredEvent(GROUP_METADATA_KIND, { id: 'old', created_at: 10, content: '{"name":"Old maps"}', tags: [['d', 'maps']] }),
+                relayAuthoredEvent(GROUP_METADATA_KIND, { id: 'new', created_at: 20, content: '{"name":"New maps"}', tags: [['d', 'maps']] }),
+                relayAuthoredEvent(GROUP_METADATA_KIND, { id: 'wrong', created_at: 30, content: '{"name":"Wrong"}', tags: [['d', 'parks']] }),
+            ],
+        });
+
+        const service = createGroupsRuntimeService({ transport, verifyEvent: (candidate) => candidate.id !== 'old' });
+        const result = await service.loadGroup({ relay: 'wss://relay.example', id: 'maps' });
+
+        expect(result.metadataVerified).toBe(false);
+        expect(result.metadata?.name).toBe('New maps');
     });
 
     test('degrades safely when private or hidden groups return only partial data', async () => {

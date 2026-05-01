@@ -26,6 +26,7 @@ function toNostrEvent(rawEvent: {
 
 export class NdkClient implements NostrClient {
     private static readonly CONNECT_TIMEOUT_MS = 4_000;
+    private static readonly FETCH_EVENTS_TIMEOUT_MS = 5_000;
     private connectPromise: Promise<void> | null = null;
 
     private readonly ndk: {
@@ -53,7 +54,11 @@ export class NdkClient implements NostrClient {
     }
 
     async fetchEvents(filter: NostrFilter): Promise<NostrEvent[]> {
-        const eventSet = await this.ndk.fetchEvents(filter as unknown as Record<string, unknown>);
+        const eventSet = await withTimeout(
+            this.ndk.fetchEvents(filter as unknown as Record<string, unknown>),
+            NdkClient.FETCH_EVENTS_TIMEOUT_MS,
+            `NDK fetchEvents timed out after ${NdkClient.FETCH_EVENTS_TIMEOUT_MS}ms`
+        );
         const events = [...eventSet]
             .map((event) => event as {
                 id: string;
@@ -83,6 +88,17 @@ export class NdkClient implements NostrClient {
 
         return events[0] ?? null;
     }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+    let timeout: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+    });
+
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+        clearTimeout(timeout);
+    });
 }
 
 export function createNdkDmTransportClient(relays: string[] = []): DmTransport {

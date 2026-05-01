@@ -110,6 +110,13 @@ export function GroupDetail({
                         <div className="flex min-w-0 flex-col gap-1">
                             <CardTitle>{group.name}</CardTitle>
                             <CardDescription>{group.description}</CardDescription>
+                            <div className="flex flex-wrap gap-1 pt-1">
+                                {group.isSaved ? <Badge variant="secondary">{t('groups.status.saved')}</Badge> : null}
+                                {group.isRemembered ? <Badge variant="outline">{t('groups.status.remembered')}</Badge> : null}
+                            </div>
+                            {group.metadataVerified === false ? (
+                                <p className="pt-1 text-xs text-muted-foreground">{t('groups.status.unverified')}</p>
+                            ) : null}
                         </div>
                         <Badge variant="secondary" className="w-fit">
                             {group.memberCount === 1
@@ -157,8 +164,7 @@ export function GroupDetail({
                         </section>
                     </FieldGroup>
                 </CardContent>
-                <CardFooter className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-muted-foreground">{t('groups.sync.publicWarning')}</p>
+                <CardFooter className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
                     <div className="flex flex-col gap-2 sm:flex-row">
                         <Button
                             type="button"

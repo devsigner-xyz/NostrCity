@@ -11,13 +11,14 @@ import {
     resolveNip29GroupDiscoveryRelays,
     verifiedDiscoveredGroups,
 } from '../nostr/group-relay-discovery';
+import { loadRememberedGroups } from '../nostr/group-remembered-storage';
 import { createGroupsRuntimeService } from '../nostr/groups-runtime-service';
 import { fetchNip11RelayInfo } from '../nostr/groups-transport';
 import { createLazyNdkClient } from '../nostr/lazy-ndk-client';
 import { getBootstrapRelays } from '../nostr/relay-policy';
 import { loadRelaySettings } from '../nostr/relay-settings';
 import type { PublishResult } from '../nostr/dm-types';
-import type { NostrEvent } from '../nostr/types';
+import type { NostrClient, NostrEvent } from '../nostr/types';
 import { createDmApiService } from '../nostr-api/dm-api-service';
 import { createGraphApiService } from '../nostr-api/graph-api-service';
 import { createHttpClient, type HttpClientAuthContext } from '../nostr-api/http-client';
@@ -73,6 +74,19 @@ function publishAttemptsToResult(attempts: PromiseSettledResult<string>[], relay
 
 function missingWriteGateway(): never {
     throw new Error('Overlay write gateway is not configured');
+}
+
+async function loadVerifiedPublicSavedGroupsEvent(input: {
+    client: Pick<NostrClient, 'connect' | 'fetchLatestReplaceableEvent'>;
+    ownerPubkey: string;
+}): Promise<NostrEvent | null> {
+    try {
+        await input.client.connect();
+        const event = await input.client.fetchLatestReplaceableEvent(input.ownerPubkey, PUBLIC_SAVED_GROUPS_KIND);
+        return event && isVerifiedPublicSavedGroupsEvent(event, input.ownerPubkey) ? event : null;
+    } catch {
+        return null;
+    }
 }
 
 export function createBootstrapOverlayServices(): OverlayServices {
@@ -185,15 +199,14 @@ export function createBootstrapOverlayServices(): OverlayServices {
         groupsService: {
             async loadGroups(input) {
                 const relayClient = getSavedGroupsClient();
-                await relayClient.connect();
-                const rawSavedGroups = await relayClient.fetchLatestReplaceableEvent(input.ownerPubkey, PUBLIC_SAVED_GROUPS_KIND);
-                const savedGroups = rawSavedGroups && isVerifiedPublicSavedGroupsEvent(rawSavedGroups, input.ownerPubkey) ? rawSavedGroups : null;
+                const savedGroups = await loadVerifiedPublicSavedGroupsEvent({ client: relayClient, ownerPubkey: input.ownerPubkey });
                 const saved = savedGroups ? parsePublicSavedGroupsEvent(savedGroups) : [];
+                const remembered = loadRememberedGroups({ ownerPubkey: input.ownerPubkey });
                 const publicRelayTags = savedGroups ? parsePublicSavedGroupRelaysEvent(savedGroups) : [];
                 const relaySettings = loadRelaySettings({ ownerPubkey: input.ownerPubkey });
                 const groupRelays = resolveNip29GroupDiscoveryRelays({
                     configuredGroupRelays: relaySettings.byType.groups,
-                    savedGroups: saved,
+                    savedGroups: [...saved, ...remembered],
                     publicRelayTags,
                 });
                 const discovered = await discoverNip29GroupsFromRelays({
@@ -202,11 +215,12 @@ export function createBootstrapOverlayServices(): OverlayServices {
                     fetchMetadataEvents: async (relay, author) => {
                         const relayOnlyClient = getGroupRelayClient(relay);
                         await relayOnlyClient.connect();
-                        return relayOnlyClient.fetchEvents({ kinds: [GROUP_METADATA_KIND], authors: [author] });
+                        return relayOnlyClient.fetchEvents(author ? { kinds: [GROUP_METADATA_KIND], authors: [author] } : { kinds: [GROUP_METADATA_KIND] });
                     },
                 });
                 return {
                     saved,
+                    remembered,
                     discovered,
                 };
             },
@@ -232,6 +246,7 @@ export function createBootstrapOverlayServices(): OverlayServices {
 }
 
 export const __bootstrapTestUtils = {
+    loadVerifiedPublicSavedGroupsEvent,
     publishAttemptsToResult,
     verifiedDiscoveredGroups,
 };

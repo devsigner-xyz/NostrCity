@@ -397,6 +397,16 @@ describe('OverlayRoutes', () => {
         expect(lastLocation(rendered.locations)).toBe('/groups');
     });
 
+    test('redirects /open invite links to /groups with search params', async () => {
+        const locationSearch = '?relay=wss%3A%2F%2Frelay.example&group=parks&code=invite';
+        const rendered = await renderOverlayRoutes(`/open${locationSearch}`, { locationSearch });
+        mounted.push(rendered);
+
+        await waitFor(() => lastLocation(rendered.locations) === `/groups${locationSearch}`);
+
+        expect(lastLocation(rendered.locations)).toBe(`/groups${locationSearch}`);
+    });
+
     test('renders Wallet route for /wallet', async () => {
         const rendered = await renderOverlayRoutes('/wallet');
         mounted.push(rendered);

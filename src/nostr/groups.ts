@@ -57,7 +57,7 @@ export interface GroupRoleList {
 
 type GroupAddressLike = GroupAddressInput | string;
 
-const GROUP_ID_PATTERN = /^[a-z0-9_-]+$/;
+const GROUP_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 function normalizeExternalRelayHost(host: string): string {
     return host.includes('://') ? host : `wss://${host}`;
