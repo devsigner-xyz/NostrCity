@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { OverlayUnreadIndicator } from './OverlayUnreadIndicator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { sanitizeImageUrl } from '../media/image-url-policy';
 import {
     DropdownMenu,
@@ -135,7 +136,6 @@ function SidebarActionsMenu({
     canAccessDirectMessages,
     canAccessSocialNotifications,
     canAccessFollowingFeed,
-    canWrite,
     chatHasUnread,
     notificationsHasUnread,
     followingFeedHasUnread,
@@ -148,7 +148,6 @@ function SidebarActionsMenu({
     onOpenArticles,
     onOpenGlobalSearch,
     onOpenWallet,
-    onOpenPublish,
     onOpenSettings,
     isUiSettingsOpen,
     missionsDiscoveredCount,
@@ -156,7 +155,7 @@ function SidebarActionsMenu({
     relaysConnectedCount,
     relaysTotal,
     onOpenMissions,
-}: Omit<OverlaySidebarProps, 'open' | 'onOpenChange' | 'resolvedTheme' | 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout' | 'mobileAppBarTitle' | 'mobileAppBarShowBack' | 'onMobileAppBarBack' | 'children'> & { isReadonlySession: boolean }) {
+}: Omit<OverlaySidebarProps, 'open' | 'onOpenChange' | 'resolvedTheme' | 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'canWrite' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout' | 'onOpenPublish' | 'mobileAppBarTitle' | 'mobileAppBarShowBack' | 'onMobileAppBarBack' | 'children'> & { isReadonlySession: boolean }) {
     const { t } = useI18n();
     const { state, isMobile, setOpenMobile } = useSidebar();
     const location = useLocation();
@@ -244,25 +243,6 @@ function SidebarActionsMenu({
                                 <span>{t('sidebar.articles')}</span>
                             </button>
                         </SidebarMenuButton>
-                    </SidebarMenuItem>
-                ) : null}
-
-                {canWrite || isReadonlySession ? (
-                    <SidebarMenuItem>
-                        <SigningRequiredTooltip enabled={isReadonlySession} label={readonlyReason}>
-                            <SidebarMenuButton asChild>
-                                <button
-                                    type="button"
-                                    aria-label={t('sidebar.openPublish')}
-                                    title={isReadonlySession ? readonlyReason : t('sidebar.publish')}
-                                    disabled={isReadonlySession}
-                                    onClick={() => runNavigationAction(onOpenPublish)}
-                                >
-                                    <PenSquareIcon />
-                                    <span>{t('sidebar.publish')}</span>
-                                </button>
-                            </SidebarMenuButton>
-                        </SigningRequiredTooltip>
                     </SidebarMenuItem>
                 ) : null}
 
@@ -459,6 +439,49 @@ function SidebarActionsMenu({
                 ) : null}
             </SidebarMenu>
         </SidebarGroup>
+    );
+}
+
+function SidebarPublishButton({
+    canWrite,
+    isReadonlySession,
+    onOpenPublish,
+}: Pick<OverlaySidebarProps, 'canWrite' | 'onOpenPublish'> & { isReadonlySession: boolean }) {
+    const { t } = useI18n();
+    const { state, isMobile, setOpenMobile } = useSidebar();
+    const collapsed = !isMobile && state === 'collapsed';
+    const readonlyReason = t('auth.readOnlySignInRequired');
+
+    if (!canWrite && !isReadonlySession) {
+        return null;
+    }
+
+    const publish = (): void => {
+        onOpenPublish();
+        if (isMobile) {
+            setOpenMobile(false);
+        }
+    };
+
+    return (
+        <SidebarMenu className="py-2">
+            <SidebarMenuItem>
+                <SigningRequiredTooltip enabled={isReadonlySession} label={readonlyReason}>
+                    <Button
+                        type="button"
+                        className={cn(!collapsed && 'w-full', collapsed && 'mx-auto')}
+                        size={collapsed ? 'icon' : 'default'}
+                        aria-label={t('sidebar.openPublish')}
+                        title={isReadonlySession ? readonlyReason : t('sidebar.publish')}
+                        disabled={isReadonlySession}
+                        onClick={publish}
+                    >
+                        <PenSquareIcon data-icon="inline-start" />
+                        {!collapsed ? <span>{t('sidebar.publish')}</span> : null}
+                    </Button>
+                </SigningRequiredTooltip>
+            </SidebarMenuItem>
+        </SidebarMenu>
     );
 }
 
@@ -729,7 +752,6 @@ export function OverlaySidebar({
                 <SidebarFooter className="pt-0">
                     <SidebarActionsMenu
                         isReadonlySession={Boolean(authSession?.readonly)}
-                        canWrite={canWrite}
                         canAccessDirectMessages={canAccessDirectMessages}
                         canAccessSocialNotifications={canAccessSocialNotifications}
                         canAccessFollowingFeed={canAccessFollowingFeed}
@@ -745,7 +767,6 @@ export function OverlaySidebar({
                         onOpenArticles={onOpenArticles}
                         onOpenGlobalSearch={onOpenGlobalSearch}
                         onOpenWallet={onOpenWallet}
-                        onOpenPublish={onOpenPublish}
                         onOpenSettings={onOpenSettings}
                         isUiSettingsOpen={isUiSettingsOpen}
                         missionsDiscoveredCount={missionsDiscoveredCount}
@@ -753,6 +774,11 @@ export function OverlaySidebar({
                         relaysConnectedCount={relaysConnectedCount}
                         relaysTotal={relaysTotal}
                         onOpenMissions={onOpenMissions}
+                    />
+                    <SidebarPublishButton
+                        canWrite={canWrite}
+                        isReadonlySession={Boolean(authSession?.readonly)}
+                        onOpenPublish={onOpenPublish}
                     />
                     <SidebarUserMenu
                         {...(authSession ? { authSession } : {})}

@@ -4367,7 +4367,7 @@ describe('Nostr overlay App', () => {
         expect(compactNotificationsButton).not.toBeNull();
     });
 
-    test('orders main sidebar actions with map/agora/publish/chats/relays/notifications/search/stats/discover/settings', async () => {
+    test('orders main sidebar actions and places publish before the user menu', async () => {
         const ownerPubkey = 'f'.repeat(64);
         const socialFeed = createSocialFeedServiceMock();
         const socialNotifications = createSocialNotificationsServiceMock();
@@ -4407,7 +4407,6 @@ describe('Nostr overlay App', () => {
         const requiredOrder = [
             'Abrir mapa',
             'Abrir Ágora',
-            'Abrir publicar',
             'Abrir chats',
             'Abrir relays',
             'Abrir notificaciones',
@@ -4422,7 +4421,17 @@ describe('Nostr overlay App', () => {
         const orderedVisibleLabels = panelLabels.filter((label) => requiredOrder.includes(label));
 
         expect(orderedVisibleLabels).toEqual(requiredOrder);
+        expect(panelLabels).not.toContain('Abrir publicar');
         expect(panelLabels).not.toContain('Regenerar mapa');
+
+        const toolbar = rendered.container.querySelector('.nostr-panel-toolbar') as HTMLElement;
+        const publishButton = rendered.container.querySelector('[data-slot="sidebar-footer"] button[aria-label="Abrir publicar"]') as HTMLButtonElement | null;
+        const userMenuButton = rendered.container.querySelector('[data-slot="sidebar-footer"] button[aria-label="Abrir menú de usuario"]') as HTMLButtonElement | null;
+
+        expect(publishButton).not.toBeNull();
+        expect(userMenuButton).not.toBeNull();
+        expect(toolbar.compareDocumentPosition(publishButton as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+        expect((publishButton as HTMLButtonElement).compareDocumentPosition(userMenuButton as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     });
 
     test('opens global publish dialog from the sidebar', async () => {
@@ -4438,7 +4447,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const publishButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir publicar"]') as HTMLButtonElement | null;
+        const publishButton = rendered.container.querySelector('[data-slot="sidebar-footer"] button[aria-label="Abrir publicar"]') as HTMLButtonElement | null;
         expect(publishButton).not.toBeNull();
 
         await act(async () => {
@@ -4491,7 +4500,7 @@ describe('Nostr overlay App', () => {
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
 
-        const publishButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir publicar"]') as HTMLButtonElement;
+        const publishButton = rendered.container.querySelector('[data-slot="sidebar-footer"] button[aria-label="Abrir publicar"]') as HTMLButtonElement;
         await act(async () => {
             publishButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
