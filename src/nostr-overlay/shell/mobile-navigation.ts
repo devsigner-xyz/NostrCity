@@ -29,7 +29,14 @@ function titleFromMessage(language: AppLocale, key: AppMessageKey): string {
 }
 
 export function shouldShowMobileBack(pathname: string): boolean {
-    return pathname !== '/';
+    return !shouldShowMobileBottomNavigation(pathname);
+}
+
+export function shouldShowMobileBottomNavigation(pathname: string): boolean {
+    return pathname === '/'
+        || pathname === '/agora'
+        || pathname === '/relays'
+        || pathname === '/notifications';
 }
 
 export function resolveMobileAppBarTitle({ pathname, language }: MobileAppBarTitleInput): string {

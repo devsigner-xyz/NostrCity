@@ -86,7 +86,7 @@ export function SocialComposeDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent aria-describedby={undefined} className="flex max-h-[min(720px,calc(100vh-2rem))] max-w-xl flex-col gap-0 overflow-hidden p-0">
+            <DialogContent aria-describedby={undefined} className="nostr-social-compose-dialog flex max-h-[min(720px,calc(100vh-2rem))] max-w-xl flex-col gap-0 overflow-hidden p-0">
                 <DialogTitle className="sr-only">{mode === 'quote' ? t('socialCompose.quoteTitle') : t('socialCompose.postTitle')}</DialogTitle>
 
                 <div className="nostr-social-compose-scroll-body grid max-h-[min(560px,calc(100vh-8rem))] min-h-0 flex-1 gap-4 overflow-y-auto px-4 pb-4 pt-10 sm:px-6">

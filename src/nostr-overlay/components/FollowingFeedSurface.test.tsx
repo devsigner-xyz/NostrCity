@@ -998,11 +998,12 @@ describe('FollowingFeedSurface', () => {
         expect(localBackButton).toBeUndefined();
     });
 
-    test('scopes mobile route header copy hiding to routed overlay surfaces', () => {
+    test('scopes mobile route header text hiding to routed overlay surfaces', () => {
         const styles = readOverlayStyles();
 
-        expect(styles).toMatch(/\.nostr-routed-surface \[data-slot="overlay-page-header-copy"\],\s*\.nostr-following-feed-surface \[data-slot="overlay-page-header-copy"\]\s*\{[^}]*display:\s*none;/s);
-        expect(styles).toMatch(/\.nostr-routed-surface \[data-slot="overlay-page-header"]:not\(:has\(\[data-slot="overlay-page-header-actions"\]\)\),\s*\.nostr-following-feed-surface \[data-slot="overlay-page-header"]:not\(:has\(\[data-slot="overlay-page-header-actions"\]\)\)\s*\{[^}]*display:\s*none;/s);
+        expect(styles).toMatch(/\.nostr-routed-surface-panel \[data-slot="overlay-page-header-description"\],\s*\.nostr-following-feed-surface \[data-slot="overlay-page-header-description"\]\s*\{[^}]*display:\s*none;/s);
+        expect(styles).toMatch(/\.nostr-routed-surface-panel \[data-slot="overlay-page-header-copy"\]:not\(:has\(\[data-slot="overlay-page-header-actions"\]\)\),\s*\.nostr-following-feed-surface \[data-slot="overlay-page-header-copy"\]:not\(:has\(\[data-slot="overlay-page-header-actions"\]\)\)\s*\{[^}]*display:\s*none;/s);
+        expect(styles).toMatch(/\.nostr-routed-surface-panel \[data-slot="overlay-page-header"]:not\(:has\(\[data-slot="overlay-page-header-actions"\]\)\),\s*\.nostr-following-feed-surface \[data-slot="overlay-page-header"]:not\(:has\(\[data-slot="overlay-page-header-actions"\]\)\)\s*\{[^}]*display:\s*none;/s);
         expect(styles).toMatch(/\.nostr-following-feed-header\s*\{[^}]*padding:\s*0;/s);
         expect(styles).toMatch(/\.nostr-following-feed-header-actions\s*\{[^}]*margin-left:\s*0;[^}]*justify-content:\s*flex-start;/s);
     });

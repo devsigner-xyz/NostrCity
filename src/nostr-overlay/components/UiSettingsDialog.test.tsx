@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -23,6 +25,10 @@ async function renderElement(element: ReactElement): Promise<RenderResult> {
 }
 
 let mounted: RenderResult[] = [];
+
+function readOverlayStyles(): string {
+    return readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
+}
 
 function createMapBridgeStub(): MapBridge {
     return {
@@ -85,6 +91,13 @@ describe('UiSettingsDialog', () => {
         expect(content?.className).toContain('nostr-settings-dialog');
         expect(content?.className).toContain('nostr-settings-dialog-ui');
         expect(content?.className).not.toContain('max-w-xl');
+    });
+
+    test('uses the same full-height mobile sheet treatment as profile detail', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-settings-dialog-ui\s*\{[^}]*width:\s*100vw;[^}]*height:\s*100dvh;[^}]*max-height:\s*100dvh;[^}]*border-radius:\s*0;/s);
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-settings-dialog-ui\s*\{[^}]*padding-top:\s*env\(safe-area-inset-top\);[^}]*padding-bottom:\s*env\(safe-area-inset-bottom\);/s);
     });
 
     test('uses an unblurred overlay so the map remains visible behind it', async () => {

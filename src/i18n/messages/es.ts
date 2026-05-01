@@ -629,6 +629,7 @@ export const esMessages = {
     'relaysRoute.description': 'Configuración y estado de conexión de relays.',
     'navigation.back': 'Volver',
     'navigation.mobileHeader': 'Navegación principal',
+    'navigation.mobileBottom': 'Navegación inferior',
     'sidebar.relaysSummary': '{{total}} relays, {{connected}} conectados, {{disconnected}} sin conexión.',
     'sidebar.openMap': 'Abrir mapa',
     'sidebar.map': 'Mapa',

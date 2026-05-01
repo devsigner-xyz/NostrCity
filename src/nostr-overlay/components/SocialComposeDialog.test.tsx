@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -41,6 +43,10 @@ async function renderElement(overrides: Partial<Parameters<typeof SocialComposeD
 
 let mounted: RenderResult[] = [];
 
+function readOverlayStyles(): string {
+    return readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
+}
+
 beforeAll(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     URL.createObjectURL = vi.fn(() => 'blob:test-preview');
@@ -77,6 +83,7 @@ describe('SocialComposeDialog', () => {
         expect(textarea?.className).toContain('bg-transparent');
         const content = rendered.container.querySelector('[data-slot="dialog-content"]') as HTMLElement | null;
         expect(content?.className).toContain('max-w-xl');
+        expect(content?.className).toContain('nostr-social-compose-dialog');
         const scrollBody = rendered.container.querySelector('.nostr-social-compose-scroll-body') as HTMLElement | null;
         expect(scrollBody?.className).toContain('overflow-y-auto');
         expect(scrollBody?.className).toContain('max-h-[min(560px,calc(100vh-8rem))]');
@@ -85,6 +92,14 @@ describe('SocialComposeDialog', () => {
             (button.textContent || '').includes('Publish')
         ) as HTMLButtonElement | undefined;
         expect(publishButton?.getAttribute('data-size')).toBe('sm');
+    });
+
+    test('uses a full-height mobile composer with sticky submit controls', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-social-compose-dialog\s*\{[^}]*height:\s*100dvh;[^}]*max-height:\s*100dvh;[^}]*border-radius:\s*0;/s);
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-social-compose-scroll-body\s*\{[^}]*max-height:\s*none;[^}]*overflow-y:\s*auto;/s);
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-social-compose-footer\s*\{[^}]*position:\s*sticky;[^}]*bottom:\s*0;[^}]*padding-bottom:\s*max\(0\.75rem, env\(safe-area-inset-bottom\)\);/s);
     });
 
     test('shows one selected image below the composer and submits it with the draft', async () => {

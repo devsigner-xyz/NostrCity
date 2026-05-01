@@ -56,6 +56,8 @@ import {
     SidebarTrigger,
     useSidebar,
 } from '@/components/ui/sidebar';
+import { MobileBottomNavigation } from '../shell/MobileBottomNavigation';
+import { shouldShowMobileBottomNavigation } from '../shell/mobile-navigation';
 import { MobileOverlayAppBar } from '../shell/MobileOverlayAppBar';
 
 export const OVERLAY_SIDEBAR_EXPANDED_WIDTH = 300;
@@ -161,6 +163,7 @@ function SidebarActionsMenu({
     const location = useLocation();
     const collapsed = !isMobile && state === 'collapsed';
     const activePath = location.pathname;
+    const showPrimaryActionsInSidebar = !isMobile || !shouldShowMobileBottomNavigation(activePath);
 
     const activeSettingsView = useMemo<SettingsRouteView | null>(() => settingsViewFromPathname(activePath), [activePath]);
     const isRelaysRoute = activePath === '/relays' || activePath.startsWith('/relays/');
@@ -197,21 +200,23 @@ function SidebarActionsMenu({
     return (
         <SidebarGroup className="pt-1 pb-0">
             <SidebarMenu className={cn('nostr-panel-toolbar flex flex-col gap-1.5', collapsed && 'nostr-compact-toolbar gap-1')}>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activePath === '/'}>
-                        <button
-                            type="button"
-                            aria-label={t('sidebar.openMap')}
-                            title={t('sidebar.map')}
-                            onClick={() => runNavigationAction(onOpenMap)}
-                        >
-                            <MapPinIcon />
-                            <span>{t('sidebar.map')}</span>
-                        </button>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
+                {showPrimaryActionsInSidebar ? (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton asChild isActive={activePath === '/'}>
+                            <button
+                                type="button"
+                                aria-label={t('sidebar.openMap')}
+                                title={t('sidebar.map')}
+                                onClick={() => runNavigationAction(onOpenMap)}
+                            >
+                                <MapPinIcon />
+                                <span>{t('sidebar.map')}</span>
+                            </button>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                ) : null}
 
-                {canAccessFollowingFeed ? (
+                {showPrimaryActionsInSidebar && canAccessFollowingFeed ? (
                     <SidebarMenuItem>
                         <SidebarMenuButton asChild isActive={isAgoraActive}>
                             <button
@@ -268,26 +273,28 @@ function SidebarActionsMenu({
                     </SidebarMenuItem>
                 ) : null}
 
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={isRelaysRoute}>
-                        <button
-                            type="button"
-                            aria-label={t('sidebar.openRelays')}
-                            title={relaysBadgeTitle}
-                            onClick={() => runNavigationAction(onOpenRelays)}
-                        >
-                            <RadioTowerIcon />
-                            <span>{t('sidebar.relays')}</span>
-                        </button>
-                    </SidebarMenuButton>
-                    {!collapsed ? (
-                        <SidebarMenuBadge>
-                            {`${relaysConnectedCount}/${relaysTotal}`}
-                        </SidebarMenuBadge>
-                    ) : null}
-                </SidebarMenuItem>
+                {showPrimaryActionsInSidebar ? (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton asChild isActive={isRelaysRoute}>
+                            <button
+                                type="button"
+                                aria-label={t('sidebar.openRelays')}
+                                title={relaysBadgeTitle}
+                                onClick={() => runNavigationAction(onOpenRelays)}
+                            >
+                                <RadioTowerIcon />
+                                <span>{t('sidebar.relays')}</span>
+                            </button>
+                        </SidebarMenuButton>
+                        {!collapsed ? (
+                            <SidebarMenuBadge>
+                                {`${relaysConnectedCount}/${relaysTotal}`}
+                            </SidebarMenuBadge>
+                        ) : null}
+                    </SidebarMenuItem>
+                ) : null}
 
-                {canAccessSocialNotifications || isReadonlySession ? (
+                {showPrimaryActionsInSidebar && (canAccessSocialNotifications || isReadonlySession) ? (
                     <SidebarMenuItem>
                         <SigningRequiredTooltip enabled={isReadonlySession} label={readonlyReason}>
                             <SidebarMenuButton asChild isActive={activePath === '/notifications'}>
@@ -449,10 +456,11 @@ function SidebarPublishButton({
 }: Pick<OverlaySidebarProps, 'canWrite' | 'onOpenPublish'> & { isReadonlySession: boolean }) {
     const { t } = useI18n();
     const { state, isMobile, setOpenMobile } = useSidebar();
+    const activePath = useLocation().pathname;
     const collapsed = !isMobile && state === 'collapsed';
     const readonlyReason = t('auth.readOnlySignInRequired');
 
-    if (!canWrite && !isReadonlySession) {
+    if ((isMobile && shouldShowMobileBottomNavigation(activePath)) || (!canWrite && !isReadonlySession)) {
         return null;
     }
 
@@ -725,6 +733,7 @@ export function OverlaySidebar({
     children,
 }: OverlaySidebarProps) {
     const { t } = useI18n();
+    const location = useLocation();
     const providerStyle = useMemo(() => ({
         '--sidebar-width': `${OVERLAY_SIDEBAR_EXPANDED_WIDTH}px`,
         '--sidebar-width-icon': `${OVERLAY_SIDEBAR_COLLAPSED_WIDTH}px`,
@@ -793,6 +802,21 @@ export function OverlaySidebar({
                 </SidebarFooter>
                 <SidebarRail />
             </Sidebar>
+            <MobileBottomNavigation
+                activePath={location.pathname}
+                canWrite={canWrite}
+                canAccessFollowingFeed={canAccessFollowingFeed}
+                canAccessSocialNotifications={canAccessSocialNotifications}
+                followingFeedHasUnread={followingFeedHasUnread}
+                notificationsHasUnread={notificationsHasUnread}
+                relaysConnectedCount={relaysConnectedCount}
+                relaysTotal={relaysTotal}
+                onOpenMap={onOpenMap}
+                onOpenFollowingFeed={onOpenFollowingFeed}
+                onOpenPublish={onOpenPublish}
+                onOpenRelays={onOpenRelays}
+                onOpenNotifications={onOpenNotifications}
+            />
         </SidebarProvider>
     );
 }

@@ -846,45 +846,30 @@ describe('Nostr overlay App', () => {
         expect(getLocationText(rendered.container)).toBe('/');
     });
 
-    test('uses the mobile app bar stack fallback after navigating from map to Agora', async () => {
+    test('uses the mobile bottom bar after navigating from map to Agora', async () => {
         const rendered = await renderAuthenticatedMobileApp('/');
         mounted.push(rendered);
 
         await waitFor(() => rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]') !== null);
 
-        const menuButton = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement;
-        await act(async () => {
-            menuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        await waitFor(() => document.body.querySelector('button[aria-label="Abrir Ágora"]') !== null);
-        const agoraButton = document.body.querySelector('button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
+        await waitFor(() => rendered.container.querySelector('[data-testid="mobile-bottom-navigation"]') !== null);
+        const agoraButton = rendered.container.querySelector('[data-testid="mobile-bottom-navigation"] button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
         await act(async () => {
             agoraButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         await waitFor(() => getLocationText(rendered.container) === '/agora');
-        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
-
-        await act(async () => {
-            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        await waitFor(() => getLocationText(rendered.container) === '/');
+        expect(rendered.container.querySelector('button[aria-label="Volver"]')).toBeNull();
+        expect(rendered.container.querySelector('[data-testid="mobile-bottom-navigation"] button[aria-label="Abrir Ágora"]')?.getAttribute('aria-current')).toBe('page');
     });
 
-    test('uses the mobile app bar fallback for a direct Agora entry', async () => {
+    test('treats a direct Agora entry as a top-level mobile route', async () => {
         const rendered = await renderAuthenticatedMobileApp('/agora');
         mounted.push(rendered);
 
-        await waitFor(() => rendered.container.querySelector('button[aria-label="Volver"]') !== null);
-        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
-
-        await act(async () => {
-            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        await waitFor(() => getLocationText(rendered.container) === '/');
+        await waitFor(() => rendered.container.querySelector('[data-testid="mobile-bottom-navigation"]') !== null);
+        expect(rendered.container.querySelector('button[aria-label="Volver"]')).toBeNull();
+        expect(getLocationText(rendered.container)).toBe('/agora');
     });
 
     test('uses explicit mobile back navigation for article detail and relay detail routes', async () => {
@@ -899,18 +884,6 @@ describe('Nostr overlay App', () => {
         });
 
         await waitFor(() => getLocationText(rendered.container) === '/agora/articles');
-
-        const menuButton = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement;
-        await act(async () => {
-            menuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        await waitFor(() => document.body.querySelector('button[aria-label="Abrir relays"]') !== null);
-        const relaysButton = document.body.querySelector('button[aria-label="Abrir relays"]') as HTMLButtonElement;
-        await act(async () => {
-            relaysButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-        await waitFor(() => getLocationText(rendered.container) === '/relays');
 
         await act(async () => {
             rendered.root.unmount();
@@ -1302,15 +1275,8 @@ describe('Nostr overlay App', () => {
         });
 
         await waitFor(() => getLocationText(rendered.container) === '/agora');
-        const appHistoryBackButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
-
-        await act(async () => {
-            appHistoryBackButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        await waitFor(() => getLocationText(rendered.container) !== '/agora');
-
-        expect(getLocationText(rendered.container)).not.toBe(`/agora/notes/${noteId}`);
+        expect(rendered.container.querySelector('button[aria-label="Volver"]')).toBeNull();
+        expect(rendered.container.querySelector('[data-testid="mobile-bottom-navigation"]')).not.toBeNull();
     });
 
     test('closes global user search back to a filtered Agora route', async () => {

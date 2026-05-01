@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
     resolveMobileAppBarTitle,
     resolveMobileBackBehavior,
+    shouldShowMobileBottomNavigation,
     shouldShowMobileBack,
 } from './mobile-navigation';
 
@@ -20,6 +21,26 @@ describe('mobile navigation route metadata', () => {
         expect(resolveMobileAppBarTitle({ pathname: '/chats', language: 'es' })).toBe('Chats');
         expect(resolveMobileAppBarTitle({ pathname: '/notifications', language: 'es' })).toBe('Notificaciones');
         expect(resolveMobileAppBarTitle({ pathname: '/wallet', language: 'es' })).toBe('Wallet');
+    });
+
+    test('hides mobile back on bottom navigation routes', () => {
+        expect(shouldShowMobileBack('/')).toBe(false);
+        expect(shouldShowMobileBack('/agora')).toBe(false);
+        expect(shouldShowMobileBack('/relays')).toBe(false);
+        expect(shouldShowMobileBack('/notifications')).toBe(false);
+    });
+
+    test('shows bottom navigation only on exact bottom navigation routes', () => {
+        expect(shouldShowMobileBottomNavigation('/')).toBe(true);
+        expect(shouldShowMobileBottomNavigation('/agora')).toBe(true);
+        expect(shouldShowMobileBottomNavigation('/relays')).toBe(true);
+        expect(shouldShowMobileBottomNavigation('/notifications')).toBe(true);
+
+        expect(shouldShowMobileBottomNavigation(`/agora/notes/${noteEventId}`)).toBe(false);
+        expect(shouldShowMobileBottomNavigation('/agora/articles')).toBe(false);
+        expect(shouldShowMobileBottomNavigation('/relays/detail')).toBe(false);
+        expect(shouldShowMobileBottomNavigation('/chats')).toBe(false);
+        expect(shouldShowMobileBottomNavigation('/settings/zaps')).toBe(false);
     });
 
     test('uses parent titles for detail routes', () => {

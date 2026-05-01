@@ -12,7 +12,9 @@ interface RenderResult {
     container: HTMLDivElement;
     root: Root;
     onOpenMap: ReturnType<typeof vi.fn>;
+    onOpenFollowingFeed: ReturnType<typeof vi.fn>;
     onOpenChat: ReturnType<typeof vi.fn>;
+    onOpenRelays: ReturnType<typeof vi.fn>;
     onOpenNotifications: ReturnType<typeof vi.fn>;
     onOpenPublish: ReturnType<typeof vi.fn>;
     onOpenWallet: ReturnType<typeof vi.fn>;
@@ -65,6 +67,8 @@ async function renderSidebar({
     const onOpenChat = vi.fn();
     const onOpenNotifications = vi.fn();
     const onOpenPublish = vi.fn();
+    const onOpenRelays = vi.fn();
+    const onOpenFollowingFeed = vi.fn();
     const onOpenWallet = vi.fn();
     const onOpenProfileEditor = vi.fn();
     const onOpenMap = vi.fn();
@@ -89,9 +93,9 @@ async function renderSidebar({
                     onOpenMap={onOpenMap}
                     onOpenCityStats={vi.fn()}
                     onOpenChat={onOpenChat}
-                    onOpenRelays={vi.fn()}
+                    onOpenRelays={onOpenRelays}
                     onOpenNotifications={onOpenNotifications}
-                    onOpenFollowingFeed={vi.fn()}
+                    onOpenFollowingFeed={onOpenFollowingFeed}
                     onOpenArticles={vi.fn()}
                     onOpenGlobalSearch={vi.fn()}
                     onOpenWallet={onOpenWallet}
@@ -118,7 +122,7 @@ async function renderSidebar({
         );
     });
 
-    return { container, root, onOpenMap, onOpenChat, onOpenNotifications, onOpenPublish, onOpenWallet, onOpenProfileEditor, onMobileAppBarBack };
+    return { container, root, onOpenMap, onOpenFollowingFeed, onOpenChat, onOpenRelays, onOpenNotifications, onOpenPublish, onOpenWallet, onOpenProfileEditor, onMobileAppBarBack };
 }
 
 function setMobileViewport(): void {
@@ -232,7 +236,7 @@ describe('OverlaySidebar', () => {
         const panelButtons = Array.from(rendered.container.querySelectorAll('.nostr-panel-toolbar > [data-slot="sidebar-menu-item"] button'));
         const labels = panelButtons.map((button) => button.getAttribute('aria-label') || '').filter(Boolean);
 
-        expect(labels.slice(0, 4)).toEqual(['Abrir mapa', 'Abrir Ágora', 'Abrir artículos', 'Abrir publicar']);
+        expect(labels.slice(0, 4)).toEqual(['Abrir mapa', 'Abrir Ágora', 'Abrir artículos', 'Abrir chats']);
         expect(rendered.container.querySelector('button[aria-label="Abrir artículos"]')).not.toBeNull();
     });
 
@@ -436,20 +440,47 @@ describe('OverlaySidebar', () => {
         expect(styles).toMatch(/\.nostr-mobile-app-bar-button\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s);
     });
 
-    test('keeps mobile routed page descriptions visible while hiding duplicate titles', () => {
+    test('reserves safe-area space for the mobile bottom navigation', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-mobile-bottom-navigation\s*\{[^}]*position:\s*fixed;[^}]*bottom:\s*0;/s);
+        expect(styles).toMatch(/\.nostr-mobile-bottom-navigation\s*\{[^}]*align-items:\s*center;/s);
+        expect(styles).toMatch(/\.nostr-mobile-bottom-navigation\s*\{[^}]*padding:[^;]*calc\(env\(safe-area-inset-bottom\) \+ 20px\)/s);
+        expect(styles).toMatch(/\.nostr-overlay-shell:has\(\.nostr-mobile-bottom-navigation\) \.nostr-overlay-surface-content,[\s\S]*?padding-bottom:\s*calc\(env\(safe-area-inset-bottom\) \+ 7\.5rem\);/);
+        expect(styles).toMatch(/\.nostr-overlay-shell:has\(\.nostr-mobile-bottom-navigation\) \.nostr-map-display-controls\s*\{[^}]*bottom:\s*max\(128px, calc\(env\(safe-area-inset-bottom\) \+ 128px\)\);/s);
+        expect(styles).toMatch(/\.nostr-overlay-shell:has\(\.nostr-mobile-bottom-navigation\) \.nostr-map-zoom-controls\s*\{[^}]*bottom:\s*max\(128px, calc\(env\(safe-area-inset-bottom\) \+ 128px\)\);/s);
+    });
+
+    test('keeps the prominent publish action aligned with larger mobile bottom icons', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).not.toMatch(/\.nostr-mobile-bottom-navigation-button\.is-prominent\s*\{[^}]*transform:\s*translateY/s);
+        expect(styles).toMatch(/\.nostr-mobile-bottom-navigation-icon-wrap\s*\{[^}]*width:\s*2\.35rem;[^}]*height:\s*2\.35rem;/s);
+        expect(styles).toMatch(/\.nostr-mobile-bottom-navigation-icon-wrap svg\s*\{[^}]*width:\s*1\.35rem;[^}]*height:\s*1\.35rem;/s);
+        expect(styles).toMatch(/\.nostr-mobile-bottom-navigation-button\.is-prominent \.nostr-mobile-bottom-navigation-icon-wrap\s*\{[^}]*width:\s*3\.4rem;[^}]*height:\s*3\.4rem;/s);
+    });
+
+    test('uses a subtle active background for mobile bottom navigation buttons', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-mobile-bottom-navigation-button\.is-active \.nostr-mobile-bottom-navigation-icon-wrap\s*\{[^}]*background:\s*color-mix\(in oklab, var\(--foreground\) 7%, transparent\);/s);
+        expect(styles).not.toMatch(/\.nostr-mobile-bottom-navigation-button\.is-active \.nostr-mobile-bottom-navigation-icon-wrap\s*\{[^}]*var\(--primary\) 16%/s);
+    });
+
+    test('hides mobile routed page titles and descriptions', () => {
         const styles = readOverlayStyles();
 
         expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-routed-surface-panel \[data-slot="overlay-page-header-title"\][\s\S]*?position:\s*absolute;/);
-        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-routed-surface-panel \[data-slot="overlay-page-header-copy"\]:not\(:has\(\[data-slot="overlay-page-header-description"\]\)\)[\s\S]*?display:\s*none;/);
-        expect(styles).not.toMatch(/\.nostr-routed-surface \[data-slot="overlay-page-header-copy"\][\s\S]*?display:\s*none;/);
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-routed-surface-panel \[data-slot="overlay-page-header-description"\],[\s\S]*?display:\s*none;/);
+        expect(styles).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.nostr-routed-surface-panel \[data-slot="overlay-page-header-copy"\]:not\(:has\(\[data-slot="overlay-page-header-actions"\]\)\),[\s\S]*?display:\s*none;/);
     });
 
     test('renders an internal-route back button and calls the provided callback', async () => {
         setMobileViewport();
         const rendered = await renderSidebar({
-            pathname: '/agora',
+            pathname: '/agora/articles',
             open: false,
-            mobileAppBarTitle: 'Agora',
+            mobileAppBarTitle: 'Artículos',
             mobileAppBarShowBack: true,
         });
         mounted.push(rendered);
@@ -457,7 +488,7 @@ describe('OverlaySidebar', () => {
         const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement | null;
 
         expect(backButton).not.toBeNull();
-        expect(rendered.container.textContent || '').toContain('Agora');
+        expect(rendered.container.textContent || '').toContain('Artículos');
 
         await act(async () => {
             backButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -466,7 +497,51 @@ describe('OverlaySidebar', () => {
         expect(rendered.onMobileAppBarBack).toHaveBeenCalledTimes(1);
     });
 
-    test('closes the mobile sidebar after selecting a navigation action', async () => {
+    test('keeps bottom navigation actions out of the mobile sidebar', async () => {
+        setMobileViewport();
+        const rendered = await renderSidebar({ open: false });
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('[data-testid="mobile-bottom-navigation"]')).not.toBeNull();
+
+        const mobileTrigger = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement | null;
+        await act(async () => {
+            mobileTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const mobileSidebar = document.body.querySelector('[data-mobile="true"]') as HTMLElement;
+        const sidebarLabels = Array.from(mobileSidebar.querySelectorAll('button')).map((button) => button.getAttribute('aria-label'));
+
+        expect(sidebarLabels).not.toContain('Abrir mapa');
+        expect(sidebarLabels).not.toContain('Abrir Ágora');
+        expect(sidebarLabels).not.toContain('Abrir publicar');
+        expect(sidebarLabels).not.toContain('Abrir relays');
+        expect(sidebarLabels).not.toContain('Abrir notificaciones');
+    });
+
+    test('keeps primary actions reachable in the mobile sidebar when the bottom navigation is hidden', async () => {
+        setMobileViewport();
+        const rendered = await renderSidebar({ pathname: '/wallet', open: false });
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('[data-testid="mobile-bottom-navigation"]')).toBeNull();
+
+        const mobileTrigger = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement | null;
+        await act(async () => {
+            mobileTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const mobileSidebar = document.body.querySelector('[data-mobile="true"]') as HTMLElement;
+        const sidebarLabels = Array.from(mobileSidebar.querySelectorAll('button')).map((button) => button.getAttribute('aria-label'));
+
+        expect(sidebarLabels).toContain('Abrir mapa');
+        expect(sidebarLabels).toContain('Abrir Ágora');
+        expect(sidebarLabels).toContain('Abrir publicar');
+        expect(sidebarLabels).toContain('Abrir relays');
+        expect(sidebarLabels).toContain('Abrir notificaciones');
+    });
+
+    test('closes the mobile sidebar after selecting a remaining navigation action', async () => {
         setMobileViewport();
         const rendered = await renderSidebar({ open: false });
         mounted.push(rendered);
@@ -476,16 +551,15 @@ describe('OverlaySidebar', () => {
             mobileTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        const mapButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
-            button.getAttribute('aria-label') === 'Abrir mapa'
+        const cityStatsButton = Array.from(document.body.querySelectorAll('[data-mobile="true"] button')).find((button) =>
+            button.getAttribute('aria-label') === 'Abrir estadísticas de la ciudad'
         ) as HTMLButtonElement | undefined;
-        expect(mapButton).toBeDefined();
+        expect(cityStatsButton).toBeDefined();
 
         await act(async () => {
-            mapButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            cityStatsButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        expect(rendered.onOpenMap).toHaveBeenCalledTimes(1);
         expect(document.body.textContent || '').not.toContain('Social content');
     });
 
