@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { buildSettingsPath } from '../settings/settings-routing';
+import { routeReturnStateFromUnknown } from './route-return-state';
 import { useOverlayRouteState } from './use-overlay-route-state';
 
 interface RenderResult {
@@ -45,12 +46,25 @@ afterEach(() => {
 
 function RouteStateProbe(): ReactElement {
     const routeState = useOverlayRouteState();
+    const activeAgoraNoteEventId = (routeState as { activeAgoraNoteEventId?: string }).activeAgoraNoteEventId;
+    const closeNoteDetail = (): void => {
+        const { returnTo = '/agora', returnFocusEventId } = routeReturnStateFromUnknown(routeState.location.state);
+
+        if (returnFocusEventId && returnTo.startsWith('/agora')) {
+            routeState.navigate(returnTo, { state: { returnFocusEventId } });
+            return;
+        }
+
+        routeState.navigate(returnTo);
+    };
 
     return (
         <div>
             <span data-testid="pathname">{routeState.location.pathname}</span>
+            <span data-testid="search">{routeState.location.search}</span>
             <span data-testid="active-settings-view">{routeState.activeSettingsView ?? 'none'}</span>
             <span data-testid="active-agora-hashtag">{routeState.activeAgoraHashtag ?? 'none'}</span>
+            <span data-testid="active-agora-note-event-id">{activeAgoraNoteEventId ?? 'none'}</span>
             <span data-testid="is-map-route">{String(routeState.isMapRoute)}</span>
             <span data-testid="is-agora-route">{String(routeState.isAgoraRoute)}</span>
             <span data-testid="is-articles-route">{String(routeState.isArticlesRoute)}</span>
@@ -62,6 +76,7 @@ function RouteStateProbe(): ReactElement {
             <button type="button" onClick={() => routeState.openSettingsPage('shortcuts')}>open shortcuts</button>
             <button type="button" onClick={routeState.openGlobalUserSearch}>open search</button>
             <button type="button" onClick={routeState.closeGlobalUserSearch}>close search</button>
+            <button type="button" onClick={closeNoteDetail}>close note</button>
             <button type="button" onClick={routeState.openUiSettingsDialog}>open ui dialog</button>
             <button type="button" onClick={routeState.closeUiSettingsDialog}>close ui dialog</button>
             <span data-testid="is-ui-settings-dialog-open">{String(routeState.isUiSettingsDialogOpen)}</span>
@@ -69,7 +84,7 @@ function RouteStateProbe(): ReactElement {
     );
 }
 
-function renderRoute(initialEntry: string): RenderResult {
+function renderRoute(initialEntry: string | { pathname: string; search?: string; state?: unknown }): RenderResult {
     return render(
         <MemoryRouter initialEntries={[initialEntry]}>
             <RouteStateProbe />
@@ -134,6 +149,21 @@ describe('useOverlayRouteState', () => {
         expect(text(detail.container, 'active-agora-hashtag')).toBe('none');
     });
 
+    test('detects note detail routes as Agora routes with an active note event id', () => {
+        const eventId = 'note-event-id';
+        const { container } = renderRoute(`/agora/notes/${eventId}`);
+
+        expect(text(container, 'is-agora-route')).toBe('true');
+        expect(text(container, 'active-agora-note-event-id')).toBe(eventId);
+    });
+
+    test('does not activate Agora hashtag filters on note detail routes', () => {
+        const { container } = renderRoute('/agora/notes/note-event-id?tag=nostr');
+
+        expect(text(container, 'is-agora-route')).toBe('true');
+        expect(text(container, 'active-agora-hashtag')).toBe('none');
+    });
+
     test('detects the notifications route using the english path', () => {
         const { container } = renderRoute('/notifications');
 
@@ -182,5 +212,44 @@ describe('useOverlayRouteState', () => {
 
         click(container, 'close ui dialog');
         expect(text(container, 'is-ui-settings-dialog-open')).toBe('false');
+    });
+
+    test('returns global user search to the tagged Agora feed that opened it', () => {
+        const { container } = renderRoute('/agora?tag=nostr');
+
+        click(container, 'open search');
+        expect(text(container, 'pathname')).toBe('/user-search');
+
+        click(container, 'close search');
+        expect(text(container, 'pathname')).toBe('/agora');
+        expect(text(container, 'search')).toBe('?tag=nostr');
+        expect(text(container, 'active-agora-hashtag')).toBe('nostr');
+    });
+
+    test('returns global user search to notifications when opened from notifications', () => {
+        const { container } = renderRoute('/notifications');
+
+        click(container, 'open search');
+        expect(text(container, 'pathname')).toBe('/user-search');
+
+        click(container, 'close search');
+        expect(text(container, 'pathname')).toBe('/notifications');
+    });
+
+    test('preserves note detail return state when global user search closes back to the note', () => {
+        const eventId = 'note-from-notifications';
+        const { container } = renderRoute({
+            pathname: `/agora/notes/${eventId}`,
+            state: { returnTo: '/notifications', returnFocusEventId: eventId },
+        });
+
+        click(container, 'open search');
+        expect(text(container, 'pathname')).toBe('/user-search');
+
+        click(container, 'close search');
+        expect(text(container, 'pathname')).toBe(`/agora/notes/${eventId}`);
+
+        click(container, 'close note');
+        expect(text(container, 'pathname')).toBe('/notifications');
     });
 });

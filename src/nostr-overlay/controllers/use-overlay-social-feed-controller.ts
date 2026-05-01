@@ -9,10 +9,13 @@ interface UseOverlaySocialFeedControllerOptions {
     ownerPubkey?: string;
     follows: string[];
     activeAgoraHashtag?: string;
+    activeThreadRootEventId?: string;
     isAgoraRoute: boolean;
     canWrite: boolean;
     service: SocialFeedService;
     writeGateway?: WriteGatewayLike;
+    onOpenThread: (eventId: string) => void;
+    onCloseThread: () => void;
     onFollowPerson: (pubkey: string) => Promise<void>;
 }
 
@@ -31,10 +34,13 @@ export function useOverlaySocialFeedController(options: UseOverlaySocialFeedCont
         ownerPubkey,
         follows,
         activeAgoraHashtag,
+        activeThreadRootEventId,
         isAgoraRoute,
         canWrite,
         service,
         writeGateway,
+        onOpenThread,
+        onCloseThread,
         onFollowPerson,
     } = options;
     const followingFeed = useFollowingFeedController({
@@ -45,6 +51,9 @@ export function useOverlaySocialFeedController(options: UseOverlaySocialFeedCont
         canWrite,
         service,
         ...(writeGateway ? { writeGateway } : {}),
+        ...(activeThreadRootEventId ? { activeThreadRootEventId } : {}),
+        onOpenThread,
+        onCloseThread,
     });
     const [pendingFollowPubkeys, setPendingFollowPubkeys] = useState<Record<string, true>>({});
     const canAccessFollowingFeed = Boolean(ownerPubkey);

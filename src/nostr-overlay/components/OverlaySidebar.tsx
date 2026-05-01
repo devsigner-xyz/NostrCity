@@ -165,6 +165,8 @@ function SidebarActionsMenu({
 
     const activeSettingsView = useMemo<SettingsRouteView | null>(() => settingsViewFromPathname(activePath), [activePath]);
     const isRelaysRoute = activePath === '/relays' || activePath.startsWith('/relays/');
+    const isAgoraActive = activePath === '/agora' || activePath.startsWith('/agora/notes/');
+    const isArticlesActive = activePath === '/agora/articles' || activePath.startsWith('/agora/articles/');
     const disconnectedRelaysCount = Math.max(0, relaysTotal - relaysConnectedCount);
     const readonlyReason = t('auth.readOnlySignInRequired');
     const relaysBadgeTitle = t('sidebar.relaysSummary', {
@@ -212,7 +214,7 @@ function SidebarActionsMenu({
 
                 {canAccessFollowingFeed ? (
                     <SidebarMenuItem>
-                        <SidebarMenuButton asChild isActive={activePath === '/agora'}>
+                        <SidebarMenuButton asChild isActive={isAgoraActive}>
                             <button
                                 type="button"
                                 className="nostr-following-feed-icon-button relative"
@@ -231,7 +233,7 @@ function SidebarActionsMenu({
 
                 {canAccessFollowingFeed ? (
                     <SidebarMenuItem>
-                        <SidebarMenuButton asChild isActive={activePath === '/agora/articles' || activePath.startsWith('/agora/articles/')}>
+                        <SidebarMenuButton asChild isActive={isArticlesActive}>
                             <button
                                 type="button"
                                 aria-label={t('sidebar.openArticles')}

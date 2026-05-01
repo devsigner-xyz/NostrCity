@@ -13,6 +13,7 @@ interface FollowingFeedSurfaceProps extends FollowingFeedViewProps {
     onAgoraFeedLayoutChange?: (layout: AgoraFeedLayout) => void;
     activeHashtag?: string;
     onClearHashtag?: () => void;
+    returnFocusEventId?: string;
     isMobile?: boolean;
 }
 

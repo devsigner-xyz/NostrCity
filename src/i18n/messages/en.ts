@@ -38,7 +38,7 @@ export const enMessages = {
     'feed.emptyNoPostsTitle': 'No notes yet',
     'feed.emptyNoPostsDescription': 'There are no notes or reposts to show yet.',
     'feed.loadingMorePosts': 'Loading notes...',
-    'feed.backToAgora': 'Back to Agora',
+    'feed.back': 'Back',
     'feed.loadingThreadTitle': 'Loading thread',
     'feed.loadingThreadDescription': 'Recovering the conversation.',
     'feed.replyComposer': 'Write a reply',

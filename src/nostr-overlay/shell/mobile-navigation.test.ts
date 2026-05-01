@@ -7,6 +7,7 @@ import {
 } from './mobile-navigation';
 
 const articleId = 'a'.repeat(64);
+const noteEventId = 'note-event-id';
 
 describe('mobile navigation route metadata', () => {
     test('uses the product title on the map route', () => {
@@ -22,6 +23,7 @@ describe('mobile navigation route metadata', () => {
     });
 
     test('uses parent titles for detail routes', () => {
+        expect(resolveMobileAppBarTitle({ pathname: `/agora/notes/${noteEventId}`, language: 'es' })).toBe('Nota');
         expect(resolveMobileAppBarTitle({ pathname: `/agora/articles/${articleId}`, language: 'es' })).toBe('Artículos');
         expect(resolveMobileAppBarTitle({ pathname: '/relays/detail', language: 'es' })).toBe('Relays');
     });
@@ -47,6 +49,18 @@ describe('mobile navigation back behavior', () => {
         expect(resolveMobileBackBehavior({ pathname: `/agora/articles/${articleId}`, search: '' })).toEqual({
             type: 'navigate',
             to: '/agora/articles',
+        });
+    });
+
+    test('closes Agora note detail routes', () => {
+        expect(resolveMobileBackBehavior({ pathname: `/agora/notes/${noteEventId}`, search: '' })).toEqual({
+            type: 'closeNoteDetail',
+        });
+    });
+
+    test('closes global search routes', () => {
+        expect(resolveMobileBackBehavior({ pathname: '/user-search', search: '' })).toEqual({
+            type: 'closeGlobalSearch',
         });
     });
 

@@ -36,7 +36,7 @@ export const esMessages = {
     'feed.emptyNoPostsTitle': 'Sin notas',
     'feed.emptyNoPostsDescription': 'Todavía no hay notas o reposts para mostrar.',
     'feed.loadingMorePosts': 'Cargando notas...',
-    'feed.backToAgora': 'Volver al Ágora',
+    'feed.back': 'Volver',
     'feed.loadingThreadTitle': 'Cargando hilo',
     'feed.loadingThreadDescription': 'Recuperando la conversación.',
     'feed.replyComposer': 'Redactar respuesta',

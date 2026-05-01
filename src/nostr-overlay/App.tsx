@@ -71,6 +71,8 @@ import {
 } from './shell/mobile-navigation';
 import { useOverlayNavigationStack } from './shell/use-overlay-navigation-stack';
 import { OverlayRoutes } from './routes/OverlayRoutes';
+import { buildAgoraNoteDetailPath } from './routes/note-detail-routing';
+import { buildLocationTarget, routeReturnStateFromUnknown } from './shell/route-return-state';
 import type { NoteCardModel } from './components/note-card-model';
 import { decodeNpubToHex } from '../nostr/npub';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -111,6 +113,7 @@ export function App({ mapBridge, services }: AppProps) {
         navigate,
         location,
         activeAgoraHashtag,
+        activeAgoraNoteEventId,
         isMapRoute,
         isAgoraRoute,
         isArticlesRoute,
@@ -167,6 +170,9 @@ export function App({ mapBridge, services }: AppProps) {
         language: uiSettings.language,
     });
     const mobileAppBarShowBack = shouldShowMobileBack(location.pathname);
+    const agoraReturnFocusEventId = location.pathname === '/agora'
+        ? routeReturnStateFromUnknown(location.state).returnFocusEventId
+        : undefined;
     const sessionRestorationResolved = overlay.sessionRestorationResolved;
 
     useEffect(() => {
@@ -234,6 +240,44 @@ export function App({ mapBridge, services }: AppProps) {
         occupancyByBuildingIndex: overlay.occupancyByBuildingIndex,
         verificationByPubkey,
     }), [uiSettings.verifiedBuildingsOverlayEnabled, overlay.occupancyByBuildingIndex, verificationByPubkey]);
+
+    const currentLocationTarget = (): string => buildLocationTarget({
+        pathname: location.pathname,
+        search: location.search,
+    });
+
+    const openNoteDetail = (eventId: string, options?: { returnTo?: string; returnFocusEventId?: string }): void => {
+        const normalizedEventId = eventId.trim();
+
+        if (!normalizedEventId) {
+            return;
+        }
+
+        const existingReturnState = activeAgoraNoteEventId
+            ? routeReturnStateFromUnknown(location.state)
+            : {};
+        const returnTo = options?.returnTo ?? existingReturnState.returnTo ?? currentLocationTarget();
+        const returnFocusEventId = options?.returnFocusEventId ?? existingReturnState.returnFocusEventId ?? normalizedEventId;
+
+        navigate(buildAgoraNoteDetailPath(normalizedEventId), {
+            state: {
+                returnTo,
+                returnFocusEventId,
+            },
+        });
+    };
+
+    const closeNoteDetail = (): void => {
+        const { returnTo = '/agora', returnFocusEventId } = routeReturnStateFromUnknown(location.state);
+
+        if (returnFocusEventId && returnTo.startsWith('/agora')) {
+            navigate(returnTo, { replace: true, state: { returnFocusEventId } });
+            return;
+        }
+
+        navigate(returnTo, { replace: true });
+    };
+
     const mapViewportInsetLeft = isMobile
         ? 0
         : sidebarOpen
@@ -324,6 +368,9 @@ export function App({ mapBridge, services }: AppProps) {
         service: overlay.socialFeedService,
         ...((overlay.socialPublisher ?? overlay.writeGateway) ? { writeGateway: overlay.socialPublisher ?? overlay.writeGateway } : {}),
         onFollowPerson: handleFollowPerson,
+        ...(activeAgoraNoteEventId ? { activeThreadRootEventId: activeAgoraNoteEventId } : {}),
+        onOpenThread: (eventId) => openNoteDetail(eventId),
+        onCloseThread: closeNoteDetail,
     });
     const articles = useOverlayArticlesController({
         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
@@ -631,9 +678,9 @@ export function App({ mapBridge, services }: AppProps) {
             return;
         }
 
+        const returnTo = currentLocationTarget();
         overlay.closeActiveProfileDialog();
-        openFollowingFeed();
-        void followingFeed.openThread(eventId);
+        openNoteDetail(eventId, { returnTo });
     };
 
     const handleToggleRepost = useCallback(async (input: Parameters<typeof followingFeed.toggleRepost>[0]): Promise<boolean> => {
@@ -774,7 +821,7 @@ export function App({ mapBridge, services }: AppProps) {
             return;
         }
 
-        void followingFeed.openThread(eventId);
+        openNoteDetail(eventId);
     };
 
     const openNotificationThread = (eventId: string): void => {
@@ -782,8 +829,7 @@ export function App({ mapBridge, services }: AppProps) {
             return;
         }
 
-        openFollowingFeed();
-        void followingFeed.openThread(eventId);
+        openNoteDetail(eventId, { returnTo: '/notifications' });
     };
 
     const resolveEventReferences = async (
@@ -828,6 +874,16 @@ export function App({ mapBridge, services }: AppProps) {
 
         if (behavior.type === 'closeAgoraThread') {
             followingFeed.closeThread();
+            return;
+        }
+
+        if (behavior.type === 'closeNoteDetail') {
+            closeNoteDetail();
+            return;
+        }
+
+        if (behavior.type === 'closeGlobalSearch') {
+            closeGlobalUserSearch();
             return;
         }
 
@@ -1095,6 +1151,7 @@ export function App({ mapBridge, services }: AppProps) {
                     locationSearch={location.search}
                     agora={{
                         isMobile,
+                        ...(agoraReturnFocusEventId ? { returnFocusEventId: agoraReturnFocusEventId } : {}),
                         agoraFeedLayout: uiSettings.agoraFeedLayout,
                         onAgoraFeedLayoutChange: setAgoraFeedLayout,
                         followingFeed: {
@@ -1121,8 +1178,8 @@ export function App({ mapBridge, services }: AppProps) {
                             loadNextFeedPage: followingFeed.loadNextFeedPage,
                             applyPendingNewItems: followingFeed.applyPendingNewItems,
                             refreshFeed: followingFeed.refreshFeed,
-                            openThread: followingFeed.openThread,
-                            closeThread: followingFeed.closeThread,
+                            openThread: openNoteDetail,
+                            closeThread: closeNoteDetail,
                             loadNextThreadPage: followingFeed.loadNextThreadPage,
                             publishPost: followingFeed.publishPost,
                             publishReply: publishReplyWithImage,
@@ -1149,6 +1206,7 @@ export function App({ mapBridge, services }: AppProps) {
                         searchRelaySetKey: userSearchRelaySetKey,
                     }}
                     articles={{
+                        isMobile,
                         items: articles.items,
                         profilesByPubkey: richContentProfilesByPubkey,
                         isLoading: articles.isLoading,

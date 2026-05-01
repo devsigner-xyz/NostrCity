@@ -74,6 +74,9 @@ interface UseFollowingFeedControllerOptions {
     now?: () => number;
     pageSize?: number;
     threadPageSize?: number;
+    activeThreadRootEventId?: string;
+    onOpenThread: (eventId: string) => void;
+    onCloseThread: () => void;
 }
 
 interface ToggleReactionMutationVariables {
@@ -267,7 +270,6 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
     const [lastReadAt, setLastReadAt] = useState(() =>
         options.ownerPubkey ? storage.getLastReadAt(options.ownerPubkey) : 0
     );
-    const [activeThreadRootEventId, setActiveThreadRootEventId] = useState<string | null>(null);
     const [publishError, setPublishError] = useState<string | null>(null);
     const [refreshError, setRefreshError] = useState<string | null>(null);
     const [pendingLatestFeedPage, setPendingLatestFeedPage] = useState<SocialFeedPage | null>(null);
@@ -284,6 +286,7 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
     const follows = useMemo(() => normalizeEventIds(options.follows), [options.follows]);
     const hasFollows = follows.length > 0;
     const activeHashtag = useMemo(() => normalizeHashtag(options.hashtag), [options.hashtag]);
+    const activeThreadRootEventId = options.activeThreadRootEventId ?? null;
     const feedPageSize = Math.max(1, options.pageSize ?? 20);
     const threadPageSize = Math.max(1, options.threadPageSize ?? 25);
 
@@ -319,10 +322,6 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
     }, [activeHashtag, feedPageSize, follows, options.ownerPubkey, options.service]);
 
     const feedQuery = useFollowingFeedInfiniteQuery(feedQueryOptions);
-
-    useEffect(() => {
-        setActiveThreadRootEventId(null);
-    }, [activeHashtag]);
 
     useEffect(() => {
         if (!options.ownerPubkey) {
@@ -1111,12 +1110,12 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
             return;
         }
 
-        setActiveThreadRootEventId(rootEventId);
-    }, []);
+        options.onOpenThread(rootEventId);
+    }, [options.onOpenThread]);
 
     const closeThread = useCallback(() => {
-        setActiveThreadRootEventId(null);
-    }, []);
+        options.onCloseThread();
+    }, [options.onCloseThread]);
 
     const loadNextThreadPage = useCallback(async () => {
         if (!activeThreadRootEventId || !threadQuery.hasNextPage || threadQuery.isFetchingNextPage) {

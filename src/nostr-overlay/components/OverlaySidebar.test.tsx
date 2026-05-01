@@ -236,6 +236,28 @@ describe('OverlaySidebar', () => {
         expect(rendered.container.querySelector('button[aria-label="Abrir artículos"]')).not.toBeNull();
     });
 
+    test('marks Agora active for note detail routes', async () => {
+        const rendered = await renderSidebar({ pathname: `/agora/notes/${'b'.repeat(64)}` });
+        mounted.push(rendered);
+
+        const agoraButton = rendered.container.querySelector('button[aria-label="Abrir Ágora"]');
+        const articlesButton = rendered.container.querySelector('button[aria-label="Abrir artículos"]');
+
+        expect(agoraButton?.getAttribute('data-active')).toBe('true');
+        expect(articlesButton?.getAttribute('data-active')).not.toBe('true');
+    });
+
+    test('marks Articles active but not Agora for article detail routes', async () => {
+        const rendered = await renderSidebar({ pathname: `/agora/articles/${'a'.repeat(64)}` });
+        mounted.push(rendered);
+
+        const agoraButton = rendered.container.querySelector('button[aria-label="Abrir Ágora"]');
+        const articlesButton = rendered.container.querySelector('button[aria-label="Abrir artículos"]');
+
+        expect(agoraButton?.getAttribute('data-active')).not.toBe('true');
+        expect(articlesButton?.getAttribute('data-active')).toBe('true');
+    });
+
     test('renders english top-level labels when ui language is en', async () => {
         window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
 

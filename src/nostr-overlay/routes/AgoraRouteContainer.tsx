@@ -7,6 +7,7 @@ type FollowingFeedSurfaceProps = ComponentProps<typeof FollowingFeedSurface>;
 
 export interface AgoraRouteContainerProps {
     isMobile?: boolean;
+    returnFocusEventId?: string;
     agoraFeedLayout: UiSettingsState['agoraFeedLayout'];
     onAgoraFeedLayoutChange: (layout: UiSettingsState['agoraFeedLayout']) => void;
     followingFeed: {
@@ -63,6 +64,7 @@ export interface AgoraRouteContainerProps {
 
 export function AgoraRouteContainer({
     isMobile = false,
+    returnFocusEventId,
     agoraFeedLayout,
     onAgoraFeedLayoutChange,
     followingFeed,
@@ -89,6 +91,7 @@ export function AgoraRouteContainer({
     return (
         <FollowingFeedSurface
             isMobile={isMobile}
+            {...(returnFocusEventId ? { returnFocusEventId } : {})}
             agoraFeedLayout={agoraFeedLayout}
             onAgoraFeedLayoutChange={onAgoraFeedLayoutChange}
             items={followingFeed.items}

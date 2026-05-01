@@ -1,6 +1,7 @@
 import type { AppMessageKey } from '@/i18n/catalog';
 import { translate } from '@/i18n/translate';
 import type { AppLocale } from '@/i18n/types';
+import { noteDetailEventIdFromPathname } from '../routes/note-detail-routing';
 
 const PRODUCT_TITLE = 'Nostr City';
 
@@ -17,6 +18,8 @@ interface MobileBackBehaviorInput {
 
 export type MobileBackBehavior =
     | { type: 'closeAgoraThread' }
+    | { type: 'closeNoteDetail' }
+    | { type: 'closeGlobalSearch' }
     | { type: 'openChatList' }
     | { type: 'navigate'; to: string }
     | { type: 'stack' };
@@ -32,6 +35,10 @@ export function shouldShowMobileBack(pathname: string): boolean {
 export function resolveMobileAppBarTitle({ pathname, language }: MobileAppBarTitleInput): string {
     if (pathname === '/') {
         return PRODUCT_TITLE;
+    }
+
+    if (noteDetailEventIdFromPathname(pathname)) {
+        return titleFromMessage(language, 'feed.noteTitle');
     }
 
     if (pathname === '/agora') {
@@ -88,6 +95,14 @@ export function resolveMobileBackBehavior({
 }: MobileBackBehaviorInput): MobileBackBehavior {
     if (pathname === '/agora' && hasActiveAgoraThread) {
         return { type: 'closeAgoraThread' };
+    }
+
+    if (noteDetailEventIdFromPathname(pathname)) {
+        return { type: 'closeNoteDetail' };
+    }
+
+    if (pathname === '/user-search') {
+        return { type: 'closeGlobalSearch' };
     }
 
     if (pathname.startsWith('/agora/articles/')) {

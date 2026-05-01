@@ -166,6 +166,16 @@ describe('AgoraRouteContainer', () => {
         expect(surfaceProps.onConfigureZapAmounts).toBe(props.onConfigureZapAmounts);
     });
 
+    test('forwards return focus event id into FollowingFeedSurface', async () => {
+        const props = buildProps({
+            returnFocusEventId: 'event-to-refocus',
+        });
+
+        await renderRoute(props);
+
+        expect(getLatestFollowingFeedSurfaceProps().returnFocusEventId).toBe('event-to-refocus');
+    });
+
     test('passes clear hashtag only when an active hashtag exists', async () => {
         const props = buildProps();
 

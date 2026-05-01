@@ -372,6 +372,15 @@ describe('OverlayRoutes', () => {
         expect(lastLocation(rendered.locations)).toBe('/agora');
     });
 
+    test('renders Agora route for authenticated note detail URLs', async () => {
+        const eventId = 'b'.repeat(64);
+        const rendered = await renderOverlayRoutes(`/agora/notes/${eventId}`);
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('[data-testid="agora-route"]')).not.toBeNull();
+        expect(lastLocation(rendered.locations)).toBe(`/agora/notes/${eventId}`);
+    });
+
     test('renders Chats route for /chats', async () => {
         const rendered = await renderOverlayRoutes('/chats');
         mounted.push(rendered);

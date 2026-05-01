@@ -1,7 +1,7 @@
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter, useLocation } from 'react-router';
+import { HashRouter, MemoryRouter, useLocation, useNavigate } from 'react-router';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { nip19 } from 'nostr-tools';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
@@ -41,6 +41,7 @@ import { createNostrOverlayQueryClient } from './query/query-client';
 import { nostrOverlayQueryKeys } from './query/keys';
 import { buildSocialLastReadStorageKey } from './query/read-state';
 import { buildFollowingFeedLastReadStorageKey } from './query/following-feed-read-state';
+import { buildRelayDetailPath } from './settings/relay-detail-routing';
 
 interface RenderResult {
     container: HTMLDivElement;
@@ -49,7 +50,7 @@ interface RenderResult {
 }
 
 interface RenderOptions {
-    initialEntries?: string[];
+    initialEntries?: Array<string | { pathname: string; search?: string; state?: unknown }>;
 }
 
 interface MapBridgeStub {
@@ -307,6 +308,15 @@ function LocationProbe() {
     return <span data-testid="location-probe">{`${location.pathname}${location.search}`}</span>;
 }
 
+function HistoryBackProbe() {
+    const navigate = useNavigate();
+    return <button type="button" data-testid="history-back-probe" onClick={() => navigate(-1)}>history back</button>;
+}
+
+function BrowserHistoryBackProbe() {
+    return <button type="button" data-testid="browser-history-back-probe" onClick={() => window.history.back()}>browser back</button>;
+}
+
 async function renderApp(element: ReactElement, options: RenderOptions = {}): Promise<RenderResult> {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -319,6 +329,25 @@ async function renderApp(element: ReactElement, options: RenderOptions = {}): Pr
                 <MemoryRouter initialEntries={options.initialEntries ?? ['/']}>
                     {element}
                 </MemoryRouter>
+            </QueryClientProvider>
+        );
+    });
+
+    return { container, root, queryClient };
+}
+
+async function renderHashApp(element: ReactElement): Promise<RenderResult> {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const queryClient = createNostrOverlayQueryClient();
+
+    await act(async () => {
+        root.render(
+            <QueryClientProvider client={queryClient}>
+                <HashRouter>
+                    {element}
+                </HashRouter>
             </QueryClientProvider>
         );
     });
@@ -372,6 +401,28 @@ async function renderAuthenticatedMobileApp(pathname: string, services?: Partial
 
 function getLocationText(container: HTMLDivElement): string {
     return container.querySelector('[data-testid="location-probe"]')?.textContent || '';
+}
+
+function createThreadResult(rootEventId: string, content = 'root note') {
+    return {
+        root: {
+            id: rootEventId,
+            pubkey: 'a'.repeat(64),
+            createdAt: 100,
+            eventKind: 1,
+            content,
+            rawEvent: {
+                id: rootEventId,
+                pubkey: 'a'.repeat(64),
+                kind: 1,
+                created_at: 100,
+                tags: [],
+                content,
+            },
+        },
+        replies: [],
+        hasMore: false,
+    };
 }
 
 async function waitFor(condition: () => boolean): Promise<void> {
@@ -536,6 +587,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
     window.localStorage.clear();
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
     __resetFollowsCacheForTests();
@@ -866,7 +918,11 @@ describe('Nostr overlay App', () => {
         rendered.container.remove();
         mounted = mounted.filter((entry) => entry !== rendered);
 
-        const relayDetailRendered = await renderAuthenticatedMobileApp('/relays/detail?url=wss%3A%2F%2Frelay.example');
+        const relayDetailRendered = await renderAuthenticatedMobileApp(buildRelayDetailPath({
+            relayUrl: 'wss://relay.example',
+            source: 'configured',
+            relayType: 'nip65Both',
+        }));
         mounted.push(relayDetailRendered);
         await waitFor(() => relayDetailRendered.container.querySelector('button[aria-label="Volver"]') !== null);
         backButton = relayDetailRendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
@@ -890,6 +946,442 @@ describe('Nostr overlay App', () => {
         });
 
         await waitFor(() => getLocationText(rendered.container) === '/chats');
+    });
+
+    test('loads a direct Agora note detail route as the active thread', async () => {
+        const noteId = 'd'.repeat(64);
+        const ownerPubkey = persistDmCapableSession();
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId));
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <>
+                <App mapBridge={bridge} services={createBasicOverlayServices(ownerPubkey, { socialFeedService: socialFeed.service })} />
+                <LocationProbe />
+            </>,
+            { initialEntries: [`/agora/notes/${noteId}`] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mock.calls.length >= 1);
+
+        expect((socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({ rootEventId: noteId });
+        expect(getLocationText(rendered.container)).toBe(`/agora/notes/${noteId}`);
+    });
+
+    test('navigates to the canonical Agora note detail route when opening a feed note', async () => {
+        const noteId = 'note-route-1';
+        const ownerPubkey = persistDmCapableSession();
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [createFeedNote(noteId, 'a'.repeat(64), 100, 'feed note route')],
+            hasMore: false,
+        });
+        (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId, 'feed note route'));
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <>
+                <App
+                    mapBridge={bridge}
+                    services={createBasicOverlayServices(ownerPubkey, {
+                        socialFeedService: socialFeed.service,
+                        fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                            ownerPubkey,
+                            follows: ['a'.repeat(64)],
+                            relayHints: [],
+                        }),
+                    })}
+                />
+                <LocationProbe />
+            </>,
+            { initialEntries: ['/agora'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Responder (0)"]')));
+        const openThreadButton = rendered.container.querySelector('button[aria-label="Responder (0)"]') as HTMLButtonElement;
+
+        await act(async () => {
+            openThreadButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === `/agora/notes/${noteId}`);
+    });
+
+    test('returns from Agora note detail to Agora with focus state', async () => {
+        const noteId = 'focus-note-1';
+        const ownerPubkey = persistDmCapableSession();
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId));
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <>
+                <App mapBridge={bridge} services={createBasicOverlayServices(ownerPubkey, { socialFeedService: socialFeed.service })} />
+                <LocationProbe />
+            </>,
+            { initialEntries: [{ pathname: `/agora/notes/${noteId}`, state: { returnTo: '/agora', returnFocusEventId: noteId } }] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => Boolean(rendered.container.querySelector('.nostr-following-feed-back')));
+        const backButton = rendered.container.querySelector('.nostr-following-feed-back') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/agora');
+    });
+
+    test('replaces note detail history entry when returning to Agora', async () => {
+        const noteId = 'focus-note-history';
+        const ownerPubkey = persistDmCapableSession();
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [createFeedNote(noteId, 'a'.repeat(64), 100, 'feed note history')],
+            hasMore: false,
+        });
+        (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId, 'feed note history'));
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <>
+                <App
+                    mapBridge={bridge}
+                    services={createBasicOverlayServices(ownerPubkey, {
+                        socialFeedService: socialFeed.service,
+                        fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                            ownerPubkey,
+                            follows: ['a'.repeat(64)],
+                            relayHints: [],
+                        }),
+                    })}
+                />
+                <LocationProbe />
+                <HistoryBackProbe />
+            </>,
+            { initialEntries: ['/agora'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Responder (0)"]')));
+        const openThreadButton = rendered.container.querySelector('button[aria-label="Responder (0)"]') as HTMLButtonElement;
+
+        await act(async () => {
+            openThreadButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === `/agora/notes/${noteId}`);
+        await waitFor(() => Boolean(rendered.container.querySelector('.nostr-following-feed-back')));
+        const backButton = rendered.container.querySelector('.nostr-following-feed-back') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/agora');
+
+        const historyBackButton = rendered.container.querySelector('[data-testid="history-back-probe"]') as HTMLButtonElement;
+        await act(async () => {
+            historyBackButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(getLocationText(rendered.container)).not.toBe(`/agora/notes/${noteId}`);
+    });
+
+    test('does not reopen note detail from browser history after desktop return to Agora', async () => {
+        window.history.replaceState(null, '', '/app/#/');
+        window.history.pushState(null, '', '/app/#/agora');
+        const noteId = 'focus-note-browser-history';
+        const ownerPubkey = persistDmCapableSession();
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [createFeedNote(noteId, 'a'.repeat(64), 100, 'feed note browser history')],
+            hasMore: false,
+        });
+        (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId, 'feed note browser history'));
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderHashApp(
+            <>
+                <App
+                    mapBridge={bridge}
+                    services={createBasicOverlayServices(ownerPubkey, {
+                        socialFeedService: socialFeed.service,
+                        fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                            ownerPubkey,
+                            follows: ['a'.repeat(64)],
+                            relayHints: [],
+                        }),
+                    })}
+                />
+                <LocationProbe />
+                <BrowserHistoryBackProbe />
+            </>
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Responder (0)"]')));
+        const openThreadButton = rendered.container.querySelector('button[aria-label="Responder (0)"]') as HTMLButtonElement;
+
+        await act(async () => {
+            openThreadButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === `/agora/notes/${noteId}`);
+        await waitFor(() => Boolean(rendered.container.querySelector('.nostr-following-feed-back')));
+        const backButton = rendered.container.querySelector('.nostr-following-feed-back') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/agora');
+
+        const browserHistoryBackButton = rendered.container.querySelector('[data-testid="browser-history-back-probe"]') as HTMLButtonElement;
+        await act(async () => {
+            browserHistoryBackButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        });
+
+        expect(getLocationText(rendered.container)).not.toBe(`/agora/notes/${noteId}`);
+    });
+
+    test('returns from filtered Agora note detail to the filtered Agora route', async () => {
+        const noteId = 'focus-note-filtered';
+        const ownerPubkey = persistDmCapableSession();
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId));
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <>
+                <App mapBridge={bridge} services={createBasicOverlayServices(ownerPubkey, { socialFeedService: socialFeed.service })} />
+                <LocationProbe />
+            </>,
+            { initialEntries: [{ pathname: `/agora/notes/${noteId}`, state: { returnTo: '/agora?tag=nostr', returnFocusEventId: noteId } }] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => Boolean(rendered.container.querySelector('.nostr-following-feed-back')));
+        const backButton = rendered.container.querySelector('.nostr-following-feed-back') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/agora?tag=nostr');
+    });
+
+    test('returns to notifications after opening a notification note detail', async () => {
+        const noteId = 'b'.repeat(64);
+        const actorPubkey = 'a'.repeat(64);
+        const ownerPubkey = persistDmCapableSession();
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId));
+        const notifications = createSocialNotificationsServiceMock();
+        (notifications.service.loadInitialSocial as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [{
+                id: 'mention-1',
+                pubkey: actorPubkey,
+                kind: 1,
+                created_at: 100,
+                tags: [['p', ownerPubkey], ['e', noteId]],
+                content: 'mentioned you',
+            }],
+            hasMore: false,
+            nextSince: null,
+        });
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <>
+                <App
+                    mapBridge={bridge}
+                    services={createBasicOverlayServices(ownerPubkey, {
+                        socialFeedService: socialFeed.service,
+                        socialNotificationsService: notifications.service,
+                        fetchProfilesFn: vi.fn().mockResolvedValue({
+                            [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                            [actorPubkey]: { pubkey: actorPubkey, displayName: 'Alice' },
+                        }),
+                    })}
+                />
+                <LocationProbe />
+            </>,
+            { initialEntries: ['/notifications'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => Boolean(rendered.container.querySelector('[data-slot="notification-target-note"]')));
+        const noteButton = rendered.container.querySelector('[data-slot="notification-target-note"]') as HTMLButtonElement;
+
+        await act(async () => {
+            noteButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === `/agora/notes/${noteId}`);
+        await waitFor(() => Boolean(rendered.container.querySelector('.nostr-following-feed-back')));
+        const backButton = rendered.container.querySelector('.nostr-following-feed-back') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/notifications');
+    });
+
+    test('uses mobile app bar back to close note detail with the same return behavior', async () => {
+        const noteId = 'mobile-note-1';
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId));
+
+        const rendered = await renderAuthenticatedMobileApp(`/agora/notes/${noteId}`, { socialFeedService: socialFeed.service });
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('button[aria-label="Volver"]') !== null);
+        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/agora');
+    });
+
+    test('does not reopen note detail from mobile app history after returning to Agora', async () => {
+        setMobileViewport();
+        const noteId = 'mobile-note-history-loop';
+        const ownerPubkey = persistDmCapableSession();
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [createFeedNote(noteId, 'a'.repeat(64), 100, 'feed note mobile history')],
+            hasMore: false,
+        });
+        (socialFeed.service.loadThread as ReturnType<typeof vi.fn>).mockResolvedValue(createThreadResult(noteId, 'feed note mobile history'));
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <>
+                <App
+                    mapBridge={bridge}
+                    services={createBasicOverlayServices(ownerPubkey, {
+                        socialFeedService: socialFeed.service,
+                        fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                            ownerPubkey,
+                            follows: ['a'.repeat(64)],
+                            relayHints: [],
+                        }),
+                    })}
+                />
+                <LocationProbe />
+            </>,
+            { initialEntries: ['/agora'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Responder (0)"]')));
+        const openThreadButton = rendered.container.querySelector('button[aria-label="Responder (0)"]') as HTMLButtonElement;
+
+        await act(async () => {
+            openThreadButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === `/agora/notes/${noteId}`);
+        await waitFor(() => rendered.container.querySelector('button[aria-label="Volver"]') !== null);
+        const closeNoteButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+
+        await act(async () => {
+            closeNoteButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/agora');
+        const appHistoryBackButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+
+        await act(async () => {
+            appHistoryBackButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) !== '/agora');
+
+        expect(getLocationText(rendered.container)).not.toBe(`/agora/notes/${noteId}`);
+    });
+
+    test('closes global user search back to a filtered Agora route', async () => {
+        const rendered = await renderAuthenticatedMobileApp('/agora?tag=nostr');
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('button[aria-label="Abrir navegación"]') !== null);
+        const menuButton = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement;
+        await act(async () => {
+            menuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => document.body.querySelector('button[aria-label="Abrir buscador global de usuarios"]') !== null);
+        const searchButton = document.body.querySelector('button[aria-label="Abrir buscador global de usuarios"]') as HTMLButtonElement;
+        await act(async () => {
+            searchButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => getLocationText(rendered.container) === '/user-search');
+
+        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/agora?tag=nostr');
+    });
+
+    test('closes global user search back to notifications', async () => {
+        const rendered = await renderAuthenticatedMobileApp('/notifications');
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('button[aria-label="Abrir navegación"]') !== null);
+        const menuButton = rendered.container.querySelector('button[aria-label="Abrir navegación"]') as HTMLButtonElement;
+        await act(async () => {
+            menuButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => document.body.querySelector('button[aria-label="Abrir buscador global de usuarios"]') !== null);
+        const searchButton = document.body.querySelector('button[aria-label="Abrir buscador global de usuarios"]') as HTMLButtonElement;
+        await act(async () => {
+            searchButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => getLocationText(rendered.container) === '/user-search');
+
+        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/notifications');
+    });
+
+    test('uses mobile app bar back from user search to the stored return route', async () => {
+        setMobileViewport();
+        const rendered = await renderApp(
+            <>
+                <App mapBridge={createMapBridgeStub().bridge} services={createBasicOverlayServices(persistDmCapableSession())} />
+                <LocationProbe />
+            </>,
+            { initialEntries: [{ pathname: '/user-search', state: { returnTo: '/notifications' } }] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => rendered.container.querySelector('button[aria-label="Volver"]') !== null);
+        const backButton = rendered.container.querySelector('button[aria-label="Volver"]') as HTMLButtonElement;
+
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/notifications');
     });
 
     test('keeps the restoration state visible while a restored session is still loading', async () => {

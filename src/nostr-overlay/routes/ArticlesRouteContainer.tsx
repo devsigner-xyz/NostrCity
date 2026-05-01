@@ -10,6 +10,7 @@ export interface ArticlesRouteContainerProps {
     isLoadingMore: boolean;
     error: string | null;
     hasMore: boolean;
+    isMobile?: boolean;
     onRefresh: () => Promise<void> | void;
     onLoadMore: () => Promise<void> | void;
     onOpenArticle: (eventId: string) => void;

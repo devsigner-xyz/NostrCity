@@ -132,6 +132,38 @@ describe('ArticlesSurface', () => {
         expect(header?.querySelector('[data-slot="overlay-page-header-actions"] button')?.textContent).toBe('Actualizar');
     });
 
+    test('uses the routed surface class so mobile taps reach article actions', async () => {
+        const rendered = await renderElement(surface());
+        mounted.push(rendered);
+
+        const surfaceElement = rendered.container.querySelector('section');
+
+        expect(surfaceElement?.className).toContain('nostr-routed-surface');
+    });
+
+    test('uses the shared routed page layout for header alignment', async () => {
+        const rendered = await renderElement(surface());
+        mounted.push(rendered);
+
+        const page = rendered.container.querySelector('.nostr-articles-page');
+
+        expect(page).not.toBeNull();
+        expect(page?.className).toContain('nostr-routed-surface-panel');
+        expect(page?.className).toContain('nostr-page-layout');
+    });
+
+    test('keeps refresh keyboard-accessible without showing a distinct mobile header action', async () => {
+        const rendered = await renderElement(surface({ isMobile: true } as Partial<React.ComponentProps<typeof ArticlesSurface>>));
+        mounted.push(rendered);
+
+        const refreshButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            button.textContent === 'Actualizar'
+        );
+
+        expect(refreshButton?.className).toContain('sr-only');
+        expect(refreshButton?.className).toContain('focus:not-sr-only');
+    });
+
     test('constrains the article list width for readable article previews', async () => {
         const rendered = await renderElement(surface({
             items: [articleItem('article-1')],

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { noteDetailEventIdFromPathname } from '../routes/note-detail-routing';
 import { buildSettingsPath, settingsViewFromPathname, type SettingsRouteView } from '../settings/settings-routing';
+import { buildLocationTarget, routeReturnStateFromUnknown } from './route-return-state';
 
 export function normalizeHashtag(value: string | null): string | undefined {
     if (typeof value !== 'string') {
@@ -19,16 +21,29 @@ function activeAgoraHashtagFromLocation(pathname: string, search: string): strin
     return normalizeHashtag(new URLSearchParams(search).get('tag'));
 }
 
+function hasRouteReturnState(state: ReturnType<typeof routeReturnStateFromUnknown>): boolean {
+    return Boolean(state.returnTo || state.returnFocusEventId);
+}
+
+function nestedRouteReturnStateFromUnknown(value: unknown): ReturnType<typeof routeReturnStateFromUnknown> {
+    if (value === null || typeof value !== 'object') {
+        return {};
+    }
+
+    return routeReturnStateFromUnknown((value as Record<string, unknown>).returnState);
+}
+
 export function useOverlayRouteState() {
     const navigate = useNavigate();
     const location = useLocation();
     const [isUiSettingsDialogOpen, setIsUiSettingsDialogOpen] = useState(false);
 
     const activeAgoraHashtag = activeAgoraHashtagFromLocation(location.pathname, location.search);
+    const activeAgoraNoteEventId = noteDetailEventIdFromPathname(location.pathname);
     const activeSettingsView = settingsViewFromPathname(location.pathname);
 
     const isMapRoute = location.pathname === '/';
-    const isAgoraRoute = location.pathname === '/agora';
+    const isAgoraRoute = location.pathname === '/agora' || Boolean(activeAgoraNoteEventId);
     const isArticlesRoute = location.pathname === '/agora/articles';
     const isArticleDetailRoute = location.pathname.startsWith('/agora/articles/');
     const isChatsRoute = location.pathname === '/chats';
@@ -71,17 +86,33 @@ export function useOverlayRouteState() {
     };
 
     const openGlobalUserSearch = (): void => {
-        navigate('/user-search');
+        const returnState = routeReturnStateFromUnknown(location.state);
+
+        navigate('/user-search', {
+            state: {
+                returnTo: buildLocationTarget(location),
+                ...(hasRouteReturnState(returnState) ? { returnState } : {}),
+            },
+        });
     };
 
     const closeGlobalUserSearch = (): void => {
-        navigate('/');
+        const { returnTo } = routeReturnStateFromUnknown(location.state);
+        const returnState = nestedRouteReturnStateFromUnknown(location.state);
+
+        if (hasRouteReturnState(returnState)) {
+            navigate(returnTo ?? '/', { state: returnState });
+            return;
+        }
+
+        navigate(returnTo ?? '/');
     };
 
     return {
         navigate,
         location,
         activeAgoraHashtag,
+        activeAgoraNoteEventId,
         activeSettingsView,
         isMapRoute,
         isAgoraRoute,

@@ -77,6 +77,7 @@ export function OverlayRoutes({
             ) : (
                 <>
                     <Route path="/agora" element={<AgoraRouteContainer {...agora} />} />
+                    <Route path="/agora/notes/:eventId" element={<AgoraRouteContainer {...agora} />} />
                     <Route path="/agora/articles" element={<ArticlesRouteContainer {...articles} />} />
                     <Route path="/agora/articles/:eventId" element={<ArticleDetailRouteContainer {...articleDetail} />} />
                     <Route path="/city-stats" element={<CityStatsRouteContainer {...cityStats} />} />

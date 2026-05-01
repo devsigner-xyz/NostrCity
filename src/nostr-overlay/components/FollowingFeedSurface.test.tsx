@@ -442,6 +442,145 @@ describe('FollowingFeedSurface', () => {
         }
     });
 
+    test('restores focus to the returned feed note once without querying unsafe selectors', async () => {
+        const targetNoteId = 'note-with-"quote"-and-]';
+        const scrollIntoViewSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
+
+        const props = {
+            ...buildProps({
+                items: [createFeedNote('other-note'), createFeedNote(targetNoteId, 'nota objetivo')],
+            }),
+            returnFocusEventId: targetNoteId,
+        };
+
+        try {
+            const rendered = await renderElement(<FollowingFeedSurface {...props} />);
+            mounted.push(rendered);
+
+            const targetNote = Array.from(rendered.container.querySelectorAll('[data-note-id]')).find((element) =>
+                element.getAttribute('data-note-id') === targetNoteId
+            ) as HTMLElement | undefined;
+            expect(targetNote).toBeDefined();
+            expect(targetNote?.getAttribute('data-feed-note-id')).toBe(targetNoteId);
+            expect(document.activeElement).toBe(targetNote);
+            expect(scrollIntoViewSpy).toHaveBeenCalledTimes(1);
+            expect(scrollIntoViewSpy).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
+
+            await act(async () => {
+                rendered.root.render(
+                    <QueryClientProvider client={createNostrOverlayQueryClient()}>
+                        <FollowingFeedSurface {...props} />
+                    </QueryClientProvider>
+                );
+            });
+
+            expect(scrollIntoViewSpy).toHaveBeenCalledTimes(1);
+        } finally {
+            scrollIntoViewSpy.mockRestore();
+        }
+    });
+
+    test('return-focus restoration respects reduced-motion preference', async () => {
+        const scrollIntoViewSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
+        const matchMediaSpy = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+            matches: query === '(prefers-reduced-motion: reduce)',
+            media: query,
+            onchange: null,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        }));
+
+        try {
+            const rendered = await renderElement(
+                <FollowingFeedSurface
+                    {...buildProps({
+                        items: [createFeedNote('target-note', 'nota objetivo')],
+                        returnFocusEventId: 'target-note',
+                    })}
+                />
+            );
+            mounted.push(rendered);
+
+            expect(scrollIntoViewSpy).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' });
+        } finally {
+            scrollIntoViewSpy.mockRestore();
+            matchMediaSpy.mockRestore();
+        }
+    });
+
+    test('same return focus note scrolls again after active thread transition', async () => {
+        const targetNoteId = 'same-return-focus-note';
+        const scrollIntoViewSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
+        const baseProps = buildProps({
+            items: [createFeedNote(targetNoteId, 'nota objetivo')],
+            returnFocusEventId: targetNoteId,
+        });
+        const activeThread: NonNullable<Parameters<typeof FollowingFeedSurface>[0]['activeThread']> = {
+            rootEventId: targetNoteId,
+            root: null,
+            replies: [],
+            isLoading: false,
+            isLoadingMore: false,
+            error: null,
+            hasMore: false,
+        };
+
+        try {
+            const rendered = await renderElement(<FollowingFeedSurface {...baseProps} />);
+            mounted.push(rendered);
+            expect(scrollIntoViewSpy).toHaveBeenCalledTimes(1);
+
+            await act(async () => {
+                rendered.root.render(
+                    <QueryClientProvider client={createNostrOverlayQueryClient()}>
+                        <FollowingFeedSurface {...baseProps} activeThread={activeThread} />
+                    </QueryClientProvider>
+                );
+            });
+            expect(scrollIntoViewSpy).toHaveBeenCalledTimes(1);
+
+            await act(async () => {
+                rendered.root.render(
+                    <QueryClientProvider client={createNostrOverlayQueryClient()}>
+                        <FollowingFeedSurface {...baseProps} activeThread={null} />
+                    </QueryClientProvider>
+                );
+            });
+
+            expect(scrollIntoViewSpy).toHaveBeenCalledTimes(2);
+            expect(scrollIntoViewSpy).toHaveBeenLastCalledWith({ block: 'center', behavior: 'smooth' });
+        } finally {
+            scrollIntoViewSpy.mockRestore();
+        }
+    });
+
+    test('does not error or load older pages when returned feed note is not rendered', async () => {
+        const onLoadMoreFeed = vi.fn(async () => undefined);
+        const scrollIntoViewSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
+
+        try {
+            const rendered = await renderElement(
+                <FollowingFeedSurface
+                    {...buildProps({
+                        items: [createFeedNote('visible-note')],
+                        hasMoreFeed: true,
+                        onLoadMoreFeed,
+                        returnFocusEventId: 'missing-note',
+                    })}
+                />
+            );
+            mounted.push(rendered);
+
+            expect(scrollIntoViewSpy).not.toHaveBeenCalled();
+            expect(onLoadMoreFeed).not.toHaveBeenCalled();
+        } finally {
+            scrollIntoViewSpy.mockRestore();
+        }
+    });
+
     test('renders empty feed copy in english when ui language is en', async () => {
         window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
 
@@ -853,7 +992,7 @@ describe('FollowingFeedSurface', () => {
         mounted.push(rendered);
 
         const localBackButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
-            (button.textContent || '').trim() === 'Volver al Ágora'
+            (button.textContent || '').trim() === 'Volver'
         );
 
         expect(localBackButton).toBeUndefined();
@@ -1858,7 +1997,34 @@ describe('FollowingFeedSurface', () => {
         expect(pageHeader).toBeDefined();
         expect(header.firstElementChild).toBe(pageHeader);
         expect(headerActions).toBeDefined();
-        expect(backButton.textContent || '').toContain('Volver al Ágora');
+        expect(backButton.textContent || '').toContain('Volver');
+        expect(backButton.textContent || '').not.toContain('Volver al Ágora');
+    });
+
+    test('renders english note detail back action as Back', async () => {
+        window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
+
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    activeThread: {
+                        rootEventId: 'thread-1',
+                        root: null,
+                        replies: [],
+                        isLoading: false,
+                        isLoadingMore: false,
+                        error: null,
+                        hasMore: false,
+                    },
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const backButton = rendered.container.querySelector('.nostr-following-feed-header-actions button') as HTMLButtonElement;
+
+        expect(backButton.textContent || '').toContain('Back');
+        expect(backButton.textContent || '').not.toContain('Back to Agora');
     });
 
     test('renders centered empty loading state for initial thread load', async () => {

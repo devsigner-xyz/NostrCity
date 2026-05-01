@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { Location, NavigateFunction } from 'react-router';
+import { useNavigationType, type Location, type NavigateFunction } from 'react-router';
 
 interface UseOverlayNavigationStackInput {
     location: Location;
@@ -18,9 +18,24 @@ export function useOverlayNavigationStack({
 }: UseOverlayNavigationStackInput): { goBackWithinApp: () => void } {
     const stackRef = useRef<string[]>([]);
     const currentPath = locationToPath(location);
+    const navigationType = useNavigationType();
 
     useEffect(() => {
         const stack = stackRef.current;
+
+        if (navigationType === 'REPLACE') {
+            if (stack.length === 0) {
+                stack.push(currentPath);
+                return;
+            }
+
+            stack[stack.length - 1] = currentPath;
+            if (stack.length > 1 && stack[stack.length - 2] === currentPath) {
+                stack.pop();
+            }
+            return;
+        }
+
         if (stack[stack.length - 1] === currentPath) {
             return;
         }
@@ -29,7 +44,7 @@ export function useOverlayNavigationStack({
         if (stack.length > 30) {
             stack.shift();
         }
-    }, [currentPath]);
+    }, [currentPath, navigationType]);
 
     const goBackWithinApp = useCallback(() => {
         const stack = stackRef.current;

@@ -17,6 +17,7 @@ interface ArticlesSurfaceProps {
     isLoadingMore: boolean;
     error: string | null;
     hasMore: boolean;
+    isMobile?: boolean;
     onRefresh: () => Promise<void> | void;
     onLoadMore: () => Promise<void> | void;
     onOpenArticle: (eventId: string) => void;
@@ -39,6 +40,7 @@ export function ArticlesSurface({
     isLoadingMore,
     error,
     hasMore,
+    isMobile = false,
     onRefresh,
     onLoadMore,
     onOpenArticle,
@@ -58,7 +60,7 @@ export function ArticlesSurface({
     return (
         <OverlaySurface ariaLabel={t('articles.title')} contentClassName="gap-0">
             <div
-                className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-3"
+                className="nostr-articles-page nostr-routed-surface-panel nostr-page-layout flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-3"
                 data-testid="articles-scroll-area"
                 onScroll={(event) => onScroll(event.currentTarget)}
             >
@@ -66,7 +68,14 @@ export function ArticlesSurface({
                     title={t('articles.title')}
                     description={t('articles.subtitle')}
                     actions={(
-                        <Button type="button" variant="outline" size="sm" disabled={isRefreshing} onClick={() => { void onRefresh(); }}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={isMobile ? 'sr-only focus:not-sr-only focus:absolute focus:right-3 focus:top-3 focus:z-20' : undefined}
+                            disabled={isRefreshing}
+                            onClick={() => { void onRefresh(); }}
+                        >
                             {isRefreshing ? t('articles.refreshing') : t('articles.refresh')}
                         </Button>
                     )}

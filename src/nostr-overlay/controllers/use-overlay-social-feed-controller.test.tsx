@@ -75,8 +75,11 @@ function Harness(props: {
     ownerPubkey?: string;
     follows?: string[];
     activeAgoraHashtag?: string;
+    activeThreadRootEventId?: string;
     isAgoraRoute?: boolean;
     canWrite?: boolean;
+    onOpenThread?: (eventId: string) => void;
+    onCloseThread?: () => void;
     onFollowPerson?: (pubkey: string) => Promise<void>;
     onController: (controller: OverlaySocialFeedController) => void;
 }): ReactElement | null {
@@ -84,9 +87,12 @@ function Harness(props: {
         ...(props.ownerPubkey ? { ownerPubkey: props.ownerPubkey } : {}),
         follows: props.follows ?? [],
         ...(props.activeAgoraHashtag ? { activeAgoraHashtag: props.activeAgoraHashtag } : {}),
+        ...(props.activeThreadRootEventId ? { activeThreadRootEventId: props.activeThreadRootEventId } : {}),
         isAgoraRoute: props.isAgoraRoute ?? false,
         canWrite: props.canWrite ?? false,
         service,
+        onOpenThread: props.onOpenThread ?? (() => {}),
+        onCloseThread: props.onCloseThread ?? (() => {}),
         onFollowPerson: props.onFollowPerson ?? (async () => {}),
     });
 
@@ -160,6 +166,30 @@ describe('useOverlaySocialFeedController', () => {
         }));
         expect(latest?.activeFeed).toBe(feedState);
         expect(latest?.followingFeed).toBe(feedState);
+    });
+
+    test('forwards URL-controlled thread state and navigation callbacks to the following feed', async () => {
+        const feedState = createFeedState();
+        const onOpenThread = vi.fn();
+        const onCloseThread = vi.fn();
+        vi.mocked(useFollowingFeedController).mockReturnValue(feedState);
+
+        await renderHarness(
+            <Harness
+                ownerPubkey="owner"
+                follows={["follow-a"]}
+                activeThreadRootEventId="thread-root"
+                onOpenThread={onOpenThread}
+                onCloseThread={onCloseThread}
+                onController={() => {}}
+            />,
+        );
+
+        expect(useFollowingFeedController).toHaveBeenCalledWith(expect.objectContaining({
+            activeThreadRootEventId: 'thread-root',
+            onOpenThread,
+            onCloseThread,
+        }));
     });
 
     test('tracks follow and unfollow mutation state while the callback is pending', async () => {

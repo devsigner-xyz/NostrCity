@@ -20,7 +20,7 @@ export function OverlaySurface({
         <section
             aria-label={ariaLabel}
             className={cn(
-                'fixed inset-y-0 left-[var(--nostr-map-inset-left)] z-[9] w-[calc(100%-var(--nostr-map-inset-left))] bg-background/95 max-[720px]:left-0 max-[720px]:w-screen',
+                'nostr-routed-surface fixed inset-y-0 left-[var(--nostr-map-inset-left)] z-[9] w-[calc(100%-var(--nostr-map-inset-left))] bg-background/95 max-[720px]:left-0 max-[720px]:w-screen',
                 className,
             )}
         >

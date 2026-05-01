@@ -113,6 +113,7 @@ export interface FollowingFeedViewProps {
     ) => Promise<Record<string, NostrEvent> | void> | Record<string, NostrEvent> | void;
     eventReferencesById?: Record<string, NostrEvent>;
     onCopyNoteId?: (noteId: string) => void;
+    returnFocusEventId?: string;
     isMobile?: boolean;
 }
 
@@ -244,6 +245,7 @@ export function FollowingFeedContent({
     onResolveEventReferences,
     eventReferencesById,
     onCopyNoteId,
+    returnFocusEventId,
     isMobile = false,
 }: FollowingFeedContentProps) {
     const { t } = useI18n();
@@ -263,6 +265,9 @@ export function FollowingFeedContent({
     const pullSettleStartTimeoutRef = useRef<number | null>(null);
     const pullSettleEndTimeoutRef = useRef<number | null>(null);
     const scrollToNewNoteRef = useRef(false);
+    const lastReturnFocusEventIdRef = useRef<string | null>(null);
+    const returnFocusHighlightTimeoutRef = useRef<number | null>(null);
+    const [highlightedReturnFocusEventId, setHighlightedReturnFocusEventId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!activeThread) {
@@ -340,6 +345,13 @@ export function FollowingFeedContent({
     };
 
     useEffect(() => () => clearPullSettleTimers(), []);
+
+    useEffect(() => () => {
+        if (returnFocusHighlightTimeoutRef.current !== null) {
+            window.clearTimeout(returnFocusHighlightTimeoutRef.current);
+            returnFocusHighlightTimeoutRef.current = null;
+        }
+    }, []);
 
     const settlePullState = (): void => {
         const settledDistance = Math.min(pullDistanceRef.current, PULL_TO_REFRESH_THRESHOLD_PX);
@@ -447,6 +459,42 @@ export function FollowingFeedContent({
         });
         firstNewNote.focus({ preventScroll: true });
     }, [items]);
+
+    useEffect(() => {
+        if (activeThread) {
+            lastReturnFocusEventIdRef.current = null;
+            return;
+        }
+
+        if (!returnFocusEventId || lastReturnFocusEventIdRef.current === returnFocusEventId) {
+            return;
+        }
+
+        const targetNote = Array.from(document.querySelectorAll<HTMLElement>('[data-note-id]')).find((element) =>
+            element.dataset.noteId === returnFocusEventId
+        );
+
+        if (!targetNote) {
+            return;
+        }
+
+        lastReturnFocusEventIdRef.current = returnFocusEventId;
+        targetNote.scrollIntoView({
+            block: 'center',
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        });
+        targetNote.focus({ preventScroll: true });
+        setHighlightedReturnFocusEventId(returnFocusEventId);
+
+        if (returnFocusHighlightTimeoutRef.current !== null) {
+            window.clearTimeout(returnFocusHighlightTimeoutRef.current);
+        }
+
+        returnFocusHighlightTimeoutRef.current = window.setTimeout(() => {
+            returnFocusHighlightTimeoutRef.current = null;
+            setHighlightedReturnFocusEventId((currentId) => currentId === returnFocusEventId ? null : currentId);
+        }, 1_200);
+    }, [activeThread, items, returnFocusEventId]);
 
     const replyDisabled = !canWrite || isPublishingReply || !replyTargetEventId;
     const activeThreadNoteId = activeThread?.root?.id ?? activeThread?.rootEventId;
@@ -581,7 +629,7 @@ export function FollowingFeedContent({
                                 className="nostr-following-feed-back"
                                 onClick={onCloseThread}
                             >
-                                {t('feed.backToAgora')}
+                                {t('feed.back')}
                             </Button>
                         ) : null}
                     </div>
@@ -745,7 +793,16 @@ export function FollowingFeedContent({
                                     });
 
                                     return (
-                                        <div key={item.id} className="nostr-following-feed-note-shell grid gap-2" data-feed-note-id={item.id} tabIndex={-1}>
+                                        <div
+                                            key={item.id}
+                                            className={cn(
+                                                'nostr-following-feed-note-shell grid gap-2 rounded-xl transition-shadow',
+                                                highlightedReturnFocusEventId === item.id ? 'ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : null
+                                            )}
+                                            data-feed-note-id={item.id}
+                                            data-note-id={item.id}
+                                            tabIndex={-1}
+                                        >
                                             <NoteCard
                                                 note={note}
                                                 profilesByPubkey={profilesByPubkey}
