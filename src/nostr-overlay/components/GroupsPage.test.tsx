@@ -349,20 +349,25 @@ describe('GroupsPage', () => {
         expect(detail?.textContent || '').not.toContain('About group');
     });
 
-    test('renders join state as the primary group detail action without duplicating join in the menu', async () => {
+    test('switches between join CTA and composer based on group membership without duplicating join in the menu', async () => {
         const onJoinGroup = vi.fn();
         const joined = await renderElement(page({ onJoinGroup }));
         mounted.push(joined);
 
-        expect(joined.container.querySelector('button[aria-label="Unido a City Gardeners"]')?.textContent).toBe('Unido');
+        expect(joined.container.querySelector('button[aria-label="Unirse a City Gardeners"]')).toBeNull();
+        expect(joined.container.querySelector('textarea[aria-label="Mensaje para City Gardeners"]')).not.toBeNull();
+        expect(joined.container.querySelector('button[aria-label="Publicar mensaje en City Gardeners"]')).not.toBeNull();
         await openGroupActions(joined.container);
         expect(document.body.querySelector('[aria-label="Unirse a City Gardeners"]')).toBeNull();
 
         const other = await renderElement(page({ selectedGroupId: "wss://relay.example'artists", onJoinGroup }));
         mounted.push(other);
 
-        const joinButton = other.container.querySelector('button[aria-label="Unirse a Street Artists"]');
+        const joinButton = other.container.querySelector('button[aria-label="Unirse a Street Artists"]') as HTMLButtonElement | null;
         expect(joinButton?.textContent).toBe('Unirse al grupo');
+        expect(joinButton?.className).toContain('w-full');
+        expect(other.container.querySelector('textarea[aria-label="Mensaje para Street Artists"]')).toBeNull();
+        expect(other.container.querySelector('button[aria-label="Publicar mensaje en Street Artists"]')).toBeNull();
         await act(async () => {
             joinButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -437,11 +442,18 @@ describe('GroupsPage', () => {
         expect(readonly.container.textContent || '').toContain('Inicia sesión con una cuenta que pueda firmar para publicar en grupos.');
         expect(readonly.container.querySelector('textarea')?.disabled).toBe(true);
         expect(readonly.container.querySelector('button[aria-label="Publicar mensaje en City Gardeners"]')?.hasAttribute('disabled')).toBe(true);
-        expect(readonly.container.querySelector('button[aria-label="Unido a City Gardeners"]')?.hasAttribute('disabled')).toBe(true);
         await openGroupActions(readonly.container);
         expect(document.body.querySelector('[aria-label="Guardar City Gardeners"]')?.getAttribute('aria-disabled')).toBe('true');
         expect(document.body.querySelector('[aria-label="Unirse a City Gardeners"]')).toBeNull();
         expect(document.body.querySelector('[aria-label="Salir de City Gardeners"]')?.getAttribute('aria-disabled')).toBe('true');
+
+        const readonlyOther = await renderElement(page({
+            selectedGroupId: "wss://relay.example'artists",
+            session: session({ method: 'npub', readonly: true, capabilities: { canSign: false, canEncrypt: false, encryptionSchemes: [] } }),
+        }));
+        mounted.push(readonlyOther);
+
+        expect(readonlyOther.container.querySelector('button[aria-label="Unirse a Street Artists"]')?.hasAttribute('disabled')).toBe(true);
 
         const locked = await renderElement(page({ session: session({ method: 'local', locked: true }) }));
         mounted.push(locked);
@@ -577,6 +589,8 @@ describe('GroupsPage', () => {
         expect(timeline).not.toBeNull();
         expect(timeline?.textContent || '').not.toContain('Mensajes recientes');
         expect(timeline?.textContent || '').not.toContain('wss://relay.example');
+        expect(timeline?.querySelector('.nostr-chat-messages')).not.toBeNull();
+        expect(timeline?.querySelectorAll('.nostr-chat-message').length).toBe(3);
         const text = timeline?.textContent || '';
 
         expect(text.indexOf('First tie note')).toBeLessThan(text.indexOf('Second tie note'));

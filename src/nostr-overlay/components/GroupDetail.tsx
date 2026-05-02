@@ -35,6 +35,17 @@ function sortedTimeline(timeline: NostrEvent[]): NostrEvent[] {
     });
 }
 
+function formatMessageTimestamp(createdAt: number, locale: 'es' | 'en'): string {
+    return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'es-ES', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+    }).format(new Date(createdAt * 1000));
+}
+
+function shortPubkey(pubkey: string): string {
+    return pubkey.slice(0, 8);
+}
+
 export function GroupDetail({
     group,
     canWrite,
@@ -47,7 +58,7 @@ export function GroupDetail({
     onJoinGroup,
     onLeaveGroup,
 }: GroupDetailProps) {
-    const { t } = useI18n();
+    const { t, locale } = useI18n();
     const [detailsOpen, setDetailsOpen] = useState(false);
 
     if (!group) {
@@ -116,17 +127,6 @@ export function GroupDetail({
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button
-                                type="button"
-                                variant={isJoined ? 'secondary' : 'default'}
-                                size="sm"
-                                disabled={isJoined || !canWrite}
-                                title={!isJoined ? disabledReason ?? undefined : undefined}
-                                aria-label={isJoined ? t('groups.joined.aria', { name: group.name }) : t('groups.join.aria', { name: group.name })}
-                                onClick={handleJoin}
-                            >
-                                {isJoined ? t('groups.joined.action') : t('groups.join.action')}
-                            </Button>
                             <Badge variant="secondary" className="w-fit">
                                 {group.memberCount === 1
                                     ? t('groups.members.one')
@@ -173,11 +173,15 @@ export function GroupDetail({
                                 </EmptyHeader>
                             </Empty>
                         ) : (
-                            <ol className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
+                            <ol className="nostr-chat-messages pr-1">
                                 {timelineItems.map((event) => (
-                                    <li key={event.id} className="rounded-md border bg-card/60 px-3 py-2">
-                                        <p className="whitespace-pre-wrap text-sm">{event.content}</p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
+                                    <li key={event.id} className="nostr-chat-message">
+                                        <div className="nostr-chat-message-header">
+                                            <strong className="nostr-chat-message-author" title={event.pubkey}>{shortPubkey(event.pubkey)}</strong>
+                                            <span className="nostr-chat-message-timestamp">{formatMessageTimestamp(event.created_at, locale)}</span>
+                                        </div>
+                                        <p className="nostr-chat-message-body">{event.content}</p>
+                                        <p className="nostr-chat-message-status">
                                             {t('groups.timeline.meta', { id: event.id.slice(0, 8) })}
                                         </p>
                                     </li>
@@ -187,32 +191,45 @@ export function GroupDetail({
                     </section>
                 </CardContent>
                 <CardFooter className="flex flex-col items-stretch gap-2">
-                    <form
-                        className="nostr-group-composer"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            handlePublish();
-                        }}
-                    >
-                        <Textarea
-                            id={textareaId}
-                            className="nostr-chat-composer-input"
-                            aria-label={t('groups.composer.aria', { name: group.name })}
-                            {...(actionDescription ? { 'aria-describedby': textareaDescriptionId } : {})}
-                            disabled={!canWrite}
-                            value={messageDraft}
-                            onChange={(event) => onMessageDraftChange(event.currentTarget.value)}
-                            placeholder={t('groups.composer.placeholder')}
-                        />
+                    {isJoined ? (
+                        <form
+                            className="nostr-group-composer"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                handlePublish();
+                            }}
+                        >
+                            <Textarea
+                                id={textareaId}
+                                className="nostr-chat-composer-input"
+                                aria-label={t('groups.composer.aria', { name: group.name })}
+                                {...(actionDescription ? { 'aria-describedby': textareaDescriptionId } : {})}
+                                disabled={!canWrite}
+                                value={messageDraft}
+                                onChange={(event) => onMessageDraftChange(event.currentTarget.value)}
+                                placeholder={t('groups.composer.placeholder')}
+                            />
+                            <Button
+                                type="submit"
+                                disabled={!canWrite}
+                                title={disabledReason ?? undefined}
+                                aria-label={t('groups.publish.aria', { name: group.name })}
+                            >
+                                {t('groups.publish.action')}
+                            </Button>
+                        </form>
+                    ) : (
                         <Button
-                            type="submit"
+                            type="button"
+                            className="w-full"
                             disabled={!canWrite}
                             title={disabledReason ?? undefined}
-                            aria-label={t('groups.publish.aria', { name: group.name })}
+                            aria-label={t('groups.join.aria', { name: group.name })}
+                            onClick={handleJoin}
                         >
-                            {t('groups.publish.action')}
+                            {t('groups.join.action')}
                         </Button>
-                    </form>
+                    )}
                     {actionDescription ? <FieldDescription id={textareaDescriptionId}>{actionDescription}</FieldDescription> : null}
                 </CardFooter>
             </Card>

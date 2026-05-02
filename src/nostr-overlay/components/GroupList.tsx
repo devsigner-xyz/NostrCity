@@ -74,7 +74,7 @@ export function GroupList({ groups, selectedGroupId, onSelectGroup, emptyTitle, 
     return (
         <Card variant="default" size="sm" className="flex h-full min-h-0 flex-col gap-0 overflow-hidden border border-border/70 py-0 ring-0 shadow-none">
             <CardContent className="min-h-0 flex-1">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'joined' | 'others')} className="h-full min-h-0 py-3" aria-label={t('groups.list.tabsAria')}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'joined' | 'others')} className="h-full min-h-0 pb-3" aria-label={t('groups.list.tabsAria')}>
                     <TabsList variant="line" className="flex h-auto w-full justify-start" aria-label={t('groups.list.tabsAria')}>
                         <TabsTrigger
                             id="groups-joined-tab"

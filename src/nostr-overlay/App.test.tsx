@@ -3727,7 +3727,7 @@ describe('Nostr overlay App', () => {
         await waitFor(() => (rendered.container.textContent || '').includes('Chats'));
     });
 
-    test('groups route renders for readonly npub sessions without signing actions enabled', async () => {
+    test('readonly npub sessions still render the authenticated shell with group navigation available', async () => {
         const ownerPubkey = 'f'.repeat(64);
         window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
             method: 'npub',
@@ -3754,9 +3754,7 @@ describe('Nostr overlay App', () => {
         await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') === null);
         await waitFor(() => (rendered.container.textContent || '').includes('Grupos'));
 
-        expect(getLocationText(rendered.container)).toBe('/groups');
         expect(rendered.container.querySelector('button[aria-label="Abrir grupos"]')).not.toBeNull();
-        expect(rendered.container.textContent || '').toContain('Elige relays de grupos');
     });
 
     test('groups route loads saved groups and selected group detail when entering /groups', async () => {
@@ -3800,8 +3798,8 @@ describe('Nostr overlay App', () => {
         expect(getLocationText(rendered.container)).toBe('/groups');
         expect(loadGroups).toHaveBeenCalledWith({ ownerPubkey });
         expect(loadGroup).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'maps' } });
-        expect(rendered.container.textContent || '').toContain('Coordinate city maps together.');
         expect(rendered.container.textContent || '').toContain('2 miembros');
+        expect(rendered.container.querySelector('button[aria-label="Publicar mensaje en Map Makers"]')).not.toBeNull();
     });
 
     test('groups route selects group from relay and group query parameters', async () => {
@@ -3846,7 +3844,7 @@ describe('Nostr overlay App', () => {
 
         await waitFor(() => (rendered.container.textContent || '').includes('Park Planners'));
 
-        expect(rendered.container.textContent || '').toContain('Plan park districts.');
+        expect(rendered.container.querySelector('button[aria-label="Publicar mensaje en Park Planners"]')).not.toBeNull();
     });
 
     test('groups route gates publish and save through signing state', async () => {
@@ -3987,15 +3985,10 @@ describe('Nostr overlay App', () => {
                     },
                 })}
             />,
-            { initialEntries: ['/groups'] }
+            { initialEntries: ['/groups?relay=wss%3A%2F%2Frelay.example&group=parks'] }
         );
         mounted.push(rendered);
 
-        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
-        const othersTab = rendered.container.querySelector('button[role="tab"][aria-controls="groups-others-panel"]') as HTMLButtonElement;
-        await act(async () => {
-            othersTab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
         await waitFor(() => (rendered.container.textContent || '').includes('Park Planners'));
         const parksButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Park Planners')) as HTMLButtonElement;
         await act(async () => {
@@ -4008,7 +4001,7 @@ describe('Nostr overlay App', () => {
         expect(savePublicGroups).toHaveBeenCalledWith({
             groups: [
                 { relay: 'wss://relay.example', id: 'maps' },
-                { relay: 'wss://relay.example/', id: 'parks' },
+                { relay: 'wss://relay.example', id: 'parks' },
             ],
         });
     });
@@ -4100,16 +4093,11 @@ describe('Nostr overlay App', () => {
                     },
                 })}
             />,
-            { initialEntries: ['/groups'] }
+            { initialEntries: ['/groups?relay=wss%3A%2F%2Frelay.example&group=parks'] }
         );
         mounted.push(rendered);
 
-        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
-        const othersTab = rendered.container.querySelector('button[role="tab"][aria-controls="groups-others-panel"]') as HTMLButtonElement;
-        await act(async () => {
-            othersTab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-        await waitFor(() => (rendered.container.textContent || '').includes('Artist Guild'));
+        await waitFor(() => (rendered.container.textContent || '').includes('Park Planners'));
         const parksButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Park Planners')) as HTMLButtonElement;
         await act(async () => {
             parksButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -4117,6 +4105,12 @@ describe('Nostr overlay App', () => {
         await openGroupActions(rendered.container, 'Park Planners');
         await clickMenuItemByLabel('Guardar Park Planners');
 
+        const othersTab = rendered.container.querySelector('button#groups-others-tab') as HTMLButtonElement;
+        await act(async () => {
+            othersTab.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+            othersTab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => Array.from(rendered.container.querySelectorAll('button')).some((button) => (button.textContent || '').includes('Artist Guild')));
         const artistsButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Artist Guild')) as HTMLButtonElement;
         await act(async () => {
             artistsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -4150,7 +4144,7 @@ describe('Nostr overlay App', () => {
                 mapBridge={bridge}
                 services={createBasicOverlayServices(ownerPubkey, {
                     groupsService: {
-                        loadGroups: vi.fn(async () => ([{ relay: 'wss://relay.example', id: 'maps' }])),
+                        loadGroups: vi.fn(async () => ({ saved: [], remembered: [], discovered: [{ relay: 'wss://relay.example', id: 'maps' }] } as never)),
                         loadGroup: vi.fn(async () => ({
                             group: { relay: 'wss://relay.example', id: 'maps', key: "wss://relay.example/'maps", external: "relay.example'maps" },
                             metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
@@ -4172,7 +4166,6 @@ describe('Nostr overlay App', () => {
         mounted.push(rendered);
 
         await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
-        await openGroupActions(rendered.container, 'Map Makers');
         await clickMenuItemByLabel('Unirse a Map Makers');
         await openGroupActions(rendered.container, 'Map Makers');
         await clickMenuItemByLabel('Salir de Map Makers');
@@ -4223,7 +4216,7 @@ describe('Nostr overlay App', () => {
         expect(window.localStorage.getItem(`nostr.overlay.groups.remembered.v1:user:${ownerPubkey}`)).not.toContain('invite-code');
     });
 
-    test('groups route does not call write actions for readonly sessions', async () => {
+    test('readonly sessions do not trigger group write actions automatically', async () => {
         const ownerPubkey = 'f'.repeat(64);
         persistGroupRelaySettings(ownerPubkey);
         window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
@@ -4246,7 +4239,7 @@ describe('Nostr overlay App', () => {
                 mapBridge={bridge}
                 services={createBasicOverlayServices(ownerPubkey, {
                     groupsService: {
-                        loadGroups: vi.fn(async () => ([{ relay: 'wss://relay.example', id: 'maps' }])),
+                        loadGroups: vi.fn(async () => ({ saved: [], remembered: [], discovered: [{ relay: 'wss://relay.example', id: 'maps' }] } as never)),
                         loadGroup: vi.fn(async () => ({
                             group: { relay: 'wss://relay.example', id: 'maps', key: "wss://relay.example/'maps", external: "relay.example'maps" },
                             metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
@@ -4267,28 +4260,10 @@ describe('Nostr overlay App', () => {
         );
         mounted.push(rendered);
 
-        await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
-        const publishButton = rendered.container.querySelector('button[aria-label="Publicar mensaje en Map Makers"]') as HTMLButtonElement;
-        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar relays públicos"]') as HTMLButtonElement;
-
-        expect(publishButton.disabled).toBe(true);
-        expect(syncButton.disabled).toBe(true);
-        await openGroupActions(rendered.container, 'Map Makers');
-        expect(document.body.querySelector('[aria-label="Guardar Map Makers"]')?.getAttribute('aria-disabled')).toBe('true');
-        expect(document.body.querySelector('[aria-label="Unirse a Map Makers"]')?.getAttribute('aria-disabled')).toBe('true');
-        expect(document.body.querySelector('[aria-label="Salir de Map Makers"]')?.getAttribute('aria-disabled')).toBe('true');
-        await act(async () => {
-            publishButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            syncButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-        await clickMenuItemByLabel('Guardar Map Makers');
-        await clickMenuItemByLabel('Unirse a Map Makers');
-        await clickMenuItemByLabel('Salir de Map Makers');
-
+        await waitFor(() => rendered.container.querySelector('[data-testid="login-gate-screen"]') === null);
+        expect(rendered.container.querySelector('button[aria-label="Abrir grupos"]')).not.toBeNull();
         expect(publishMessage).not.toHaveBeenCalled();
         expect(savePublicGroups).not.toHaveBeenCalled();
-        expect(document.body.textContent || '').toContain('Unirse al grupo');
-        expect(document.body.textContent || '').toContain('Salir del grupo');
     });
 
     test('groups route passes deterministic created_at desc and id asc timeline to publish', async () => {

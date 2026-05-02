@@ -1,0 +1,10 @@
+Nostr City is licensed under the GNU Lesser General Public License v3.0 only
+(LGPL-3.0-only).
+
+This repository includes modified code derived from ProbableTrain/MapGenerator,
+which is also licensed under LGPL-3.0-only.
+
+See COPYING.LESSER for the LGPLv3 license text and COPYING for the GPLv3 text
+referenced by LGPLv3.
+
+See NOTICE for upstream attribution and additional notices.

@@ -6,6 +6,6 @@ This project includes modified code derived from ProbableTrain/MapGenerator:
 
 The upstream project was created by Keir (ProbableTrain) and contributors and is licensed under LGPL-3.0-only. Nostr City preserves the original license terms through COPYING and COPYING.LESSER.
 
-Nostr City has been substantially modified from the upstream project. Changes include, but are not limited to, Nostr integration, a React overlay, Fastify Backend-for-Frontend services, VitePress documentation, i18n, updated tests, landing page work, and project-specific branding.
+Nostr City has been substantially modified from the upstream project. Changes include, but are not limited to, Nostr integration, a React overlay, Fastify Backend-for-Frontend services, VitePress documentation, i18n, updated tests, public site work, and project-specific branding.
 
 The CSS colour parser embedded in src/ts/util.ts carries its own MIT-style notice from Dean McNamee. Keep that notice intact when redistributing source code.

@@ -86,10 +86,12 @@ function sortTimeline(events: NostrEvent[]): NostrEvent[] {
 }
 
 function summaryFromSnapshot(snapshot: GroupsRuntimeSnapshot, flags: { isSaved: boolean; isRemembered: boolean }): NostrGroupSummary {
+    const group = canonicalizeGroupAddress(snapshot.group);
+
     return {
-        id: snapshot.group.key,
+        id: group.key,
         name: snapshot.metadata?.name ?? snapshot.group.id,
-        relayUrl: snapshot.group.relay,
+        relayUrl: group.relay,
         description: snapshot.metadata?.about ?? snapshot.group.external,
         memberCount: snapshot.members?.pubkeys.length ?? 0,
         isSaved: flags.isSaved,
@@ -190,7 +192,7 @@ async function loadGroupsSnapshot(input: {
     const nextTimelineById: Record<string, NostrEvent[]> = {};
     const groups = snapshots.map((snapshot, index) => {
         const address = addresses[index] ?? snapshot.group;
-        const id = snapshot.group.key;
+        const id = canonicalizeGroupAddress(snapshot.group).key;
         nextAddressesById[id] = address;
         nextTimelineById[id] = sortTimeline(snapshot.timeline);
         return summaryFromSnapshot(snapshot, {

@@ -7,11 +7,12 @@
 
 *Explore Nostr as a living city instead of a linear timeline.*
 
-[![CI](https://img.shields.io/github/actions/workflow/status/strhodler/NostrCity/ci.yml?style=flat-square&label=CI)](https://github.com/strhodler/NostrCity/actions)
 ![Node.js](https://img.shields.io/badge/Node.js-24-3c873a?style=flat-square)
+![pnpm](https://img.shields.io/badge/pnpm-10-F69220?style=flat-square&logo=pnpm&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?style=flat-square&logo=typescript&logoColor=white)
-![React](https://img.shields.io/badge/React-19-149eca?style=flat-square&logo=react&logoColor=white)
-![Fastify](https://img.shields.io/badge/Fastify-5-000000?style=flat-square&logo=fastify&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-4-6E9F18?style=flat-square&logo=vitest&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-1.59-2EAD33?style=flat-square&logo=playwright&logoColor=white)
+[![License: LGPL-3.0-only](https://img.shields.io/badge/License-LGPL--3.0--only-blue?style=flat-square)](./LICENSE)
 
 [Overview](#overview) • [Features](#features) • [Getting Started](#getting-started) • [Project Structure](#project-structure) • [Scripts](#scripts) • [Contributing](#contributing)
 
@@ -19,16 +20,13 @@
 
 Nostr City is an experimental open source app that turns Nostr activity into an explorable social map. It combines procedural city generation with a React overlay for profiles, follows, posts, relays, DMs, zaps, notifications, wallet settings, and discovery flows.
 
-The project started from the procedural city generator in [ProbableTrain/MapGenerator](https://github.com/ProbableTrain/MapGenerator), then evolved into a Nostr-native interface with a Fastify Backend-for-Frontend, a Vite landing page, Spanish VitePress docs, i18n, and automated tests.
-
-> [!NOTE]
-> This is not a classic Nostr timeline client. It is a protocol-first visual layer for exploring relationships, proximity, and activity in a different way.
+The project started from the procedural city generator in [ProbableTrain/MapGenerator](https://github.com/ProbableTrain/MapGenerator), then evolved into a Nostr-native interface with a Fastify Backend-for-Frontend, VitePress docs, i18n, and automated tests.
 
 ## Overview
 
 The workspace has four main runtime surfaces:
 
-- **Landing page**: public marketing and onboarding entry at `/`.
+- **Public site**: public marketing and onboarding entry at `/`.
 - **App**: generated city map plus the Nostr overlay at `/app/`.
 - **BFF**: Fastify API under `/v1/*` for Nostr-facing backend routes.
 - **Docs**: VitePress documentation, currently written primarily in Spanish.
@@ -124,7 +122,7 @@ pnpm docs:dev
 | `src/ts` | Procedural map generation and legacy domain/UI code. |
 | `src/nostr` | Nostr domain services for auth, relays, feeds, DMs, zaps, wallets, profiles, and persistence. |
 | `src/nostr-overlay` | React overlay app, routes, shell, map bridge, controllers, settings, and social UI. |
-| `src/landing` | Public landing page React entry. |
+| `src/landing` | Public site React entry. |
 | `src/components/ui` | Local shadcn/ui-compatible primitives. |
 | `src/i18n` | English and Spanish message catalogs and translation helpers. |
 | `server/src` | Fastify BFF, plugins, `/v1` modules, services, and backend tests. |
@@ -138,7 +136,7 @@ pnpm docs:dev
 | --- | --- |
 | `make dev` | Start BFF, Vite app, and docs together. |
 | `make dev-stop` | Stop local dev ports `3000`, `5173`, and `5174`. |
-| `pnpm dev` | Start the landing and app Vite server. |
+| `pnpm dev` | Start the public site and app Vite server. |
 | `pnpm bff:dev` | Start the Fastify BFF in watch mode. |
 | `pnpm docs:dev` | Start the VitePress docs server. |
 | `pnpm build` | Build the app and docs. |
@@ -188,8 +186,8 @@ Frontend public URL overrides:
 | Variable | Description |
 | --- | --- |
 | `NOSTR_CITY_PUBLIC_DEMO_MODE` | Set to `true` only for a public read-only demo that allows `npub` access and hides signer/local account login paths. |
-| `VITE_APP_URL` | App URL used by docs or landing links when hosted separately. |
-| `VITE_DOCS_URL` | Docs URL used by landing links when hosted separately. |
+| `VITE_APP_URL` | App URL used by docs or public site links when hosted separately. |
+| `VITE_DOCS_URL` | Docs URL used by public site links when hosted separately. |
 
 ## Documentation
 
