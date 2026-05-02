@@ -93,6 +93,7 @@ interface OverlayDialogLayerProps {
     userSearchRelaySetKey?: string;
     onCloseSocialCompose: () => void;
     onSubmitSocialCompose: (content: SocialComposeSubmitInput) => Promise<void> | void;
+    publicDemoMode?: boolean;
     authSession?: AuthSessionState;
     savedLocalAccount?: { pubkey: string; mode: 'device' | 'passphrase' };
     loginDisabled: boolean;
@@ -165,6 +166,7 @@ export function OverlayDialogLayer({
     userSearchRelaySetKey,
     onCloseSocialCompose,
     onSubmitSocialCompose,
+    publicDemoMode = false,
     authSession,
     savedLocalAccount,
     loginDisabled,
@@ -272,6 +274,7 @@ export function OverlayDialogLayer({
                     mapLoaderText={mapLoaderText}
                     overlayTheme={resolvedOverlayTheme}
                     restoringSession={!sessionRestorationResolved}
+                    publicDemoMode={publicDemoMode}
                     onStartSession={onStartSession}
                 />
             ) : null}

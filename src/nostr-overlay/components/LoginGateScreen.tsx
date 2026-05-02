@@ -21,6 +21,7 @@ interface LoginGateScreenProps {
     mapLoaderText?: string | null;
     overlayTheme: 'light' | 'dark';
     restoringSession?: boolean;
+    publicDemoMode?: boolean;
     onStartSession: (method: LoginMethod, input: ProviderResolveInput) => Promise<void> | void;
 }
 
@@ -31,6 +32,7 @@ export function LoginGateScreen({
     mapLoaderText,
     overlayTheme,
     restoringSession = false,
+    publicDemoMode = false,
     onStartSession,
 }: LoginGateScreenProps) {
     const { t } = useI18n();
@@ -45,6 +47,7 @@ export function LoginGateScreen({
     const loginMethodSelectorProps = {
         disabled,
         ...(mapLoaderText === null || mapLoaderText === undefined ? {} : { loadingText: mapLoaderText }),
+        ...(publicDemoMode ? { restrictToNpubOnly: true } : {}),
         onStartSession: async (method: LoginMethod, input: ProviderResolveInput) => {
             await onStartSession(method, input);
         },
@@ -56,6 +59,7 @@ export function LoginGateScreen({
     const [savedLocalPassphrase, setSavedLocalPassphrase] = useState('');
     const restorationSubtitle = mapLoaderText && mapLoaderText.trim().length > 0 ? mapLoaderText : t('auth.login.preparingAccess');
     const loginLogo = overlayTheme === 'dark' ? '/logo-v2-dark.png' : '/logo-v2-light.png';
+    const visibleSavedLocalAccount = publicDemoMode ? undefined : savedLocalAccount;
 
     return (
         <div className="nostr-login-screen nostr-login-screen-dialog" data-testid="login-gate-screen" role="main" aria-label={t('auth.login.screen')}>
@@ -64,13 +68,22 @@ export function LoginGateScreen({
                     <CardContent className="flex flex-col gap-4 p-5 sm:p-6">
                         <img src={loginLogo} alt={t('auth.login.coverAlt')} className="nostr-login-cover mx-auto h-auto max-w-full" />
 
-                        {panel === 'login' && !restoringSession && !showUnlockLocalAccount ? (
+                        {panel === 'login' && publicDemoMode && !restoringSession && !showUnlockLocalAccount ? (
                             <div
-                                className="mb-2 rounded-lg border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground"
-                                data-testid="login-desktop-notice"
+                                className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground"
+                                data-testid="public-demo-login-notice"
                                 role="status"
                             >
-                                {t('auth.login.desktopNotice')}
+                                <p className="font-medium">{t('auth.login.publicDemo.title')}</p>
+                                <p className="mt-1 text-muted-foreground">{t('auth.login.publicDemo.body')}</p>
+                                <a
+                                    className="mt-2 inline-flex text-primary underline-offset-4 hover:underline"
+                                    href="https://github.com/strhodler/NostrCity"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    {t('auth.login.publicDemo.localGuide')}
+                                </a>
                             </div>
                         ) : null}
 
@@ -159,35 +172,37 @@ export function LoginGateScreen({
                             />
                         ) : (
                             <>
-                                {savedLocalAccount ? (
+                                {visibleSavedLocalAccount ? (
                                     <LoginMethodSelector {...loginMethodSelectorProps} />
                                 ) : (
                                     <div className="nostr-login-gate-actions grid gap-3" data-testid="login-gate-actions">
                                         <LoginMethodSelector {...loginMethodSelectorProps} />
-                                        <Button type="button" variant="outline" disabled={disabled} onClick={() => setPanel('create-account-selector')}>
-                                            {t('auth.login.createAccount')}
-                                        </Button>
+                                        {!publicDemoMode ? (
+                                            <Button type="button" variant="outline" disabled={disabled} onClick={() => setPanel('create-account-selector')}>
+                                                {t('auth.login.createAccount')}
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 )}
-                                {savedLocalAccount?.mode === 'device' ? (
+                                {visibleSavedLocalAccount?.mode === 'device' ? (
                                     <Button
                                         type="button"
                                         variant="outline"
                                         disabled={disabled}
                                         onClick={() => {
-                                            void onStartSession('local', { pubkey: savedLocalAccount.pubkey });
+                                            void onStartSession('local', { pubkey: visibleSavedLocalAccount.pubkey });
                                         }}
                                     >
                                         {t('auth.login.continueSavedLocal')}
                                     </Button>
                                 ) : null}
-                                {savedLocalAccount?.mode === 'passphrase' ? (
+                                {visibleSavedLocalAccount?.mode === 'passphrase' ? (
                                     <form
                                         className="flex flex-col gap-3"
                                         onSubmit={(event) => {
                                             event.preventDefault();
                                             void onStartSession('local', {
-                                                pubkey: savedLocalAccount.pubkey,
+                                                pubkey: visibleSavedLocalAccount.pubkey,
                                                 passphrase: savedLocalPassphrase.trim(),
                                             });
                                         }}
@@ -208,7 +223,7 @@ export function LoginGateScreen({
                                         </Button>
                                     </form>
                                 ) : null}
-                                {savedLocalAccount ? (
+                                {visibleSavedLocalAccount ? (
                                     <Button type="button" variant="outline" disabled={disabled} onClick={() => setPanel('create-account-selector')}>
                                         {t('auth.login.createAccount')}
                                     </Button>

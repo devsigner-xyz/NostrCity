@@ -126,6 +126,29 @@ describe('createAuthService', () => {
         expect(storage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
     });
 
+    test('clears stored non-npub session when restore is restricted to npub', async () => {
+        const storage = createMemoryStorage();
+        const deviceKeyStore = createMemoryDeviceKeyStore();
+        const localKeyStorage = createLocalKeyStorage({ storage, deviceKeyStore, now: () => 222 });
+        const authA = createAuthService({ storage, localKeyStorage, now: () => 222 });
+        const session = await authA.startSession('local', { secretKey: generateSecretKey() });
+
+        const authB = createAuthService({
+            storage,
+            localKeyStorage: createLocalKeyStorage({ storage, deviceKeyStore }),
+        });
+        const restored = await authB.restoreSession({ allowedMethods: ['npub'] });
+        const savedLocalAccount = await authB.getSavedLocalAccount();
+
+        expect(restored).toBeUndefined();
+        expect(authB.getSession()).toBeUndefined();
+        expect(storage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull();
+        expect(savedLocalAccount).toEqual({
+            pubkey: session.pubkey,
+            mode: 'device',
+        });
+    });
+
     test('switchMethod updates active session for supported method', async () => {
         const storage = createMemoryStorage();
         const auth = createAuthService({ storage });

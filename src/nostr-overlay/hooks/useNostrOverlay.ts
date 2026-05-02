@@ -114,6 +114,7 @@ export interface NostrOverlayServices {
 interface UseNostrOverlayOptions {
     mapBridge: MapBridge | null;
     services: NostrOverlayServices;
+    publicDemoMode?: boolean;
 }
 
 const DM_INBOX_RELAY_CAP = 8;
@@ -354,7 +355,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: 
     });
 }
 
-export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions) {
+export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }: UseNostrOverlayOptions) {
     const OCCUPANCY_BATCH_SIZE = 8;
     const OCCUPANCY_BATCH_DELAY_MS = 22;
     const createClient = services.createClient;
@@ -382,6 +383,7 @@ export function useNostrOverlay({ mapBridge, services }: UseNostrOverlayOptions)
         enabled: Boolean(mapBridge),
         configureAuthHeaders: services?.configureAuthHeaders,
         setWriteGateway: services?.setWriteGateway,
+        publicDemoMode,
         onRestoredSession: async (restored) => {
             await loadOwnerGraph({
                 session: restored,

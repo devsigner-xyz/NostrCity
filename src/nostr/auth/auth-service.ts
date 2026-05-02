@@ -30,6 +30,7 @@ type SessionListener = (session: AuthSessionState | undefined) => void;
 
 interface RestoreSessionInput {
     passphrase?: string;
+    allowedMethods?: readonly LoginMethod[];
 }
 
 interface AuthService {
@@ -194,7 +195,6 @@ export function createAuthService(options: AuthServiceOptions = {}): AuthService
         },
 
         async restoreSession(input: RestoreSessionInput = {}): Promise<AuthSessionState | undefined> {
-            void input;
             const stored = loadStoredAuthSession(storage);
             if (!stored) {
                 currentSession = undefined;
@@ -205,6 +205,14 @@ export function createAuthService(options: AuthServiceOptions = {}): AuthService
             const storedMethod = stored.method;
 
             if (isLegacyNsecMethod(storedMethod)) {
+                clearStoredAuthSession(storage);
+                currentSession = undefined;
+                activeProvider = undefined;
+                notify();
+                return undefined;
+            }
+
+            if (input.allowedMethods && !input.allowedMethods.includes(storedMethod as LoginMethod)) {
                 clearStoredAuthSession(storage);
                 currentSession = undefined;
                 activeProvider = undefined;

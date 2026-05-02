@@ -21,6 +21,7 @@ async function renderScreen(options: {
     mapLoaderText?: string;
     overlayTheme?: 'light' | 'dark';
     restoringSession?: boolean;
+    publicDemoMode?: boolean;
 } = {}): Promise<RenderResult> {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -35,6 +36,7 @@ async function renderScreen(options: {
                 {...(options.mapLoaderText === undefined ? {} : { mapLoaderText: options.mapLoaderText })}
                 overlayTheme={options.overlayTheme ?? 'light'}
                 restoringSession={options.restoringSession ?? false}
+                publicDemoMode={options.publicDemoMode ?? false}
                 onStartSession={vi.fn()}
             />
         );
@@ -116,29 +118,9 @@ describe('LoginGateScreen', () => {
         expect(content).toContain('Crear cuenta');
     });
 
-    test('shows a desktop-only notice on the main login view', async () => {
+    test('does not show a desktop-only notice on the main login view', async () => {
         const rendered = await renderScreen();
         mounted.push(rendered);
-
-        const notice = rendered.container.querySelector('[data-testid="login-desktop-notice"]');
-
-        expect(notice).not.toBeNull();
-        expect(notice?.className).toContain('mb-2');
-        expect(notice?.textContent || '').toContain('Por el momento, el cliente está optimizado para la versión de escritorio.');
-    });
-
-    test('hides the desktop-only notice outside the main login view', async () => {
-        const rendered = await renderScreen();
-        mounted.push(rendered);
-
-        const createAccountButton = Array.from(rendered.container.querySelectorAll('button')).find(
-            (button) => (button.textContent || '').includes('Crear cuenta')
-        ) as HTMLButtonElement | undefined;
-        expect(createAccountButton).toBeDefined();
-
-        await act(async () => {
-            createAccountButton?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
-        });
 
         expect(rendered.container.querySelector('[data-testid="login-desktop-notice"]')).toBeNull();
     });
@@ -223,6 +205,33 @@ describe('LoginGateScreen', () => {
         expect(options).toContain('npub (solo lectura)');
         expect(options).toContain('Extensión (NIP-07)');
         expect(options).toContain('Búnker (NIP-46)');
+    });
+
+    test('shows public demo notice and npub-only login in public demo mode', async () => {
+        const rendered = await renderScreen({ publicDemoMode: true });
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('[data-testid="public-demo-login-notice"]')).not.toBeNull();
+        expect(rendered.container.textContent || '').toContain('Demo pública de solo lectura');
+        expect(rendered.container.textContent || '').toContain('npub (solo lectura)');
+        expect(rendered.container.textContent || '').toContain('Ver repositorio en GitHub');
+        expect(rendered.container.textContent || '').not.toContain('Crear cuenta');
+
+        const link = rendered.container.querySelector('[data-testid="public-demo-login-notice"] a') as HTMLAnchorElement | null;
+        expect(link?.getAttribute('href')).toBe('https://github.com/strhodler/NostrCity');
+        expect(link?.getAttribute('target')).toBe('_blank');
+        expect(link?.getAttribute('rel')).toBe('noreferrer');
+    });
+
+    test('hides saved local account actions in public demo mode', async () => {
+        const rendered = await renderScreen({
+            publicDemoMode: true,
+            savedLocalAccount: { pubkey: 'f'.repeat(64), mode: 'device' },
+        });
+        mounted.push(rendered);
+
+        expect(rendered.container.textContent || '').not.toContain('Continuar con cuenta local guardada');
+        expect(rendered.container.textContent || '').not.toContain('Crear cuenta');
     });
 
     test('disables create account entry point when login gate is disabled', async () => {

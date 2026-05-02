@@ -19,7 +19,7 @@ export interface OverlaySessionAuthService {
     getSession(): AuthSessionState | undefined;
     getActiveProvider(): AuthProvider | undefined;
     getSavedLocalAccount(): Promise<SavedLocalAccount | undefined>;
-    restoreSession(): Promise<AuthSessionState | undefined>;
+    restoreSession(input?: { allowedMethods?: readonly LoginMethod[] }): Promise<AuthSessionState | undefined>;
     startSession(method: LoginMethod, input: ProviderResolveInput): Promise<AuthSessionState>;
     logout(): Promise<void>;
 }
@@ -30,6 +30,7 @@ export interface UseOverlaySessionControllerOptions {
     configureAuthHeaders?: ((getAuthHeaders: ((context: HttpClientAuthContext) => Promise<Record<string, string> | undefined>) | undefined) => void) | undefined;
     setWriteGateway?: ((writeGateway: ReturnType<typeof createWriteGateway> | undefined) => void) | undefined;
     onRestoredSession?: ((session: AuthSessionState) => void | Promise<void>) | undefined;
+    publicDemoMode?: boolean;
 }
 
 export interface OverlaySessionController {
@@ -103,6 +104,7 @@ export function useOverlaySessionController(options: UseOverlaySessionController
     const [savedLocalAccount, setSavedLocalAccount] = useState<SavedLocalAccount | undefined>(undefined);
     const [sessionRestorationResolved, setSessionRestorationResolved] = useState(false);
     const onRestoredSession = options.onRestoredSession;
+    const publicDemoMode = options.publicDemoMode ?? false;
 
     const writeGateway = useMemo(
         () =>
@@ -169,8 +171,12 @@ export function useOverlaySessionController(options: UseOverlaySessionController
         didRestoreSessionRef.current = true;
         void (async () => {
             try {
-                const restored = await authService.restoreSession();
-                const nextSavedLocalAccount = await authService.getSavedLocalAccount();
+                const restored = await authService.restoreSession(
+                    publicDemoMode ? { allowedMethods: ['npub'] } : undefined,
+                );
+                const nextSavedLocalAccount = publicDemoMode
+                    ? undefined
+                    : await authService.getSavedLocalAccount();
                 setSavedLocalAccount(nextSavedLocalAccount);
 
                 if (!restored) {
@@ -183,23 +189,31 @@ export function useOverlaySessionController(options: UseOverlaySessionController
                 setSessionRestorationResolved(true);
             }
         })();
-    }, [authService, onRestoredSession, options.enabled]);
+    }, [authService, onRestoredSession, options.enabled, publicDemoMode]);
 
     const startSession = useCallback(async (method: LoginMethod, input: ProviderResolveInput) => {
+        if (publicDemoMode && method !== 'npub') {
+            throw new Error('Public demo mode only allows npub read-only sessions');
+        }
+
         const session = await authService.startSession(method, input);
-        const nextSavedLocalAccount = await authService.getSavedLocalAccount();
+        const nextSavedLocalAccount = publicDemoMode
+            ? undefined
+            : await authService.getSavedLocalAccount();
         setAuthSession(session);
         setSavedLocalAccount(nextSavedLocalAccount);
         return { session, savedLocalAccount: nextSavedLocalAccount };
-    }, [authService]);
+    }, [authService, publicDemoMode]);
 
     const logoutSession = useCallback(async () => {
         await authService.logout();
-        const nextSavedLocalAccount = await authService.getSavedLocalAccount();
+        const nextSavedLocalAccount = publicDemoMode
+            ? undefined
+            : await authService.getSavedLocalAccount();
         setAuthSession(undefined);
         setSavedLocalAccount(nextSavedLocalAccount);
         return nextSavedLocalAccount;
-    }, [authService]);
+    }, [authService, publicDemoMode]);
 
     return {
         authService,

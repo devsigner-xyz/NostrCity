@@ -1,7 +1,7 @@
 import { act, useEffect, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-import { createAuthSession, type AuthSessionState } from '../../nostr/auth/session';
+import { createAuthSession, type AuthSessionState, type LoginMethod } from '../../nostr/auth/session';
 import type { AuthProvider, ProviderResolveInput, UnsignedNostrEvent } from '../../nostr/auth/providers/types';
 import type { HttpClientAuthContext } from '../../nostr-api/http-client';
 import { useOverlaySessionController, type OverlaySessionAuthService, type OverlaySessionController } from './use-overlay-session-controller';
@@ -13,9 +13,9 @@ interface RenderResult {
 
 const mountedRoots: RenderResult[] = [];
 
-function createSession(pubkey: string = 'a'.repeat(64)): AuthSessionState {
+function createSession(pubkey: string = 'a'.repeat(64), method: LoginMethod = 'local'): AuthSessionState {
     return createAuthSession({
-        method: 'local',
+        method,
         pubkey,
         createdAt: 123,
     });
@@ -26,19 +26,25 @@ function createFakeAuthService(input: {
     savedLocalAccount?: { pubkey: string; mode: 'device' | 'passphrase' };
     savedLocalAccountAfterLogout?: { pubkey: string; mode: 'device' | 'passphrase' };
     activeProvider?: AuthProvider;
-} = {}): OverlaySessionAuthService & { logout: ReturnType<typeof vi.fn> } {
+} = {}): OverlaySessionAuthService & {
+    logout: ReturnType<typeof vi.fn>;
+    restoreSession: ReturnType<typeof vi.fn>;
+    startSession: ReturnType<typeof vi.fn>;
+} {
     const logout = vi.fn(async () => {
         didLogout = true;
+    });
+    const restoreSession = vi.fn(async () => input.restoredSession);
+    const startSession = vi.fn(async (method: LoginMethod, _sessionInput: ProviderResolveInput) => {
+        return input.restoredSession ?? createSession(undefined, method);
     });
     let didLogout = false;
 
     return {
         getSession: () => input.restoredSession,
         getActiveProvider: () => input.activeProvider,
-        restoreSession: async () => input.restoredSession,
-        startSession: async (_method: 'npub' | 'nip07' | 'nip46' | 'local', _sessionInput: ProviderResolveInput) => {
-            return input.restoredSession ?? createSession();
-        },
+        restoreSession,
+        startSession,
         logout,
         getSavedLocalAccount: async () => didLogout
             ? input.savedLocalAccountAfterLogout
@@ -51,6 +57,7 @@ function Harness(props: {
     enabled?: boolean;
     configureAuthHeaders?: ((getAuthHeaders: ((context: HttpClientAuthContext) => Promise<Record<string, string> | undefined>) | undefined) => void) | undefined;
     onRestoredSession?: (session: AuthSessionState) => void | Promise<void>;
+    publicDemoMode?: boolean;
     onController: (controller: OverlaySessionController) => void;
 }): ReactElement | null {
     const controller = useOverlaySessionController({
@@ -58,6 +65,7 @@ function Harness(props: {
         enabled: props.enabled ?? true,
         configureAuthHeaders: props.configureAuthHeaders,
         onRestoredSession: props.onRestoredSession,
+        publicDemoMode: props.publicDemoMode ?? false,
     });
 
     useEffect(() => {
@@ -148,6 +156,79 @@ describe('useOverlaySessionController', () => {
         expect(onRestoredSession).toHaveBeenCalledWith(session);
     });
 
+    test('restricts restored sessions to npub in public demo mode', async () => {
+        const authService = createFakeAuthService();
+
+        await renderHarness(
+            <Harness
+                authService={authService}
+                publicDemoMode
+                onController={() => {}}
+            />,
+        );
+        await flushEffects();
+
+        expect(authService.restoreSession).toHaveBeenCalledWith({ allowedMethods: ['npub'] });
+    });
+
+    test('does not expose saved local accounts in public demo mode', async () => {
+        let latest: OverlaySessionController | undefined;
+        const savedLocalAccount = { pubkey: 'f'.repeat(64), mode: 'device' as const };
+        const authService = createFakeAuthService({ savedLocalAccount });
+
+        await renderHarness(
+            <Harness
+                authService={authService}
+                publicDemoMode
+                onController={(controller) => { latest = controller; }}
+            />,
+        );
+        await flushEffects();
+
+        expect(latest?.savedLocalAccount).toBeUndefined();
+    });
+
+    test('allows npub session starts in public demo mode', async () => {
+        let latest: OverlaySessionController | undefined;
+        const authService = createFakeAuthService();
+
+        await renderHarness(
+            <Harness
+                authService={authService}
+                publicDemoMode
+                onController={(controller) => { latest = controller; }}
+            />,
+        );
+        await flushEffects();
+
+        await act(async () => {
+            await latest?.startSession('npub', { credential: 'npub1example' });
+        });
+
+        expect(authService.startSession).toHaveBeenCalledWith('npub', { credential: 'npub1example' });
+        expect(latest?.authSession?.method).toBe('npub');
+        expect(latest?.savedLocalAccount).toBeUndefined();
+    });
+
+    test('rejects signed and local session starts in public demo mode', async () => {
+        let latest: OverlaySessionController | undefined;
+        const authService = createFakeAuthService();
+
+        await renderHarness(
+            <Harness
+                authService={authService}
+                publicDemoMode
+                onController={(controller) => { latest = controller; }}
+            />,
+        );
+        await flushEffects();
+
+        await expect(latest?.startSession('local', {})).rejects.toThrow('Public demo mode only allows npub read-only sessions');
+        await expect(latest?.startSession('nip07', {})).rejects.toThrow('Public demo mode only allows npub read-only sessions');
+        await expect(latest?.startSession('nip46', {})).rejects.toThrow('Public demo mode only allows npub read-only sessions');
+        expect(authService.startSession).not.toHaveBeenCalled();
+    });
+
     test('logout callback clears session state and keeps saved local account status', async () => {
         let latest: OverlaySessionController | undefined;
         const session = createSession();
@@ -170,6 +251,34 @@ describe('useOverlaySessionController', () => {
         expect(latest?.canWrite).toBe(false);
         expect(latest?.canEncrypt).toBe(false);
         expect(latest?.canDirectMessages).toBe(false);
+    });
+
+    test('logout callback keeps saved local accounts hidden in public demo mode', async () => {
+        let latest: OverlaySessionController | undefined;
+        const session = createSession('a'.repeat(64), 'npub');
+        const savedLocalAccountAfterLogout = { pubkey: 'f'.repeat(64), mode: 'device' as const };
+        const authService = createFakeAuthService({
+            restoredSession: session,
+            savedLocalAccountAfterLogout,
+        });
+
+        await renderHarness(
+            <Harness
+                authService={authService}
+                publicDemoMode
+                onController={(controller) => { latest = controller; }}
+            />,
+        );
+        await flushEffects();
+
+        await act(async () => {
+            const savedLocalAccount = await latest?.logoutSession();
+            expect(savedLocalAccount).toBeUndefined();
+        });
+
+        expect(authService.logout).toHaveBeenCalledTimes(1);
+        expect(latest?.authSession).toBeUndefined();
+        expect(latest?.savedLocalAccount).toBeUndefined();
     });
 
     test('includes payload hash for an empty string request body', async () => {

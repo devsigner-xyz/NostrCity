@@ -175,9 +175,9 @@ describe('LoginMethodSelector', () => {
         const options = Array.from(document.body.querySelectorAll('[data-slot="select-item"]'));
         expect(options.some((option) => (option.textContent || '').trim() === 'nsec')).toBe(false);
         expect(options.some((option) => (option.textContent || '').trim() === 'Extensión (NIP-07)')).toBe(false);
-        expect(options.some((option) => (option.textContent || '').trim() === 'Bunker (NIP-46)')).toBe(false);
+        expect(options.some((option) => (option.textContent || '').trim() === 'Búnker (NIP-46)')).toBe(false);
         expect(rendered.container.textContent || '').not.toContain('Extensión (NIP-07)');
-        expect(rendered.container.textContent || '').not.toContain('Bunker (NIP-46)');
+        expect(rendered.container.textContent || '').not.toContain('Búnker (NIP-46)');
     });
 
     test('submits npub login through startSession handler', async () => {

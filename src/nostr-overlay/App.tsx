@@ -81,6 +81,7 @@ import { decodeNpubToHex } from '../nostr/npub';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Toaster, toast } from 'sonner';
 import { translate } from '@/i18n/translate';
+import { isPublicDemoMode } from '@/site/public-demo-mode';
 import { SITE_THEME_CHANGE_EVENT } from '@/site/theme-preference';
 import type { OverlayServices } from './services/overlay-services';
 
@@ -112,6 +113,7 @@ function canCreateZapRequest(input: { writeGateway: unknown; relaySettingsSnapsh
 }
 
 export function App({ mapBridge, services }: AppProps) {
+    const publicDemoMode = isPublicDemoMode();
     const {
         navigate,
         location,
@@ -136,7 +138,7 @@ export function App({ mapBridge, services }: AppProps) {
         navigate,
         fallbackPath: '/',
     });
-    const overlay = useNostrOverlay({ mapBridge, services });
+    const overlay = useNostrOverlay({ mapBridge, services, publicDemoMode });
     const activeProfileData = useActiveProfileQuery({
         ...(overlay.activeProfilePubkey ? { pubkey: overlay.activeProfilePubkey } : {}),
         service: overlay.activeProfileService,
@@ -1500,6 +1502,7 @@ export function App({ mapBridge, services }: AppProps) {
                     userSearchRelaySetKey={userSearchRelaySetKey}
                     onCloseSocialCompose={closeSocialCompose}
                     onSubmitSocialCompose={submitSocialCompose}
+                    publicDemoMode={publicDemoMode}
                     {...(overlay.authSession ? { authSession: overlay.authSession } : {})}
                     {...(overlay.savedLocalAccount ? { savedLocalAccount: overlay.savedLocalAccount } : {})}
                     loginDisabled={loginDisabled}

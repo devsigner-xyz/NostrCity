@@ -123,6 +123,20 @@ pnpm docs:dev
 
 ## Configuration
 
+### Local Environment Files
+
+Copy `.env.example` to `.env` only for local overrides. `.env` is ignored by git and must not contain committed secrets.
+
+```bash
+cp .env.example .env
+```
+
+`VITE_PUBLIC_DEMO_MODE=false` keeps all supported login methods available for local/self-hosted usage. Set `VITE_PUBLIC_DEMO_MODE=true` only for a public read-only demo deployment such as `nostrcity.xyz`.
+
+Public demo deployments must set `VITE_PUBLIC_DEMO_MODE=true` before `pnpm build`, because Vite inlines frontend env values at build time.
+
+`VITE_*` variables are public browser configuration in Vite builds, not secrets.
+
 The BFF reads these environment variables:
 
 | Variable | Default | Description |
@@ -147,6 +161,7 @@ Frontend public URL overrides:
 
 | Variable | Description |
 | --- | --- |
+| `VITE_PUBLIC_DEMO_MODE` | Set to `true` only for a public read-only demo that allows `npub` access and hides signer/local account login paths. |
 | `VITE_APP_URL` | App URL used by docs or landing links when hosted separately. |
 | `VITE_DOCS_URL` | Docs URL used by landing links when hosted separately. |
 
