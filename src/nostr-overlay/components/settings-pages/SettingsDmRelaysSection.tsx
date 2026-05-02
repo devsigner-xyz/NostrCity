@@ -1,7 +1,6 @@
 import type { MouseEvent, ReactElement } from 'react';
 import type { RelayType } from '../../../nostr/relay-settings';
 import type { RelayConnectionStatus } from '../../hooks/useRelayConnectionSummary';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +15,8 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { useI18n } from '@/i18n/useI18n';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EllipsisVerticalIcon } from 'lucide-react';
-import type { RelayDetails, RelayInformationDocument, RelayRow, RelaySource } from './types';
+import { SettingsRelayMobileList, formatRelayDisplayUrl } from './SettingsRelayMobileList';
+import type { RelayInformationDocument, RelayRow, RelaySource } from './types';
 
 interface SettingsDmRelaysSectionProps {
     configuredRows: RelayRow[];
@@ -34,8 +34,6 @@ interface SettingsDmRelaysSectionProps {
     onAddAllSuggestedRelays: () => void;
     onResetRelaysToDefault: () => void;
     onOpenRelayActionsMenu: (event: MouseEvent<HTMLButtonElement>) => void;
-    describeRelay: (relayUrl: string, source: RelaySource) => RelayDetails;
-    relayAvatarFallback: (details: RelayDetails, document?: RelayInformationDocument) => string;
     relayConnectionBadge: (status: RelayConnectionStatus | undefined) => ReactElement;
 }
 
@@ -55,8 +53,6 @@ export function SettingsDmRelaysSection({
     onAddAllSuggestedRelays,
     onResetRelaysToDefault,
     onOpenRelayActionsMenu,
-    describeRelay,
-    relayAvatarFallback,
     relayConnectionBadge,
 }: SettingsDmRelaysSectionProps) {
     const { t } = useI18n();
@@ -107,7 +103,7 @@ export function SettingsDmRelaysSection({
                         <div className="nostr-relay-suggested-header mb-2">
                             <h3 className="text-sm font-semibold">{t('settings.relays.section.configured')}</h3>
                         </div>
-                        <div className="nostr-relay-table-scroll">
+                        <div className="nostr-relay-table-scroll nostr-relay-desktop-table">
                             <Table className="nostr-relay-table">
                                 <TableHeader>
                                     <TableRow>
@@ -119,7 +115,6 @@ export function SettingsDmRelaysSection({
                                 </TableHeader>
                                 <TableBody>
                                     {configuredRows.map(({ relayUrl, relayTypes, primaryRelayType }) => {
-                                        const details = describeRelay(relayUrl, 'configured');
                                         const document = relayInfoByUrl[relayUrl]?.data;
                                         const relayConnectionStatus = relayConnectionStatusByRelay[relayUrl];
 
@@ -127,11 +122,8 @@ export function SettingsDmRelaysSection({
                                             <TableRow key={`dm-configured-${relayUrl}`}>
                                                 <TableCell className="nostr-relay-url-cell">
                                                     <div className="nostr-relay-main-cell">
-                                                        <Avatar className="size-8">
-                                                            <AvatarFallback>{relayAvatarFallback(details, document)}</AvatarFallback>
-                                                        </Avatar>
                                                         <div className="min-w-0">
-                                                            <p className="nostr-relay-summary-primary">{document?.name || relayUrl}</p>
+                                                            <p className="nostr-relay-summary-primary" title={relayUrl}>{document?.name || formatRelayDisplayUrl(relayUrl)}</p>
                                                         </div>
                                                     </div>
                                                 </TableCell>
@@ -176,6 +168,16 @@ export function SettingsDmRelaysSection({
                                 </TableBody>
                             </Table>
                         </div>
+                        <SettingsRelayMobileList
+                            rows={configuredRows}
+                            source="configured"
+                            relayInfoByUrl={relayInfoByUrl}
+                            relayConnectionStatusByRelay={relayConnectionStatusByRelay}
+                            relayTypeLabels={relayTypeLabels}
+                            onOpenRelayDetails={onOpenRelayDetails}
+                            onRemoveRelay={onRemoveRelay}
+                            onOpenRelayActionsMenu={onOpenRelayActionsMenu}
+                        />
                     </div>
 
                     {suggestedRows.length > 0 ? (
@@ -186,7 +188,7 @@ export function SettingsDmRelaysSection({
                                     {t('settings.relays.addAll')}
                                 </Button>
                             </div>
-                            <div className="nostr-relay-table-scroll">
+                            <div className="nostr-relay-table-scroll nostr-relay-desktop-table">
                                 <Table className="nostr-relay-table">
                                     <TableHeader>
                                         <TableRow>
@@ -198,7 +200,6 @@ export function SettingsDmRelaysSection({
                                     </TableHeader>
                                     <TableBody>
                                         {suggestedRows.map(({ relayUrl, relayTypes, primaryRelayType }) => {
-                                            const details = describeRelay(relayUrl, 'suggested');
                                             const document = relayInfoByUrl[relayUrl]?.data;
                                             const relayConnectionStatus = relayConnectionStatusByRelay[relayUrl];
 
@@ -206,11 +207,8 @@ export function SettingsDmRelaysSection({
                                                 <TableRow key={`dm-suggested-${relayUrl}`}>
                                                     <TableCell className="nostr-relay-url-cell">
                                                         <div className="nostr-relay-main-cell">
-                                                            <Avatar className="size-8">
-                                                                <AvatarFallback>{relayAvatarFallback(details, document)}</AvatarFallback>
-                                                            </Avatar>
                                                             <div className="min-w-0">
-                                                                <p className="nostr-relay-summary-primary">{document?.name || relayUrl}</p>
+                                                                <p className="nostr-relay-summary-primary" title={relayUrl}>{document?.name || formatRelayDisplayUrl(relayUrl)}</p>
                                                             </div>
                                                         </div>
                                                     </TableCell>
@@ -255,6 +253,16 @@ export function SettingsDmRelaysSection({
                                     </TableBody>
                                 </Table>
                             </div>
+                            <SettingsRelayMobileList
+                                rows={suggestedRows}
+                                source="suggested"
+                                relayInfoByUrl={relayInfoByUrl}
+                                relayConnectionStatusByRelay={relayConnectionStatusByRelay}
+                                relayTypeLabels={relayTypeLabels}
+                                onOpenRelayDetails={onOpenRelayDetails}
+                                onAddSuggestedRelay={onAddSuggestedRelay}
+                                onOpenRelayActionsMenu={onOpenRelayActionsMenu}
+                            />
                         </div>
                     ) : null}
                 </div>

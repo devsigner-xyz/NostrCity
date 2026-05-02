@@ -1,16 +1,20 @@
 import { act, type ReactElement } from 'react';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { AuthSessionState } from '../../nostr/auth/session';
 import type { GroupsRuntimeSnapshot } from '../../nostr/groups-runtime-service';
+import { createNostrOverlayQueryClient } from '../query/query-client';
 import { useOverlayGroupsController, type OverlayGroupsService } from './use-overlay-groups-controller';
 
 interface Rendered {
     container: HTMLDivElement;
     root: Root;
+    queryClient: QueryClient;
 }
 
 const mounted: Rendered[] = [];
+type OverlayGroupsController = ReturnType<typeof useOverlayGroupsController>;
 
 beforeAll(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -54,28 +58,27 @@ async function waitFor(condition: () => boolean): Promise<void> {
         if (condition()) {
             return;
         }
-        await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 0));
-        });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        act(() => {});
     }
     throw new Error('Condition was not met in time');
 }
 
-async function render(element: ReactElement): Promise<Rendered> {
+async function render(element: ReactElement, queryClient: QueryClient = createNostrOverlayQueryClient()): Promise<Rendered> {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
-    await act(async () => {
-        root.render(element);
+    act(() => {
+        root.render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
     });
-    const rendered = { container, root };
+    const rendered = { container, root, queryClient };
     mounted.push(rendered);
     return rendered;
 }
 
 describe('useOverlayGroupsController', () => {
     test('groups saved, remembered, and discovered groups by relay and selects the deep-linked group', async () => {
-        let controller: ReturnType<typeof useOverlayGroupsController> | undefined;
+        let controller: OverlayGroupsController | undefined;
         const service: OverlayGroupsService = {
             loadGroups: vi.fn(async () => ({
                 saved: [{ relay: 'wss://relay.example', id: 'maps' }],
@@ -123,7 +126,7 @@ describe('useOverlayGroupsController', () => {
     });
 
     test('join uses invite code, remembers locally, and does not save public groups', async () => {
-        let controller: ReturnType<typeof useOverlayGroupsController> | undefined;
+        let controller: OverlayGroupsController | undefined;
         const requestJoin = vi.fn(async () => undefined);
         const savePublicGroups = vi.fn(async () => undefined);
         const rememberGroup = vi.fn();
@@ -171,5 +174,154 @@ describe('useOverlayGroupsController', () => {
         });
 
         expect(savePublicGroups).toHaveBeenCalledWith({ groups: [{ relay: 'wss://relay.example', id: 'parks' }] });
+    });
+
+    test('reuses cached groups after remounting with the same owner and relays', async () => {
+        let controller: OverlayGroupsController | undefined;
+        const service: OverlayGroupsService = {
+            loadGroups: vi.fn(async () => ({ saved: [{ relay: 'wss://relay.example', id: 'maps' }], remembered: [], discovered: [] })),
+            loadGroup: vi.fn(async () => snapshot('wss://relay.example', 'maps', 'maps')),
+            publishMessage: vi.fn(),
+            requestJoin: vi.fn(),
+            requestLeave: vi.fn(),
+            savePublicGroups: vi.fn(),
+        };
+        const authSession = session();
+        const queryClient = createNostrOverlayQueryClient();
+        let show = true;
+
+        function Harness() {
+            if (!show) {
+                return null;
+            }
+
+            controller = useOverlayGroupsController({
+                enabled: true,
+                ownerPubkey: 'a'.repeat(64),
+                session: authSession,
+                service,
+                configuredGroupRelays: ['wss://relay.example'],
+                errorFallbackMessage: 'Could not load groups',
+            });
+            return null;
+        }
+
+        const rendered = await render(<Harness />, queryClient);
+        await waitFor(() => controller?.selectedGroupId === "wss://relay.example'maps");
+        show = false;
+        await act(async () => {
+            rendered.root.render(<QueryClientProvider client={queryClient}><Harness /></QueryClientProvider>);
+        });
+
+        controller = undefined;
+        show = true;
+        await act(async () => {
+            rendered.root.render(<QueryClientProvider client={queryClient}><Harness /></QueryClientProvider>);
+        });
+
+        const currentController = controller as unknown as OverlayGroupsController;
+        expect(currentController.groups.map((group) => group.name)).toEqual(['maps']);
+        expect(currentController.isLoading).toBe(false);
+        expect(service.loadGroups).toHaveBeenCalledTimes(1);
+        expect(service.loadGroup).toHaveBeenCalledTimes(1);
+    });
+
+    test('keeps cached groups visible without full-page loading during background refresh', async () => {
+        let controller: OverlayGroupsController | undefined;
+        let enabled = true;
+        let resolveSecondLoad: (() => void) | undefined;
+        const loadGroups = vi
+            .fn<OverlayGroupsService['loadGroups']>()
+            .mockResolvedValueOnce({ saved: [{ relay: 'wss://relay.example', id: 'maps' }], remembered: [], discovered: [] })
+            .mockImplementationOnce(async () => {
+                await new Promise<void>((resolve) => {
+                    resolveSecondLoad = resolve;
+                });
+                return { saved: [{ relay: 'wss://relay.example', id: 'maps' }], remembered: [], discovered: [] };
+            });
+        const service: OverlayGroupsService = {
+            loadGroups,
+            loadGroup: vi.fn(async () => snapshot('wss://relay.example', 'maps', 'maps')),
+            publishMessage: vi.fn(),
+            requestJoin: vi.fn(),
+            requestLeave: vi.fn(),
+            savePublicGroups: vi.fn(),
+        };
+        const authSession = session();
+
+        function Harness() {
+            controller = useOverlayGroupsController({
+                enabled,
+                ownerPubkey: 'a'.repeat(64),
+                session: authSession,
+                service,
+                configuredGroupRelays: ['wss://relay.example'],
+                errorFallbackMessage: 'Could not load groups',
+            });
+            return null;
+        }
+
+        const rendered = await render(<Harness />);
+        await waitFor(() => controller?.selectedGroupId === "wss://relay.example'maps");
+
+        enabled = false;
+        await act(async () => {
+            rendered.root.render(<QueryClientProvider client={rendered.queryClient}><Harness /></QueryClientProvider>);
+        });
+        await rendered.queryClient.invalidateQueries();
+        enabled = true;
+        await act(async () => {
+            rendered.root.render(<QueryClientProvider client={rendered.queryClient}><Harness /></QueryClientProvider>);
+        });
+        await waitFor(() => loadGroups.mock.calls.length === 2);
+
+        const currentController = controller as unknown as OverlayGroupsController;
+        expect(currentController.groups.map((group) => group.name)).toEqual(['maps']);
+        expect(currentController.isLoading).toBe(false);
+
+        await act(async () => {
+            resolveSecondLoad?.();
+        });
+    });
+
+    test('keeps cached groups visible when a background refresh fails', async () => {
+        let controller: OverlayGroupsController | undefined;
+        const loadGroups = vi
+            .fn<OverlayGroupsService['loadGroups']>()
+            .mockResolvedValueOnce({ saved: [{ relay: 'wss://relay.example', id: 'maps' }], remembered: [], discovered: [] })
+            .mockRejectedValue(new Error('relay timeout'));
+        const service: OverlayGroupsService = {
+            loadGroups,
+            loadGroup: vi.fn(async () => snapshot('wss://relay.example', 'maps', 'maps')),
+            publishMessage: vi.fn(),
+            requestJoin: vi.fn(),
+            requestLeave: vi.fn(),
+            savePublicGroups: vi.fn(),
+        };
+        const authSession = session();
+
+        function Harness() {
+            controller = useOverlayGroupsController({
+                enabled: true,
+                ownerPubkey: 'a'.repeat(64),
+                session: authSession,
+                service,
+                configuredGroupRelays: ['wss://relay.example'],
+                errorFallbackMessage: 'Could not load groups',
+            });
+            return null;
+        }
+
+        await render(<Harness />);
+        await waitFor(() => controller?.selectedGroupId === "wss://relay.example'maps");
+
+        await act(async () => {
+            await controller?.retry();
+        });
+        expect(loadGroups.mock.calls.length).toBeGreaterThan(1);
+
+        const currentController = controller as OverlayGroupsController;
+        expect(currentController.groups.map((group) => group.name)).toEqual(['maps']);
+        expect(currentController.error).toBeNull();
     });
 });

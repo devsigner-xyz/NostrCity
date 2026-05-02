@@ -10,7 +10,7 @@ import { OverlaySurface } from './OverlaySurface';
 import { GroupDetail } from './GroupDetail';
 import { GroupInviteDialog } from './GroupInviteDialog';
 import { GroupList } from './GroupList';
-import { GroupRelayList, type NostrGroupRelaySummary } from './GroupRelayList';
+import { GroupRelaySelect, type NostrGroupRelaySummary } from './GroupRelayList';
 import type { ParsedGroupInviteLink } from '../../nostr/group-invite-links';
 
 export interface NostrGroupSummary {
@@ -34,7 +34,7 @@ export interface GroupsPageProps {
     session: AuthSessionState | null;
     messageDraft: string;
     timeline: NostrEvent[];
-    onSelectRelay?: (relayUrl: string) => void;
+    onSelectRelay?: (relayUrl: string | null) => void;
     onSelectGroup: (groupId: string) => void;
     onMessageDraftChange: (message: string) => void;
     onPublishMessage: (groupId: string, message: string) => void;
@@ -108,6 +108,7 @@ export function GroupsPage({
     const group = selectedGroup(relayGroups, selectedGroupId);
     const disabledReason = writeDisabledReason(session, t);
     const canWrite = !disabledReason;
+    const selectedRelayHasNoGroups = Boolean(selectedRelayUrl && relayGroups.length === 0);
     const relaySummaries = relays ?? [...new Set(groups.map((item) => item.relayUrl))].map((relayUrl) => ({
         relayUrl,
         groupCount: groups.filter((item) => item.relayUrl === relayUrl).length,
@@ -116,9 +117,17 @@ export function GroupsPage({
         isConfigured: true,
     }));
 
+    const handleSync = (): void => {
+        if (!canWrite) {
+            return;
+        }
+
+        onSyncPublicGroups();
+    };
+
     return (
         <OverlaySurface ariaLabel={t('groups.title')}>
-            <div className="nostr-groups-page nostr-routed-surface-panel nostr-page-layout flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-3">
+            <div className="nostr-groups-page nostr-routed-surface-panel nostr-page-layout h-full" data-group-source="query">
                 <OverlayPageHeader
                     title={t('groups.title')}
                     description={t('groups.description')}
@@ -167,7 +176,7 @@ export function GroupsPage({
                             </Button>
                         </div>
                     </Empty>
-                ) : groups.length === 0 ? (
+                ) : groups.length === 0 && !selectedRelayUrl ? (
                     <Empty className="min-h-[18rem] self-stretch">
                         <EmptyHeader>
                             <EmptyTitle>{t('groups.emptyTitle')}</EmptyTitle>
@@ -177,28 +186,50 @@ export function GroupsPage({
                 ) : (
                     <div
                         data-testid="groups-page-layout"
-                        className="flex min-h-0 flex-1 flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,18rem)_minmax(0,20rem)_minmax(0,1fr)] lg:overflow-hidden"
+                        className="nostr-groups-layout"
                     >
-                        <GroupRelayList
-                            relays={relaySummaries}
-                            selectedRelayUrl={selectedRelayUrl ?? relaySummaries[0]?.relayUrl ?? null}
-                            onSelectRelay={onSelectRelay}
-                            onAddCustomGroupRelay={onAddCustomGroupRelay}
-                        />
-                        <GroupList groups={relayGroups} selectedGroupId={group?.id ?? null} onSelectGroup={onSelectGroup} />
-                        <GroupDetail
-                            group={group}
-                            canWrite={canWrite}
-                            disabledReason={disabledReason}
-                            messageDraft={messageDraft}
-                            timeline={timeline}
-                            onMessageDraftChange={onMessageDraftChange}
-                            onPublishMessage={onPublishMessage}
-                            onSaveGroup={onSaveGroup}
-                            onSyncPublicGroups={onSyncPublicGroups}
-                            onJoinGroup={onJoinGroup}
-                            onLeaveGroup={onLeaveGroup}
-                        />
+                        <div className="flex flex-col gap-2 rounded-xl border bg-card/60 p-3 sm:flex-row sm:items-end sm:justify-between">
+                            <GroupRelaySelect
+                                relays={relaySummaries}
+                                selectedRelayUrl={selectedRelayUrl ?? null}
+                                onSelectRelay={onSelectRelay}
+                                onAddCustomGroupRelay={onAddCustomGroupRelay}
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={!canWrite}
+                                title={disabledReason ?? undefined}
+                                aria-label={t('groups.sync.aria')}
+                                onClick={handleSync}
+                            >
+                                {t('groups.sync.action')}
+                            </Button>
+                        </div>
+                        <div className="nostr-groups-columns min-h-0 flex-1">
+                            <GroupList
+                                groups={relayGroups}
+                                selectedGroupId={group?.id ?? null}
+                                onSelectGroup={onSelectGroup}
+                                {...(selectedRelayHasNoGroups ? {
+                                    emptyTitle: t('groups.list.relayEmptyTitle'),
+                                    emptyDescription: t('groups.list.relayEmptyDescription'),
+                                    onEmptyRetry: onRetry,
+                                } : {})}
+                            />
+                            <GroupDetail
+                                group={group}
+                                canWrite={canWrite}
+                                disabledReason={disabledReason}
+                                messageDraft={messageDraft}
+                                timeline={timeline}
+                                onMessageDraftChange={onMessageDraftChange}
+                                onPublishMessage={onPublishMessage}
+                                onSaveGroup={onSaveGroup}
+                                onJoinGroup={onJoinGroup}
+                                onLeaveGroup={onLeaveGroup}
+                            />
+                        </div>
                     </div>
                 )}
             </div>

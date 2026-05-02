@@ -4,7 +4,7 @@
   "description": "",
   "main": "server/dist/main.js",
   "scripts": {
-    "dev": "VITE_DOCS_URL=http://127.0.0.1:5174/docs/ vite --host 127.0.0.1 --port 5173 --strictPort",
+    "dev": "VITE_DOCS_URL=http://127.0.0.1:5174/docs/ vite --host 127.0.0.1 --port 5173 --strictPort --open /app/",
     "dev:lan": "VITE_DOCS_URL=http://127.0.0.1:5174/docs/ vite --host 0.0.0.0 --port 5173 --strictPort",
     "bff:dev": "tsx watch server/src/main.ts",
     "bff:start": "tsx server/src/main.ts",

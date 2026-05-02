@@ -4,7 +4,7 @@ SHELL := /bin/bash
 
 dev:
 	@printf "BFF: http://127.0.0.1:3000/v1/health\n"
-	@printf "Landing + app: http://127.0.0.1:5173/\n"
+	@printf "App: http://127.0.0.1:5173/app/\n"
 	@printf "Documentacion: http://127.0.0.1:5174/\n\n"
 	@printf "Pulsa Ctrl+C para detener los tres procesos.\n"
 	@trap 'for job in $$(jobs -pr); do kill $$job 2>/dev/null || true; done' EXIT INT TERM; \

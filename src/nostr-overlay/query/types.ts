@@ -56,6 +56,13 @@ export interface DirectMessagesConversationQueryInput {
     conversationId: string;
 }
 
+export interface OverlayGroupsQueryInput {
+    ownerPubkey: string;
+    configuredRelays: string[];
+    hasGroupRelaysConfigured: boolean;
+    selectedGroupKey?: string;
+}
+
 export interface ActiveProfilePostsQueryInput {
     pubkey: string;
     pageSize: number;

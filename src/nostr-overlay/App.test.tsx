@@ -484,6 +484,19 @@ async function openDropdownTrigger(button: HTMLButtonElement): Promise<void> {
     });
 }
 
+async function clickMenuItemByLabel(label: string): Promise<void> {
+    const item = document.body.querySelector(`[aria-label="${label}"]`);
+    await act(async () => {
+        item?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+        item?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+}
+
+async function openGroupActions(container: HTMLElement, groupName: string): Promise<void> {
+    const trigger = container.querySelector(`button[aria-label="Abrir acciones de ${groupName}"]`) as HTMLButtonElement;
+    await openDropdownTrigger(trigger);
+}
+
 async function openSettingsContextMenu(container: HTMLDivElement): Promise<void> {
     const inlineSettingsButton = container.querySelector('button[aria-label="Alternar ajustes"]') as HTMLButtonElement | null;
     const inlineOptionsVisible = (container.textContent || '').includes('Ajustes avanzados');
@@ -3874,11 +3887,11 @@ describe('Nostr overlay App', () => {
         await fillTextarea(textarea, 'Hello group');
 
         const publishButton = rendered.container.querySelector('button[aria-label="Publicar mensaje en Map Makers"]') as HTMLButtonElement;
-        const saveButton = rendered.container.querySelector('button[aria-label="Guardar Map Makers"]') as HTMLButtonElement;
         await act(async () => {
             publishButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
+        await openGroupActions(rendered.container, 'Map Makers');
+        await clickMenuItemByLabel('Guardar Map Makers');
 
         expect(publishMessage).toHaveBeenCalledWith({
             group: { relay: 'wss://relay.example', id: 'maps' },
@@ -3921,7 +3934,7 @@ describe('Nostr overlay App', () => {
 
         await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
         expect(rendered.container.textContent || '').not.toContain('Los relays y grupos sincronizados son datos públicos de Nostr.');
-        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar grupos públicos"]') as HTMLButtonElement;
+        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar relays públicos"]') as HTMLButtonElement;
         await act(async () => {
             syncButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
@@ -3989,10 +4002,8 @@ describe('Nostr overlay App', () => {
             parksButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        const saveButton = rendered.container.querySelector('button[aria-label="Guardar Park Planners"]') as HTMLButtonElement;
-        await act(async () => {
-            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await openGroupActions(rendered.container, 'Park Planners');
+        await clickMenuItemByLabel('Guardar Park Planners');
 
         expect(savePublicGroups).toHaveBeenCalledWith({
             groups: [
@@ -4040,10 +4051,8 @@ describe('Nostr overlay App', () => {
         mounted.push(rendered);
 
         await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
-        const saveButton = rendered.container.querySelector('button[aria-label="Guardar Map Makers"]') as HTMLButtonElement;
-        await act(async () => {
-            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await openGroupActions(rendered.container, 'Map Makers');
+        await clickMenuItemByLabel('Guardar Map Makers');
 
         expect(savePublicGroups).toHaveBeenCalledWith({
             groups: [{ relay: 'wss://relay.example', id: 'maps' }],
@@ -4105,19 +4114,15 @@ describe('Nostr overlay App', () => {
         await act(async () => {
             parksButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
-        const saveParksButton = rendered.container.querySelector('button[aria-label="Guardar Park Planners"]') as HTMLButtonElement;
-        await act(async () => {
-            saveParksButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await openGroupActions(rendered.container, 'Park Planners');
+        await clickMenuItemByLabel('Guardar Park Planners');
 
         const artistsButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Artist Guild')) as HTMLButtonElement;
         await act(async () => {
             artistsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
-        const saveArtistsButton = rendered.container.querySelector('button[aria-label="Guardar Artist Guild"]') as HTMLButtonElement;
-        await act(async () => {
-            saveArtistsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await openGroupActions(rendered.container, 'Artist Guild');
+        await clickMenuItemByLabel('Guardar Artist Guild');
 
         expect(savePublicGroups).toHaveBeenNthCalledWith(1, {
             groups: [
@@ -4167,12 +4172,10 @@ describe('Nostr overlay App', () => {
         mounted.push(rendered);
 
         await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
-        const joinButton = rendered.container.querySelector('button[aria-label="Unirse a Map Makers"]') as HTMLButtonElement;
-        const leaveButton = rendered.container.querySelector('button[aria-label="Salir de Map Makers"]') as HTMLButtonElement;
-        await act(async () => {
-            joinButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            leaveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await openGroupActions(rendered.container, 'Map Makers');
+        await clickMenuItemByLabel('Unirse a Map Makers');
+        await openGroupActions(rendered.container, 'Map Makers');
+        await clickMenuItemByLabel('Salir de Map Makers');
 
         expect(requestJoin).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'maps' } });
         expect(requestLeave).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'maps' } });
@@ -4211,10 +4214,8 @@ describe('Nostr overlay App', () => {
         mounted.push(rendered);
 
         await waitFor(() => (rendered.container.textContent || '').includes('Park Planners'));
-        const joinButton = rendered.container.querySelector('button[aria-label="Unirse a Park Planners"]') as HTMLButtonElement;
-        await act(async () => {
-            joinButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await openGroupActions(rendered.container, 'Park Planners');
+        await clickMenuItemByLabel('Unirse a Park Planners');
 
         expect(requestJoin).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'parks' }, code: 'invite-code' });
         expect(savePublicGroups).not.toHaveBeenCalled();
@@ -4268,28 +4269,26 @@ describe('Nostr overlay App', () => {
 
         await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
         const publishButton = rendered.container.querySelector('button[aria-label="Publicar mensaje en Map Makers"]') as HTMLButtonElement;
-        const saveButton = rendered.container.querySelector('button[aria-label="Guardar Map Makers"]') as HTMLButtonElement;
-        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar grupos públicos"]') as HTMLButtonElement;
+        const syncButton = rendered.container.querySelector('button[aria-label="Sincronizar relays públicos"]') as HTMLButtonElement;
 
         expect(publishButton.disabled).toBe(true);
-        expect(saveButton.disabled).toBe(true);
         expect(syncButton.disabled).toBe(true);
-        const joinButton = rendered.container.querySelector('button[aria-label="Unirse a Map Makers"]') as HTMLButtonElement;
-        const leaveButton = rendered.container.querySelector('button[aria-label="Salir de Map Makers"]') as HTMLButtonElement;
-        expect(joinButton.disabled).toBe(true);
-        expect(leaveButton.disabled).toBe(true);
+        await openGroupActions(rendered.container, 'Map Makers');
+        expect(document.body.querySelector('[aria-label="Guardar Map Makers"]')?.getAttribute('aria-disabled')).toBe('true');
+        expect(document.body.querySelector('[aria-label="Unirse a Map Makers"]')?.getAttribute('aria-disabled')).toBe('true');
+        expect(document.body.querySelector('[aria-label="Salir de Map Makers"]')?.getAttribute('aria-disabled')).toBe('true');
         await act(async () => {
             publishButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             syncButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            joinButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            leaveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
+        await clickMenuItemByLabel('Guardar Map Makers');
+        await clickMenuItemByLabel('Unirse a Map Makers');
+        await clickMenuItemByLabel('Salir de Map Makers');
 
         expect(publishMessage).not.toHaveBeenCalled();
         expect(savePublicGroups).not.toHaveBeenCalled();
-        expect(rendered.container.textContent || '').toContain('Unirse al grupo');
-        expect(rendered.container.textContent || '').toContain('Salir del grupo');
+        expect(document.body.textContent || '').toContain('Unirse al grupo');
+        expect(document.body.textContent || '').toContain('Salir del grupo');
     });
 
     test('groups route passes deterministic created_at desc and id asc timeline to publish', async () => {

@@ -1,7 +1,6 @@
 import type { MouseEvent, ReactElement } from 'react';
 import type { RelayType } from '../../../nostr/relay-settings';
 import type { RelayConnectionStatus } from '../../hooks/useRelayConnectionSummary';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +19,7 @@ import { EllipsisVerticalIcon } from 'lucide-react';
 import { OverlayPageHeader } from '../OverlayPageHeader';
 import { SettingsDmRelaysSection } from './SettingsDmRelaysSection';
 import { SettingsGroupRelaysSection } from './SettingsGroupRelaysSection';
+import { SettingsRelayMobileList, compactRelayTypes, formatRelayDisplayUrl, hasNip65ReadAccess, hasNip65WriteAccess } from './SettingsRelayMobileList';
 import type { RelayDetails, RelayInformationDocument, RelayRow, RelaySource } from './types';
 
 interface SettingsRelaysPageProps {
@@ -77,40 +77,6 @@ interface SettingsRelaysPageProps {
     relayConnectionBadge: (status: RelayConnectionStatus | undefined) => ReactElement;
 }
 
-function compactRelayTypes(relayTypes: RelayType[]): RelayType[] {
-    if (relayTypes.includes('search')) {
-        return ['search'];
-    }
-
-    const hasBoth = relayTypes.includes('nip65Both');
-    const hasRead = relayTypes.includes('nip65Read');
-    const hasWrite = relayTypes.includes('nip65Write');
-    const hasDmInbox = relayTypes.includes('dmInbox');
-
-    const compacted: RelayType[] = [];
-    if (hasBoth || (hasRead && hasWrite)) {
-        compacted.push('nip65Both');
-    } else if (hasRead) {
-        compacted.push('nip65Read');
-    } else if (hasWrite) {
-        compacted.push('nip65Write');
-    }
-
-    if (hasDmInbox) {
-        compacted.push('dmInbox');
-    }
-
-    return compacted;
-}
-
-function hasNip65ReadAccess(relayTypes: RelayType[]): boolean {
-    return relayTypes.includes('nip65Both') || relayTypes.includes('nip65Read');
-}
-
-function hasNip65WriteAccess(relayTypes: RelayType[]): boolean {
-    return relayTypes.includes('nip65Both') || relayTypes.includes('nip65Write');
-}
-
 export function SettingsRelaysPage({
     configuredRows,
     suggestedRows,
@@ -161,8 +127,6 @@ export function SettingsRelaysPage({
     onAddAllSuggestedSearchRelays,
     onResetSearchRelaysToDefault,
     onOpenRelayActionsMenu,
-    describeRelay,
-    relayAvatarFallback,
     relayConnectionBadge,
 }: SettingsRelaysPageProps) {
     const { t } = useI18n();
@@ -198,7 +162,7 @@ export function SettingsRelaysPage({
                                 </div>
                             </CardHeader>
                             <CardContent className="px-0 py-0">
-                                <div className="nostr-relay-table-scroll">
+                                <div className="nostr-relay-table-scroll nostr-relay-desktop-table">
                                     <Table className="nostr-relay-table">
                                         <TableHeader>
                                             <TableRow>
@@ -211,7 +175,6 @@ export function SettingsRelaysPage({
                                         </TableHeader>
                                         <TableBody>
                                             {configuredRows.map(({ relayUrl, relayTypes, primaryRelayType }) => {
-                                                const details = describeRelay(relayUrl, 'configured');
                                                 const info = relayInfoByUrl[relayUrl];
                                                 const document = info?.data;
                                                 const relayConnectionStatus = configuredRelayConnectionStatusByRelay[relayUrl];
@@ -225,11 +188,8 @@ export function SettingsRelaysPage({
                                                     <TableRow key={`configured-${relayUrl}`}>
                                                         <TableCell className="nostr-relay-url-cell">
                                                             <div className="nostr-relay-main-cell">
-                                                                <Avatar className="size-8">
-                                                                    <AvatarFallback>{relayAvatarFallback(details, document)}</AvatarFallback>
-                                                                </Avatar>
                                                                 <div className="min-w-0">
-                                                                    <p className="nostr-relay-summary-primary">{document?.name || relayUrl}</p>
+                                                                    <p className="nostr-relay-summary-primary" title={relayUrl}>{document?.name || formatRelayDisplayUrl(relayUrl)}</p>
                                                                 </div>
                                                             </div>
                                                         </TableCell>
@@ -281,6 +241,17 @@ export function SettingsRelaysPage({
                                         </TableBody>
                                     </Table>
                                 </div>
+                                <SettingsRelayMobileList
+                                    rows={configuredRows}
+                                    source="configured"
+                                    relayInfoByUrl={relayInfoByUrl}
+                                    relayConnectionStatusByRelay={configuredRelayConnectionStatusByRelay}
+                                    relayTypeLabels={relayTypeLabels}
+                                    onOpenRelayDetails={onOpenRelayDetails}
+                                    onRemoveRelay={onRemoveRelay}
+                                    onSetConfiguredRelayNip65Access={onSetConfiguredRelayNip65Access}
+                                    onOpenRelayActionsMenu={onOpenRelayActionsMenu}
+                                />
                             </CardContent>
                         </Card>
 
@@ -339,7 +310,7 @@ export function SettingsRelaysPage({
                                         <CardDescription>{t('settings.relays.suggested.description')}</CardDescription>
                                     </CardHeader>
                                     <CardContent className="px-0 py-0">
-                                        <div className="nostr-relay-table-scroll">
+                                        <div className="nostr-relay-table-scroll nostr-relay-desktop-table">
                                             <Table className="nostr-relay-table">
                                                 <TableHeader>
                                                     <TableRow>
@@ -351,7 +322,6 @@ export function SettingsRelaysPage({
                                                 </TableHeader>
                                                 <TableBody>
                                                     {suggestedRows.map(({ relayUrl, relayTypes, primaryRelayType }) => {
-                                                        const details = describeRelay(relayUrl, 'suggested');
                                                         const info = relayInfoByUrl[relayUrl];
                                                         const document = info?.data;
                                                         const relayConnectionStatus = relayConnectionStatusByRelay[relayUrl];
@@ -363,11 +333,8 @@ export function SettingsRelaysPage({
                                                             <TableRow key={`suggested-${relayUrl}`}>
                                                                 <TableCell className="nostr-relay-url-cell">
                                                                     <div className="nostr-relay-main-cell">
-                                                                        <Avatar className="size-8">
-                                                                            <AvatarFallback>{relayAvatarFallback(details, document)}</AvatarFallback>
-                                                                        </Avatar>
                                                                         <div className="min-w-0">
-                                                                            <p className="nostr-relay-summary-primary">{document?.name || relayUrl}</p>
+                                                                            <p className="nostr-relay-summary-primary" title={relayUrl}>{document?.name || formatRelayDisplayUrl(relayUrl)}</p>
                                                                         </div>
                                                                     </div>
                                                                 </TableCell>
@@ -414,6 +381,16 @@ export function SettingsRelaysPage({
                                                 </TableBody>
                                             </Table>
                                         </div>
+                                        <SettingsRelayMobileList
+                                            rows={suggestedRows}
+                                            source="suggested"
+                                            relayInfoByUrl={relayInfoByUrl}
+                                            relayConnectionStatusByRelay={relayConnectionStatusByRelay}
+                                            relayTypeLabels={relayTypeLabels}
+                                            onOpenRelayDetails={onOpenRelayDetails}
+                                            onAddSuggestedRelay={onAddSuggestedRelay}
+                                            onOpenRelayActionsMenu={onOpenRelayActionsMenu}
+                                        />
                                     </CardContent>
                                 </Card>
                             ) : null}
@@ -434,8 +411,6 @@ export function SettingsRelaysPage({
                                 onAddAllSuggestedRelays={onAddAllSuggestedDmRelays}
                                 onResetRelaysToDefault={onResetDmRelaysToDefault}
                                 onOpenRelayActionsMenu={onOpenRelayActionsMenu}
-                                describeRelay={describeRelay}
-                                relayAvatarFallback={relayAvatarFallback}
                                 relayConnectionBadge={relayConnectionBadge}
                             />
 
@@ -455,8 +430,6 @@ export function SettingsRelaysPage({
                                 onAddAllSuggestedRelays={onAddAllSuggestedGroupRelays}
                                 onResetRelaysToDefault={onResetGroupRelaysToDefault}
                                 onOpenRelayActionsMenu={onOpenRelayActionsMenu}
-                                describeRelay={describeRelay}
-                                relayAvatarFallback={relayAvatarFallback}
                             />
 
                             <Card size="sm" className="nostr-relay-search nostr-relays-panel gap-0 py-0">
@@ -502,7 +475,7 @@ export function SettingsRelaysPage({
                                             <div className="nostr-relay-suggested-header mb-2">
                                                 <h3 className="text-sm font-semibold">{t('settings.relays.section.configured')}</h3>
                                             </div>
-                                            <div className="nostr-relay-table-scroll">
+                                            <div className="nostr-relay-table-scroll nostr-relay-desktop-table">
                                                 <Table className="nostr-relay-table">
                                                     <TableHeader>
                                                         <TableRow>
@@ -514,7 +487,6 @@ export function SettingsRelaysPage({
                                                     </TableHeader>
                                                     <TableBody>
                                                         {searchConfiguredRows.map(({ relayUrl, relayTypes, primaryRelayType }) => {
-                                                            const details = describeRelay(relayUrl, 'configured');
                                                             const info = relayInfoByUrl[relayUrl];
                                                             const document = info?.data;
                                                             const relayConnectionStatus = relayConnectionStatusByRelay[relayUrl];
@@ -526,11 +498,8 @@ export function SettingsRelaysPage({
                                                                 <TableRow key={`search-configured-${relayUrl}`}>
                                                                     <TableCell className="nostr-relay-url-cell">
                                                                         <div className="nostr-relay-main-cell">
-                                                                            <Avatar className="size-8">
-                                                                                <AvatarFallback>{relayAvatarFallback(details, document)}</AvatarFallback>
-                                                                            </Avatar>
                                                                             <div className="min-w-0">
-                                                                                <p className="nostr-relay-summary-primary">{document?.name || relayUrl}</p>
+                                                                                <p className="nostr-relay-summary-primary" title={relayUrl}>{document?.name || formatRelayDisplayUrl(relayUrl)}</p>
                                                                             </div>
                                                                         </div>
                                                                     </TableCell>
@@ -575,6 +544,16 @@ export function SettingsRelaysPage({
                                                     </TableBody>
                                                 </Table>
                                             </div>
+                                            <SettingsRelayMobileList
+                                                rows={searchConfiguredRows}
+                                                source="configured"
+                                                relayInfoByUrl={relayInfoByUrl}
+                                                relayConnectionStatusByRelay={relayConnectionStatusByRelay}
+                                                relayTypeLabels={relayTypeLabels}
+                                                onOpenRelayDetails={onOpenRelayDetails}
+                                                onRemoveRelay={onRemoveSearchRelay}
+                                                onOpenRelayActionsMenu={onOpenRelayActionsMenu}
+                                            />
                                         </div>
 
                                         {searchSuggestedRows.length > 0 ? (
@@ -585,7 +564,7 @@ export function SettingsRelaysPage({
                                                         {t('settings.relays.addAll')}
                                                     </Button>
                                                 </div>
-                                                <div className="nostr-relay-table-scroll">
+                                                <div className="nostr-relay-table-scroll nostr-relay-desktop-table">
                                                     <Table className="nostr-relay-table">
                                                         <TableHeader>
                                                             <TableRow>
@@ -597,7 +576,6 @@ export function SettingsRelaysPage({
                                                         </TableHeader>
                                                         <TableBody>
                                                             {searchSuggestedRows.map(({ relayUrl, relayTypes, primaryRelayType }) => {
-                                                                const details = describeRelay(relayUrl, 'suggested');
                                                                 const info = relayInfoByUrl[relayUrl];
                                                                 const document = info?.data;
                                                                 const relayConnectionStatus = relayConnectionStatusByRelay[relayUrl];
@@ -609,11 +587,8 @@ export function SettingsRelaysPage({
                                                                     <TableRow key={`search-suggested-${relayUrl}`}>
                                                                         <TableCell className="nostr-relay-url-cell">
                                                                             <div className="nostr-relay-main-cell">
-                                                                                <Avatar className="size-8">
-                                                                                    <AvatarFallback>{relayAvatarFallback(details, document)}</AvatarFallback>
-                                                                                </Avatar>
                                                                                 <div className="min-w-0">
-                                                                                    <p className="nostr-relay-summary-primary">{document?.name || relayUrl}</p>
+                                                                                    <p className="nostr-relay-summary-primary" title={relayUrl}>{document?.name || formatRelayDisplayUrl(relayUrl)}</p>
                                                                                 </div>
                                                                             </div>
                                                                         </TableCell>
@@ -658,6 +633,16 @@ export function SettingsRelaysPage({
                                                         </TableBody>
                                                     </Table>
                                                 </div>
+                                                <SettingsRelayMobileList
+                                                    rows={searchSuggestedRows}
+                                                    source="suggested"
+                                                    relayInfoByUrl={relayInfoByUrl}
+                                                    relayConnectionStatusByRelay={relayConnectionStatusByRelay}
+                                                    relayTypeLabels={relayTypeLabels}
+                                                    onOpenRelayDetails={onOpenRelayDetails}
+                                                    onAddSuggestedRelay={onAddSuggestedSearchRelay}
+                                                    onOpenRelayActionsMenu={onOpenRelayActionsMenu}
+                                                />
                                             </div>
                                         ) : null}
                                     </div>

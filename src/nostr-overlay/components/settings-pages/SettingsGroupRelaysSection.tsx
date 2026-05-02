@@ -1,7 +1,6 @@
 import type { MouseEvent } from 'react';
 import type { RelayType } from '../../../nostr/relay-settings';
 import type { RelayConnectionStatus } from '../../hooks/useRelayConnectionSummary';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +16,8 @@ import { useI18n } from '@/i18n/useI18n';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EllipsisVerticalIcon } from 'lucide-react';
-import type { RelayDetails, RelayInformationDocument, RelayRow, RelaySource } from './types';
+import { SettingsRelayMobileList, formatRelayDisplayUrl } from './SettingsRelayMobileList';
+import type { RelayInformationDocument, RelayRow, RelaySource } from './types';
 
 interface SettingsGroupRelaysSectionProps {
     configuredRows: RelayRow[];
@@ -35,8 +35,6 @@ interface SettingsGroupRelaysSectionProps {
     onAddAllSuggestedRelays: () => void;
     onResetRelaysToDefault: () => void;
     onOpenRelayActionsMenu: (event: MouseEvent<HTMLButtonElement>) => void;
-    describeRelay: (relayUrl: string, source: RelaySource) => RelayDetails;
-    relayAvatarFallback: (details: RelayDetails, document?: RelayInformationDocument) => string;
 }
 
 export function SettingsGroupRelaysSection({
@@ -55,8 +53,6 @@ export function SettingsGroupRelaysSection({
     onAddAllSuggestedRelays,
     onResetRelaysToDefault,
     onOpenRelayActionsMenu,
-    describeRelay,
-    relayAvatarFallback,
 }: SettingsGroupRelaysSectionProps) {
     const { t } = useI18n();
     const relayInputErrorId = 'group-relay-input-error';
@@ -64,7 +60,7 @@ export function SettingsGroupRelaysSection({
 
     const relayConnectionBadge = (status: RelayConnectionStatus | undefined) => {
         if (status === 'connected') {
-            return <Badge>{t('settings.relays.status.connected')}</Badge>;
+            return <Badge variant="success">{t('settings.relays.status.connected')}</Badge>;
         }
 
         if (status === 'disconnected') {
@@ -123,7 +119,7 @@ export function SettingsGroupRelaysSection({
                         <div className="nostr-relay-suggested-header mb-2">
                             <h4 className="text-sm font-semibold">{t('settings.relays.section.configured')}</h4>
                         </div>
-                        <div className="nostr-relay-table-scroll">
+                        <div className="nostr-relay-table-scroll nostr-relay-desktop-table">
                             <Table className="nostr-relay-table" aria-label={t('settings.relays.groups.configuredTable')}>
                                 <TableHeader>
                                     <TableRow>
@@ -135,7 +131,6 @@ export function SettingsGroupRelaysSection({
                                 </TableHeader>
                                 <TableBody>
                                     {configuredRows.map(({ relayUrl, relayTypes, primaryRelayType }) => {
-                                        const details = describeRelay(relayUrl, 'configured');
                                         const document = relayInfoByUrl[relayUrl]?.data;
                                         const relayConnectionStatus = relayConnectionStatusByRelay[relayUrl];
                                         const relayTypeSummary = relayTypes.map((relayType) => relayTypeLabels[relayType]).join(', ');
@@ -144,11 +139,8 @@ export function SettingsGroupRelaysSection({
                                             <TableRow key={`group-configured-${relayUrl}`}>
                                                 <TableCell className="nostr-relay-url-cell">
                                                     <div className="nostr-relay-main-cell">
-                                                        <Avatar className="size-8">
-                                                            <AvatarFallback>{relayAvatarFallback(details, document)}</AvatarFallback>
-                                                        </Avatar>
                                                         <div className="min-w-0">
-                                                            <p className="nostr-relay-summary-primary">{document?.name || relayUrl}</p>
+                                                            <p className="nostr-relay-summary-primary" title={relayUrl}>{document?.name || formatRelayDisplayUrl(relayUrl)}</p>
                                                         </div>
                                                     </div>
                                                 </TableCell>
@@ -193,6 +185,16 @@ export function SettingsGroupRelaysSection({
                                 </TableBody>
                             </Table>
                         </div>
+                        <SettingsRelayMobileList
+                            rows={configuredRows}
+                            source="configured"
+                            relayInfoByUrl={relayInfoByUrl}
+                            relayConnectionStatusByRelay={relayConnectionStatusByRelay}
+                            relayTypeLabels={relayTypeLabels}
+                            onOpenRelayDetails={onOpenRelayDetails}
+                            onRemoveRelay={onRemoveRelay}
+                            onOpenRelayActionsMenu={onOpenRelayActionsMenu}
+                        />
                     </div>
 
                     {suggestedRows.length > 0 ? (
@@ -203,7 +205,7 @@ export function SettingsGroupRelaysSection({
                                     {t('settings.relays.addAll')}
                                 </Button>
                             </div>
-                            <div className="nostr-relay-table-scroll">
+                            <div className="nostr-relay-table-scroll nostr-relay-desktop-table">
                                 <Table className="nostr-relay-table" aria-label={t('settings.relays.groups.suggestedTable')}>
                                     <TableHeader>
                                         <TableRow>
@@ -215,7 +217,6 @@ export function SettingsGroupRelaysSection({
                                     </TableHeader>
                                     <TableBody>
                                         {suggestedRows.map(({ relayUrl, relayTypes, primaryRelayType }) => {
-                                            const details = describeRelay(relayUrl, 'suggested');
                                             const document = relayInfoByUrl[relayUrl]?.data;
                                             const relayConnectionStatus = relayConnectionStatusByRelay[relayUrl];
                                             const relayTypeSummary = relayTypes.map((relayType) => relayTypeLabels[relayType]).join(', ');
@@ -224,11 +225,8 @@ export function SettingsGroupRelaysSection({
                                                 <TableRow key={`group-suggested-${relayUrl}`}>
                                                     <TableCell className="nostr-relay-url-cell">
                                                         <div className="nostr-relay-main-cell">
-                                                            <Avatar className="size-8">
-                                                                <AvatarFallback>{relayAvatarFallback(details, document)}</AvatarFallback>
-                                                            </Avatar>
                                                             <div className="min-w-0">
-                                                                <p className="nostr-relay-summary-primary">{document?.name || relayUrl}</p>
+                                                                <p className="nostr-relay-summary-primary" title={relayUrl}>{document?.name || formatRelayDisplayUrl(relayUrl)}</p>
                                                             </div>
                                                         </div>
                                                     </TableCell>
@@ -273,6 +271,16 @@ export function SettingsGroupRelaysSection({
                                     </TableBody>
                                 </Table>
                             </div>
+                            <SettingsRelayMobileList
+                                rows={suggestedRows}
+                                source="suggested"
+                                relayInfoByUrl={relayInfoByUrl}
+                                relayConnectionStatusByRelay={relayConnectionStatusByRelay}
+                                relayTypeLabels={relayTypeLabels}
+                                onOpenRelayDetails={onOpenRelayDetails}
+                                onAddSuggestedRelay={onAddSuggestedRelay}
+                                onOpenRelayActionsMenu={onOpenRelayActionsMenu}
+                            />
                         </div>
                     ) : null}
                 </div>

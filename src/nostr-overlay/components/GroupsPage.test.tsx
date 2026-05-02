@@ -134,6 +134,20 @@ function setInputValue(input: HTMLInputElement, value: string) {
     input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+async function clickElement(element: Element | null | undefined): Promise<void> {
+    await act(async () => {
+        element?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+        element?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        element?.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+        element?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        element?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+}
+
+async function openGroupActions(container: HTMLElement, groupName = 'City Gardeners'): Promise<void> {
+    await clickElement(container.querySelector(`button[aria-label="Abrir acciones de ${groupName}"]`));
+}
+
 describe('GroupsPage', () => {
     test('renders loading, empty, and error states with accessible feedback', async () => {
         const loading = await renderElement(page({ isLoading: true, groups: [] }));
@@ -142,7 +156,7 @@ describe('GroupsPage', () => {
         expect(loading.container.querySelector('[role="status"]')).not.toBeNull();
         expect(loading.container.textContent || '').toContain('Cargando grupos');
 
-        const empty = await renderElement(page({ groups: [], selectedGroupId: null }));
+        const empty = await renderElement(page({ groups: [], selectedRelayUrl: null, selectedGroupId: null }));
         mounted.push(empty);
 
         expect(empty.container.textContent || '').toContain('Sin grupos guardados');
@@ -197,12 +211,18 @@ describe('GroupsPage', () => {
         mounted.push(rendered);
 
         const layout = rendered.container.querySelector('[data-testid="groups-page-layout"]');
-        expect(layout?.className).toContain('flex-col');
-        expect(layout?.className).toContain('lg:grid');
+        expect(layout?.className).toContain('nostr-groups-layout');
+        expect(rendered.container.querySelector('.nostr-groups-columns')).not.toBeNull();
         const groupList = rendered.container.querySelector('nav[aria-label="Lista de grupos"]');
         expect(groupList).not.toBeNull();
         expect(groupList?.className).toContain('overflow-y-auto');
+        const groupListCard = groupList?.closest('[data-slot="card"]');
+        expect(groupListCard?.className).toContain('border');
+        expect(groupListCard?.className).toContain('ring-0');
         expect(rendered.container.querySelector('article[aria-label="Detalle del grupo City Gardeners"]')).not.toBeNull();
+        const groupDetailCard = rendered.container.querySelector('article[aria-label="Detalle del grupo City Gardeners"] [data-slot="card"]');
+        expect(groupDetailCard?.className).toContain('border');
+        expect(groupDetailCard?.className).toContain('ring-0');
         expect(rendered.container.textContent || '').toContain('City Gardeners');
         expect(rendered.container.textContent || '').toContain('12 miembros');
 
@@ -218,7 +238,9 @@ describe('GroupsPage', () => {
         const rendered = await renderElement(page());
         mounted.push(rendered);
 
-        expect(rendered.container.querySelector('[role="tablist"]')).not.toBeNull();
+        const tabsList = rendered.container.querySelector('[data-slot="tabs-list"]');
+        expect(tabsList).not.toBeNull();
+        expect(tabsList?.getAttribute('data-variant')).toBe('line');
         expect(rendered.container.textContent || '').toContain('Joined (2)');
         expect(rendered.container.textContent || '').toContain('Others (1)');
         expect(rendered.container.textContent || '').toContain('City Gardeners');
@@ -234,6 +256,99 @@ describe('GroupsPage', () => {
         expect(othersRendered.container.textContent || '').not.toContain('Builders Guild');
     });
 
+    test('centers shadcn empty states for relay groups and missing group detail', async () => {
+        const rendered = await renderElement(page({ selectedRelayUrl: 'wss://groups.extra.example', selectedGroupId: null }));
+        mounted.push(rendered);
+
+        const list = rendered.container.querySelector('nav[aria-label="Lista de grupos"]');
+        const listEmpty = list?.querySelector('[data-slot="empty"]');
+        expect(listEmpty).not.toBeNull();
+        expect(listEmpty?.className).toContain('justify-center');
+
+        const detailCard = rendered.container.querySelector('[data-testid="groups-empty-detail"]');
+        const detailEmpty = detailCard?.querySelector('[data-slot="empty"]');
+        expect(detailEmpty).not.toBeNull();
+        expect(detailEmpty?.className).toContain('justify-center');
+        expect(detailEmpty?.textContent || '').toContain('Selecciona un grupo');
+        expect(detailEmpty?.textContent || '').toContain('Elige un grupo guardado para ver sus detalles.');
+    });
+
+    test('shows a retryable empty state when the selected relay has no discoverable groups', async () => {
+        const onRetry = vi.fn();
+        const rendered = await renderElement(page({
+            selectedRelayUrl: 'wss://groups.extra.example',
+            selectedGroupId: null,
+            onRetry,
+        }));
+        mounted.push(rendered);
+
+        const list = rendered.container.querySelector('nav[aria-label="Lista de grupos"]');
+        const listEmpty = list?.querySelector('[data-slot="empty"]');
+        expect(listEmpty).not.toBeNull();
+        expect(listEmpty?.textContent || '').toContain('No hay grupos detectables en este relay');
+        expect(listEmpty?.textContent || '').toContain('El relay no expuso metadata NIP-29 o no respondió a la búsqueda. Reintenta o elige otro relay.');
+
+        const retry = Array.from(rendered.container.querySelectorAll('button')).find((button) => button.textContent === 'Reintentar');
+        await act(async () => {
+            retry?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    test('shows the selected relay empty state when discovery returns no groups overall', async () => {
+        const onRetry = vi.fn();
+        const rendered = await renderElement(page({
+            groups: [],
+            relays: [{ relayUrl: 'wss://groups.extra.example', groupCount: 0, savedCount: 0, rememberedCount: 0, isConfigured: true }],
+            selectedRelayUrl: 'wss://groups.extra.example',
+            selectedGroupId: null,
+            onRetry,
+        }));
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('[data-testid="groups-page-layout"]')).not.toBeNull();
+        expect(rendered.container.textContent || '').not.toContain('Sin grupos guardados');
+        expect(rendered.container.textContent || '').toContain('No hay grupos detectables en este relay');
+
+        const retry = Array.from(rendered.container.querySelectorAll('button')).find((button) => button.textContent === 'Reintentar');
+        await act(async () => {
+            retry?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not render the temporary group search or list heading copy', async () => {
+        const rendered = await renderElement(page());
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('input[aria-label="Buscar grupos"]')).toBeNull();
+        expect(rendered.container.textContent || '').not.toContain('Grupos disponibles');
+        expect(rendered.container.textContent || '').not.toContain('Selecciona un grupo del relay activo.');
+    });
+
+    test('does not render generic group about copy in the main group detail header', async () => {
+        const rendered = await renderElement(page({
+            groups: [
+                {
+                    id: "wss://relay.example'devs",
+                    name: 'Nostr Developers Test',
+                    relayUrl: 'wss://relay.example',
+                    description: 'About group',
+                    memberCount: 58,
+                    metadataVerified: true,
+                },
+            ],
+            selectedGroupId: "wss://relay.example'devs",
+        }));
+        mounted.push(rendered);
+
+        const detail = rendered.container.querySelector('article[aria-label="Detalle del grupo Nostr Developers Test"]');
+        expect(detail?.textContent || '').toContain('Nostr Developers Test');
+        expect(detail?.textContent || '').not.toContain('About group');
+    });
+
     test('renders relay-first controls, group status labels, and invite parsing feedback', async () => {
         const onSelectRelay = vi.fn();
         const onAddCustomGroupRelay = vi.fn();
@@ -242,47 +357,43 @@ describe('GroupsPage', () => {
         mounted.push(rendered);
 
         expect(rendered.container.textContent || '').toContain('Relays de grupos');
-        const relayList = rendered.container.querySelector('nav[aria-label="Relays de grupos"]');
-        expect(relayList).not.toBeNull();
-        expect(relayList?.className).toContain('overflow-y-auto');
-        const relayButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => button.textContent?.includes('wss://groups.extra.example'));
-        await act(async () => {
-            relayButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-        expect(onSelectRelay).toHaveBeenCalledWith('wss://groups.extra.example');
+        expect(rendered.container.querySelector('button[aria-label="Relays de grupos"]')).not.toBeNull();
+        expect(rendered.container.textContent || '').toContain('Sincronizar relays públicos');
 
         expect(rendered.container.textContent || '').toContain('Guardado públicamente');
-        expect(rendered.container.textContent || '').toContain('Recordado en este dispositivo');
+        expect(rendered.container.textContent || '').not.toContain('Recordado en este dispositivo');
+        expect(rendered.container.textContent || '').not.toContain('Remembered on this device');
         const unverifiedDetail = await renderElement(page({ selectedGroupId: "wss://relay.example'builders" }));
         mounted.push(unverifiedDetail);
-        expect(unverifiedDetail.container.textContent || '').toContain('Metadata no verificada por NIP-11');
-        expect(unverifiedDetail.container.querySelector('nav[aria-label="Lista de grupos"]')?.textContent || '').not.toContain('Metadata no verificada por NIP-11');
+        expect(unverifiedDetail.container.textContent || '').not.toContain('Metadata no verificada por NIP-11');
+        await openGroupActions(unverifiedDetail.container, 'Builders Guild');
+        await clickElement(document.body.querySelector('[role="menuitem"]'));
+        expect(document.body.textContent || '').toContain('Metadata no verificada por NIP-11');
+        expect(document.body.textContent || '').not.toContain('Recordado en este dispositivo');
+        expect(document.body.textContent || '').not.toContain('About group');
         expect(rendered.container.textContent || '').not.toContain('Unirse recordará este grupo localmente. No se publicará tu lista pública hasta que guardes o sincronices explícitamente.');
-        const headerInviteButton = rendered.container.querySelector('[data-slot="overlay-page-header-actions"] button[aria-label="Abrir invitación de grupo"]');
+        const headerInviteButton = rendered.container.querySelector('[data-slot="overlay-page-header-actions"] button[aria-label="Abrir grupo NIP-29"]');
         expect(headerInviteButton).not.toBeNull();
 
+        await openGroupActions(rendered.container);
+        await clickElement(document.body.querySelector('[role="menuitem"]'));
+        expect(document.body.textContent || '').toContain('Detalles de City Gardeners');
+        expect(document.body.textContent || '').toContain("wss://relay.example'gardeners");
+
         expect(rendered.container.querySelector('input[aria-label="Relay de grupo personalizado"]')).toBeNull();
-        const addRelayButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => button.textContent === 'Añadir relay');
-        expect(addRelayButton).not.toBeNull();
-        await act(async () => {
-            addRelayButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-        expect(document.body.textContent || '').toContain('Añadir relay de grupo');
-        const customRelay = document.body.querySelector('input[aria-label="Relay de grupo personalizado"]') as HTMLInputElement;
-        expect(customRelay).not.toBeNull();
-        await act(async () => {
-            setInputValue(customRelay, 'wss://custom.groups.example');
-            document.body.querySelector('button[aria-label="Añadir relay de grupo personalizado"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-        expect(onAddCustomGroupRelay).toHaveBeenCalledWith('wss://custom.groups.example');
+        expect(onSelectRelay).not.toHaveBeenCalled();
+        expect(document.body.textContent || '').not.toContain('Añadir relay de grupo');
 
         await act(async () => {
             headerInviteButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
-        expect(document.body.textContent || '').toContain('Pega un enlace de invitación o una ruta /groups.');
+        expect(document.body.textContent || '').not.toContain('Formato: relay-host\'group-id');
+        expect(document.body.textContent || '').not.toContain('Ejemplo: groups.example\'maps');
         expect(document.body.textContent || '').not.toContain('Nostrord');
-        const dialogInput = document.body.querySelector('input[aria-label="Enlace de invitación"]') as HTMLInputElement;
+        const dialogInput = document.body.querySelector('input[aria-label="Dirección de grupo"]') as HTMLInputElement;
+        const inviteCodeInput = document.body.querySelector('input[aria-label="Código de invitación"]') as HTMLInputElement;
         expect(dialogInput).not.toBeNull();
+        expect(inviteCodeInput).not.toBeNull();
         await act(async () => {
             setInputValue(dialogInput, 'not a link');
             document.body.querySelector('button[aria-label="Abrir grupo desde invitación"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -291,7 +402,8 @@ describe('GroupsPage', () => {
         expect(onOpenInvite).not.toHaveBeenCalled();
 
         await act(async () => {
-            setInputValue(dialogInput, '/groups?relay=groups.example&group=Maps&code=abc');
+            setInputValue(dialogInput, "groups.example'Maps");
+            setInputValue(inviteCodeInput, 'abc');
             document.body.querySelector('button[aria-label="Abrir grupo desde invitación"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
         expect(onOpenInvite).toHaveBeenCalledWith({ relay: 'wss://groups.example', group: 'Maps', code: 'abc' });
@@ -304,9 +416,10 @@ describe('GroupsPage', () => {
         expect(readonly.container.textContent || '').toContain('Inicia sesión con una cuenta que pueda firmar para publicar en grupos.');
         expect(readonly.container.querySelector('textarea')?.disabled).toBe(true);
         expect(readonly.container.querySelector('button[aria-label="Publicar mensaje en City Gardeners"]')?.hasAttribute('disabled')).toBe(true);
-        expect(readonly.container.querySelector('button[aria-label="Guardar City Gardeners"]')?.hasAttribute('disabled')).toBe(true);
-        expect(readonly.container.querySelector('button[aria-label="Unirse a City Gardeners"]')?.hasAttribute('disabled')).toBe(true);
-        expect(readonly.container.querySelector('button[aria-label="Salir de City Gardeners"]')?.hasAttribute('disabled')).toBe(true);
+        await openGroupActions(readonly.container);
+        expect(document.body.querySelector('[aria-label="Guardar City Gardeners"]')?.getAttribute('aria-disabled')).toBe('true');
+        expect(document.body.querySelector('[aria-label="Unirse a City Gardeners"]')?.getAttribute('aria-disabled')).toBe('true');
+        expect(document.body.querySelector('[aria-label="Salir de City Gardeners"]')?.getAttribute('aria-disabled')).toBe('true');
 
         const locked = await renderElement(page({ session: session({ method: 'local', locked: true }) }));
         mounted.push(locked);
@@ -342,13 +455,14 @@ describe('GroupsPage', () => {
         expect(blockedPublish).not.toHaveBeenCalled();
     });
 
-    test('changes draft text and warns that saved groups are public before saving', async () => {
+    test('changes draft text without showing the public saved-groups warning', async () => {
         const onMessageDraftChange = vi.fn();
         const onSaveGroup = vi.fn();
         const rendered = await renderElement(page({ onMessageDraftChange, onSaveGroup }));
         mounted.push(rendered);
 
-        expect(rendered.container.textContent || '').toContain('Los grupos guardados se publican en tu lista pública de grupos guardados.');
+        expect(rendered.container.textContent || '').not.toContain('Los grupos guardados se publican en tu lista pública de grupos guardados.');
+        expect(rendered.container.textContent || '').not.toContain('Saved groups are published to your public saved-groups list.');
 
         const textarea = rendered.container.querySelector('textarea[aria-label="Mensaje para City Gardeners"]') as HTMLTextAreaElement | null;
         expect(textarea).not.toBeNull();
@@ -359,10 +473,8 @@ describe('GroupsPage', () => {
 
         expect(onMessageDraftChange).toHaveBeenCalledWith('New message');
 
-        const save = rendered.container.querySelector('button[aria-label="Guardar City Gardeners"]');
-        await act(async () => {
-            save?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await openGroupActions(rendered.container);
+        await clickElement(document.body.querySelector('[aria-label="Guardar City Gardeners"]'));
 
         expect(onSaveGroup).toHaveBeenCalledWith("wss://relay.example'gardeners");
     });
@@ -373,7 +485,7 @@ describe('GroupsPage', () => {
         mounted.push(writable);
 
         expect(writable.container.textContent || '').not.toContain('Los relays y grupos sincronizados son datos públicos de Nostr.');
-        const sync = writable.container.querySelector('button[aria-label="Sincronizar grupos públicos"]') as HTMLButtonElement | null;
+        const sync = writable.container.querySelector('button[aria-label="Sincronizar relays públicos"]') as HTMLButtonElement | null;
         expect(sync).not.toBeNull();
         expect(sync?.disabled).toBe(false);
 
@@ -390,7 +502,7 @@ describe('GroupsPage', () => {
         }));
         mounted.push(blocked);
 
-        const blockedButton = blocked.container.querySelector('button[aria-label="Sincronizar grupos públicos"]') as HTMLButtonElement | null;
+        const blockedButton = blocked.container.querySelector('button[aria-label="Sincronizar relays públicos"]') as HTMLButtonElement | null;
         expect(blockedButton).not.toBeNull();
         expect(blockedButton?.disabled).toBe(true);
 
@@ -407,10 +519,10 @@ describe('GroupsPage', () => {
         const writable = await renderElement(page({ onJoinGroup, onLeaveGroup }));
         mounted.push(writable);
 
-        await act(async () => {
-            writable.container.querySelector('button[aria-label="Unirse a City Gardeners"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            writable.container.querySelector('button[aria-label="Salir de City Gardeners"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await openGroupActions(writable.container);
+        await clickElement(document.body.querySelector('[aria-label="Unirse a City Gardeners"]'));
+        await openGroupActions(writable.container);
+        await clickElement(document.body.querySelector('[aria-label="Salir de City Gardeners"]'));
 
         expect(onJoinGroup).toHaveBeenCalledWith("wss://relay.example'gardeners");
         expect(onLeaveGroup).toHaveBeenCalledWith("wss://relay.example'gardeners");
@@ -424,10 +536,9 @@ describe('GroupsPage', () => {
         }));
         mounted.push(blocked);
 
-        await act(async () => {
-            blocked.container.querySelector('button[aria-label="Unirse a City Gardeners"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            blocked.container.querySelector('button[aria-label="Salir de City Gardeners"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
+        await openGroupActions(blocked.container);
+        await clickElement(document.body.querySelector('[aria-label="Unirse a City Gardeners"]'));
+        await clickElement(document.body.querySelector('[aria-label="Salir de City Gardeners"]'));
 
         expect(blockedJoin).not.toHaveBeenCalled();
         expect(blockedLeave).not.toHaveBeenCalled();
@@ -442,10 +553,24 @@ describe('GroupsPage', () => {
 
         const timeline = rendered.container.querySelector('[data-testid="groups-timeline"]');
         expect(timeline).not.toBeNull();
-        expect(timeline?.textContent || '').toContain('Mensajes recientes');
+        expect(timeline?.textContent || '').not.toContain('Mensajes recientes');
+        expect(timeline?.textContent || '').not.toContain('wss://relay.example');
         const text = timeline?.textContent || '';
 
         expect(text.indexOf('First tie note')).toBeLessThan(text.indexOf('Second tie note'));
         expect(text.indexOf('Second tie note')).toBeLessThan(text.indexOf('Older garden note'));
+    });
+
+    test('centers the shadcn empty state in the conversation area when there are no messages', async () => {
+        const rendered = await renderElement(page());
+        mounted.push(rendered);
+
+        const timeline = rendered.container.querySelector('[data-testid="groups-timeline"]');
+        const empty = timeline?.querySelector('[data-slot="empty"]');
+        expect(empty).not.toBeNull();
+        expect(empty?.className).toContain('justify-center');
+        expect(empty?.textContent || '').toContain('Aún no hay mensajes en el grupo.');
+        expect(timeline?.textContent || '').not.toContain('Mensajes recientes');
+        expect(timeline?.textContent || '').not.toContain('wss://relay.example');
     });
 });

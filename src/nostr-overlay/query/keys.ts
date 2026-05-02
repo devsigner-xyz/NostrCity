@@ -8,6 +8,7 @@ import type {
     EngagementQueryInput,
     FollowingFeedQueryInput,
     Nip05BatchQueryInput,
+    OverlayGroupsQueryInput,
     RelayGroupsQueryInput,
     NotificationsQueryInput,
     RelayMetadataQueryInput,
@@ -143,6 +144,17 @@ export const nostrOverlayQueryKeys = {
         },
     ] as const,
     directMessagesSendMutation: () => [ROOT_SCOPE, SOCIAL_SCOPE, 'direct-messages', 'send-dm'] as const,
+    overlayGroups: (input: OverlayGroupsQueryInput) => [
+        ROOT_SCOPE,
+        SOCIAL_SCOPE,
+        'groups',
+        {
+            ownerPubkey: input.ownerPubkey,
+            configuredRelays: normalizeValues(input.configuredRelays),
+            hasGroupRelaysConfigured: input.hasGroupRelaysConfigured,
+            selectedGroupKey: input.selectedGroupKey ?? null,
+        },
+    ] as const,
     userSearch: (input: { term: string; ownerPubkey?: string | undefined; searchRelaySetKey?: string | undefined }) => [
         ROOT_SCOPE,
         SOCIAL_SCOPE,

@@ -2,7 +2,6 @@ import type { ReactElement } from 'react';
 import { AlertTriangleIcon } from 'lucide-react';
 import { RELAY_TYPES, type RelayType } from '../../../nostr/relay-settings';
 import type { RelayConnectionStatus } from '../../hooks/useRelayConnectionSummary';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import { Item, ItemContent, ItemDescription, ItemMedia } from '@/components/ui/i
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableRow } from '@/components/ui/table';
 import { OverlayPageHeader } from '../OverlayPageHeader';
+import { SettingsRelayAvatar } from './SettingsRelayAvatar';
 import type { RelayDetails, RelayFee, RelayInformationDocument, RelayInfoState, RelaySelection } from './types';
 import type { RelayGroupsState, RelayGroupSummary } from '../../query/relay-groups.query';
 
@@ -71,10 +71,7 @@ export function SettingsRelayDetailPage({
                     ) : null}
 
                     <div className="nostr-relay-detail-header">
-                <Avatar className="size-10">
-                    {selectedRelayDocument?.icon ? <AvatarImage src={selectedRelayDocument.icon} alt={selectedRelayDocument.name || selectedRelayDetails.host} /> : null}
-                    <AvatarFallback>{relayAvatarFallback(selectedRelayDetails, selectedRelayDocument)}</AvatarFallback>
-                </Avatar>
+                <SettingsRelayAvatar details={selectedRelayDetails} document={selectedRelayDocument} fallback={relayAvatarFallback(selectedRelayDetails, selectedRelayDocument)} className="size-10" />
 
                 <div className="min-w-0">
                     <p className="nostr-relay-summary-primary">{selectedRelayDocument?.name || selectedRelayDetails.relayUrl}</p>

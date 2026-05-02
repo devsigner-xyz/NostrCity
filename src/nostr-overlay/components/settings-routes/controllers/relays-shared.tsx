@@ -108,7 +108,7 @@ export function hasNip11Metadata(document?: RelayInformationDocument): boolean {
 
 export function relayConnectionBadge(status: RelayConnectionStatus | undefined): ReactElement {
     if (status === 'connected') {
-        return <Badge>Conectado</Badge>;
+        return <Badge variant="success">Conectado</Badge>;
     }
 
     if (status === 'disconnected') {

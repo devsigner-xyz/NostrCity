@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -5,6 +7,8 @@ import { UI_SETTINGS_STORAGE_KEY } from '../../../nostr/ui-settings';
 import { Badge } from '@/components/ui/badge';
 import { SettingsRelaysPage } from './SettingsRelaysPage';
 import type { RelayDetails, RelayInformationDocument, RelayRow } from './types';
+
+const overlayStyles = readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
 
 interface RenderResult {
     container: HTMLDivElement;
@@ -85,6 +89,18 @@ function getSwitch(container: HTMLElement, label: string): HTMLElement {
     }
 
     return element;
+}
+
+function getMobileRelayItem(container: HTMLElement, relayUrl: string): HTMLElement {
+    const item = Array.from(container.querySelectorAll('.nostr-relay-mobile-item')).find(
+        (element) => element.textContent?.includes(relayUrl) || Array.from(element.querySelectorAll('[title]')).some((titledElement) => titledElement.getAttribute('title')?.includes(relayUrl)),
+    );
+
+    if (!(item instanceof HTMLElement)) {
+        throw new Error(`Mobile relay item not found: ${relayUrl}`);
+    }
+
+    return item;
 }
 
 function getDropdownItem(label: string): HTMLElement {
@@ -231,8 +247,10 @@ describe('SettingsRelaysPage', () => {
         const configuredTable = getTableFromCard(configuredCard);
 
         expect(getTableHeaders(configuredTable)).toEqual(['Relay', 'Lectura', 'Escritura', 'Estado', 'Acciones']);
-        expect(configuredTable.textContent).toContain('wss://relay.one');
-        expect(configuredTable.textContent).not.toContain('wss://relay.dm');
+        expect(configuredTable.textContent).toContain('relay.one');
+        expect(configuredTable.textContent).not.toContain('wss://relay.one');
+        expect(configuredTable.textContent).not.toContain('relay.dm');
+        expect(configuredTable.querySelector('[data-slot="avatar"]')).toBeNull();
         expect(configuredCard.textContent).toContain('Estado actual y categorías activas de tus relays.');
 
         const readSwitch = rendered.container.querySelector('button[aria-label="Lectura para wss://relay.one"]');
@@ -250,6 +268,81 @@ describe('SettingsRelaysPage', () => {
         await clickElement(writeSwitch);
 
         expect(props.onSetConfiguredRelayNip65Access).toHaveBeenCalledWith('wss://relay.one', { read: true, write: false });
+    });
+
+    test('renders mobile relay items for every relay table and keeps key actions wired', async () => {
+        const props = buildProps();
+        props.relayInfoByUrl = {
+            'wss://relay.one': {
+                data: {
+                    icon: 'https://relay.one/icon.png',
+                },
+            },
+        };
+        const rendered = await renderElement(<SettingsRelaysPage {...props} />);
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelectorAll('.nostr-relay-mobile-list')).toHaveLength(8);
+
+        const expectedRelayLabels = [
+            'relay.one',
+            'relay.two',
+            'relay.dm',
+            'relay.dm-suggested',
+            'groups.example',
+            'groups-suggested.example',
+            'search.nos.today',
+            'relay.noswhere.com',
+        ];
+
+        for (const relayLabel of expectedRelayLabels) {
+            const item = getMobileRelayItem(rendered.container, relayLabel);
+            expect(item.textContent).toContain(relayLabel);
+            expect(item.textContent).not.toContain(`wss://${relayLabel}`);
+            expect(item.querySelector('.nostr-relay-mobile-summary-types')?.textContent).not.toBe('');
+            expect(item.querySelector('.nostr-relay-mobile-summary-types [data-slot="badge"]')).toBeNull();
+            expect(item.querySelector('.nostr-relay-mobile-summary-status')).toBeNull();
+            expect(Array.from(item.querySelectorAll('.nostr-relay-mobile-meta-label')).map((element) => element.textContent)).toContain('Estado');
+            expect(item.querySelector('.nostr-relay-mobile-status-row [data-slot="badge"]')).not.toBeNull();
+        }
+
+        const configuredItem = getMobileRelayItem(rendered.container, 'relay.one');
+        const configuredAvatar = configuredItem.querySelector('[data-slot="avatar"]');
+        const configuredAvatarImage = configuredItem.querySelector('[data-slot="avatar-image"]');
+        expect(configuredAvatar).toBeNull();
+        expect(configuredAvatarImage).toBeNull();
+        expect(overlayStyles).toMatch(/\.nostr-relay-summary-primary\s*\{[^}]*font-weight:\s*600;/s);
+        expect(overlayStyles).not.toMatch(/\.nostr-relay-summary-primary\s*\{[^}]*font-weight:\s*700;/s);
+        expect(overlayStyles).toMatch(/\.nostr-relay-mobile-summary-types\s*\{[^}]*font-weight:\s*500;/s);
+        expect(overlayStyles).not.toMatch(/\.nostr-relay-mobile-switches\s*\{[^}]*border-top:/s);
+
+        const mobileWriteSwitch = configuredItem.querySelector('button[aria-label="Escritura para wss://relay.one"]');
+
+        if (!(mobileWriteSwitch instanceof HTMLElement)) {
+            throw new Error('Mobile write switch not found');
+        }
+
+        await clickElement(mobileWriteSwitch);
+
+        expect(props.onSetConfiguredRelayNip65Access).toHaveBeenCalledWith('wss://relay.one', { read: true, write: false });
+
+        const suggestedItem = getMobileRelayItem(rendered.container, 'relay.two');
+        const addSuggestedButton = Array.from(suggestedItem.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Añadir');
+
+        if (!(addSuggestedButton instanceof HTMLElement)) {
+            throw new Error('Mobile suggested add button not found');
+        }
+
+        await clickElement(addSuggestedButton);
+
+        expect(props.onAddSuggestedRelay).toHaveBeenCalledWith('wss://relay.two', ['nip65Read']);
+    });
+
+    test('uses the relays container width to switch from tables to mobile items', () => {
+        expect(overlayStyles).toMatch(/\.nostr-settings-page-relays\s*\{[^}]*container-type:\s*inline-size;/s);
+        expect(overlayStyles).toMatch(/@container\s*\(max-width:\s*760px\)\s*\{[\s\S]*?\.nostr-settings-page-relays\s+\.nostr-relay-desktop-table\s*\{[^}]*display:\s*none;/);
+        expect(overlayStyles).toMatch(/@container\s*\(max-width:\s*760px\)\s*\{[\s\S]*?\.nostr-settings-page-relays\s+\.nostr-relay-mobile-list\s*\{[^}]*display:\s*grid;/);
+        expect(overlayStyles).toMatch(/@container\s*\(max-width:\s*760px\)\s*\{[\s\S]*?\.nostr-settings-page-relays\s+\.nostr-relay-mobile-item\s+\.nostr-relay-main-cell\s*\{[^}]*align-items:\s*center;/);
     });
 
     test('sends the complementary access payload when read is disabled', async () => {
@@ -327,20 +420,23 @@ describe('SettingsRelaysPage', () => {
         expect(dmCard.textContent).toContain('Se usan para recibir mensajes privados.');
         expect(dmCard.textContent).toContain('Esta lista corresponde al kind:10050.');
         expect(dmCard.textContent).toContain('Si tu perfil publica relays de DM, pueden aparecer como sugeridos.');
-        expect(dmCard.textContent).toContain('wss://relay.dm');
-        expect(dmCard.textContent).toContain('wss://relay.dm-suggested');
+        expect(dmCard.textContent).toContain('relay.dm');
+        expect(dmCard.textContent).toContain('relay.dm-suggested');
+        expect(dmCard.textContent).not.toContain('wss://relay.dm');
         expect(dmCard.textContent).toContain('Restablecer por defecto');
         expect(dmCard.querySelector('input[aria-label="URLs de relay de mensajes"]')).not.toBeNull();
         expect(dmCard.textContent).toContain('Agregar todos');
 
         const configuredCard = getCardByTitle(rendered.container, 'Relays configurados');
-        expect(getTableFromCard(configuredCard).textContent).not.toContain('wss://relay.dm');
+        expect(getTableFromCard(configuredCard).textContent).not.toContain('relay.dm');
 
         const dmConfiguredTable = getTableByHeading(dmCard, 'Configurados');
         const dmSuggestedTable = getTableByHeading(dmCard, 'Sugeridos');
 
-        expect(dmConfiguredTable.textContent).toContain('wss://relay.dm');
-        expect(dmSuggestedTable.textContent).toContain('wss://relay.dm-suggested');
+        expect(dmConfiguredTable.textContent).toContain('relay.dm');
+        expect(dmSuggestedTable.textContent).toContain('relay.dm-suggested');
+        expect(dmConfiguredTable.textContent).not.toContain('wss://relay.dm');
+        expect(dmSuggestedTable.textContent).not.toContain('wss://relay.dm-suggested');
         expect(dmCard.querySelector('button[aria-label^="Abrir acciones para wss://relay.dm"]')).not.toBeNull();
         expect(dmCard.querySelector('button[aria-label^="Abrir acciones sugeridas para wss://relay.dm-suggested"]')).not.toBeNull();
     });
@@ -441,8 +537,9 @@ describe('SettingsRelaysPage', () => {
         expect(cardTitles.indexOf('Relays de grupos')).toBeGreaterThan(cardTitles.indexOf('Relays de mensajes'));
         expect(cardTitles.indexOf('Relays de búsqueda')).toBeGreaterThan(cardTitles.indexOf('Relays de grupos'));
         expect(groupCard.textContent).toContain('Se usan para descubrir y abrir grupos NIP-29. Añadirlos aquí no publica kind:10009.');
-        expect(groupCard.textContent).toContain('wss://groups.example');
-        expect(groupCard.textContent).toContain('wss://groups-suggested.example');
+        expect(groupCard.textContent).toContain('groups.example');
+        expect(groupCard.textContent).toContain('groups-suggested.example');
+        expect(groupCard.textContent).not.toContain('wss://groups.example');
         expect(groupCard.querySelector('input[aria-label="URLs de relay de grupos"]')).not.toBeNull();
 
         const groupInput = groupCard.querySelector('input[aria-label="URLs de relay de grupos"]');
