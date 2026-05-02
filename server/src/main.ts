@@ -20,6 +20,32 @@ export const resolveHost = (rawHost: string | undefined): string => {
   return rawHost?.trim() || DEFAULT_HOST;
 };
 
+export const formatLocalDockerReadyMessage = (
+  env: Partial<Pick<NodeJS.ProcessEnv, 'NOSTR_CITY_DOCKER_LOCAL'>>,
+): string | undefined => {
+  if (env.NOSTR_CITY_DOCKER_LOCAL !== 'true') return undefined;
+
+  return [
+    '',
+    'Nostr City local is ready.',
+    '',
+    'Open Nostr City locally:',
+    '  App:  http://127.0.0.1:3000/app/',
+    '  Docs: http://127.0.0.1:3000/docs/',
+    '',
+    'Press Ctrl+C to stop. Run `docker compose down` to remove the container.',
+    '',
+  ].join('\n');
+};
+
+export const logLocalDockerReadyMessage = (
+  env: Partial<Pick<NodeJS.ProcessEnv, 'NOSTR_CITY_DOCKER_LOCAL'>>,
+  write: (message: string) => void = console.info,
+): void => {
+  const localDockerReadyMessage = formatLocalDockerReadyMessage(env);
+  if (localDockerReadyMessage) write(localDockerReadyMessage);
+};
+
 export const start = async (): Promise<void> => {
   const port = resolvePort(process.env.PORT);
   const host = resolveHost(process.env.HOST);
@@ -27,6 +53,7 @@ export const start = async (): Promise<void> => {
 
   try {
     await app.listen({ host, port });
+    logLocalDockerReadyMessage(process.env);
   } catch (error) {
     app.log.error(error);
     process.exitCode = 1;

@@ -53,6 +53,32 @@ In development, Vite proxies `/v1/*` to the local BFF so the browser app can use
 - [Node.js](https://nodejs.org/) `24` as defined in `.nvmrc`
 - [pnpm](https://pnpm.io/) via Corepack
 - Git
+- Docker Desktop or Docker Engine with Docker Compose, if you want the one-command local container setup.
+
+### Run Locally With Docker
+
+Docker is the easiest way to run the full app locally without using the public read-only demo.
+
+```bash
+docker compose up --build
+```
+
+Then open:
+
+| Surface | URL |
+| --- | --- |
+| Landing | `http://127.0.0.1:3000/` |
+| App | `http://127.0.0.1:3000/app/` |
+| Docs | `http://127.0.0.1:3000/docs/` |
+| BFF health check | `http://127.0.0.1:3000/v1/health` |
+
+Stop it with:
+
+```bash
+docker compose down
+```
+
+The compose file binds to `127.0.0.1` by default and builds with `VITE_PUBLIC_DEMO_MODE=false`, so full supported login methods remain available locally.
 
 ### Install Dependencies
 

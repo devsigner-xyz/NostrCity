@@ -1,0 +1,50 @@
+.git
+.github
+.DS_Store
+
+# Dependencies and generated output
+node_modules
+dist
+server/dist
+docs/.vitepress/cache
+docs/.vitepress/dist
+.vite
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.asc
+*.gpg
+*.kdbx
+
+# Logs and local state
+logs
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# Test and coverage artifacts
+test-results
+playwright-report
+coverage
+.nyc_output
+.playwright-mcp
+
+# Agent/context material not needed for app builds
+context
+docs/superpowers
+plans
+.agents
+.opencode
+.worktrees
+.superpowers
+skills-lock.json

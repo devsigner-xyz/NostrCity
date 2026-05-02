@@ -8,7 +8,7 @@ Nostr City no es un cliente de timeline clasico. Es una capa visual para leer re
 
 ## 2. Decide como quieres entrar
 
-Si entras desde la demo pública, empieza con `npub` en modo lectura. Si quieres publicar, usar DMs, zaps, cuentas locales o firmantes, ejecuta la app en local con `make dev` y entra desde `http://127.0.0.1:5173/app/`.
+Si entras desde la demo pública, empieza con `npub` en modo lectura. Si quieres publicar, usar DMs, zaps, cuentas locales o firmantes, usa [Nostr City en local](/empezar/usar-en-local) con Docker o ejecuta la app de desarrollo con `make dev` y entra desde `http://127.0.0.1:5173/app/`.
 
 En una instancia local o propia puedes usar una identidad existente, una extensión NIP-07, un búnker NIP-46 o una cuenta local, según el tipo de acceso soportado por la versión actual de la app.
 
@@ -25,5 +25,6 @@ Para moverte por el mapa, revisar edificios ocupados y entender los controles fl
 ## Relacionado
 
 - [Acceso y login](/cuenta-y-acceso/acceso-y-login)
+- [Usar en local](/empezar/usar-en-local)
 - [Mapa y controles](/empezar/mapa-y-controles)
 - [Relays y configuracion](/cuenta-y-acceso/relays-y-configuracion)

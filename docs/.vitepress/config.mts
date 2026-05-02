@@ -16,7 +16,7 @@ export default defineConfig({
     ['link', { rel: 'manifest', href: '/site.webmanifest' }],
   ],
   cleanUrls: true,
-  lastUpdated: true,
+  lastUpdated: process.env.VITEPRESS_LAST_UPDATED !== 'false',
   outDir: '../dist/docs',
   ignoreDeadLinks: ['/app/', '/app/index'],
   srcExclude: ['superpowers/**', 'migration/**', 'landing-routing.md', 'portfolio-backend-first.md'],
@@ -38,6 +38,7 @@ export default defineConfig({
         items: [
           { text: 'Inicio', link: '/' },
           { text: 'Primeros pasos', link: '/empezar/' },
+          { text: 'Usar en local', link: '/empezar/usar-en-local' },
           { text: 'Recorrido rápido', link: '/empezar/primeros-pasos' },
           { text: 'Mapa y controles', link: '/empezar/mapa-y-controles' },
           { text: 'Exportación y STL', link: '/empezar/exportacion-y-stl' },

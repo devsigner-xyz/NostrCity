@@ -10,7 +10,7 @@ Te ayuda a elegir entre entrar en modo lectura, firmar con una extensión, conec
 
 La instancia pública puede estar configurada como demo de solo lectura. En ese modo solo se permite entrar con `npub`; la app no solicita firmas, no crea cuentas locales y no conecta firmantes NIP-07 o NIP-46.
 
-Para usar todas las capacidades, ejecuta Nostr City en local o en una instancia propia. Así puedes usar extensión NIP-07, búnker NIP-46, cuenta local, publicación, DMs, zaps y configuración local sin depender del dominio público del autor.
+Para usar todas las capacidades, ejecuta [Nostr City en local](/empezar/usar-en-local) o en una instancia propia. Así puedes usar extensión NIP-07, búnker NIP-46, cuenta local, publicación, DMs, zaps y configuración local sin depender del dominio público del autor.
 
 Si ya habías usado una cuenta local en el dominio público, el modo demo no borra automáticamente material guardado del navegador. Puedes limpiar los datos del sitio desde las herramientas del navegador si quieres eliminar estado antiguo de `nostrcity.xyz`.
 
@@ -81,5 +81,6 @@ Con este método:
 ## Relacionado
 
 - [Crear cuenta](/cuenta-y-acceso/crear-cuenta)
+- [Usar Nostr City en local](/empezar/usar-en-local)
 - [Relays y configuración](/cuenta-y-acceso/relays-y-configuracion)
 - [Grupos](/grupos/)
