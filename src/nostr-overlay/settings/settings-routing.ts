@@ -1,4 +1,4 @@
-export const SETTINGS_ROUTE_VIEWS = ['advanced', 'shortcuts', 'about', 'zaps'] as const;
+export const SETTINGS_ROUTE_VIEWS = ['advanced', 'shortcuts', 'about'] as const;
 
 export type SettingsRouteView = (typeof SETTINGS_ROUTE_VIEWS)[number];
 

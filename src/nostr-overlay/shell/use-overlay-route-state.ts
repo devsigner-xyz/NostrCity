@@ -21,6 +21,14 @@ function activeAgoraHashtagFromLocation(pathname: string, search: string): strin
     return normalizeHashtag(new URLSearchParams(search).get('tag'));
 }
 
+function activeArticlesHashtagFromLocation(pathname: string, search: string): string | undefined {
+    if (pathname !== '/agora/articles') {
+        return undefined;
+    }
+
+    return normalizeHashtag(new URLSearchParams(search).get('tag'));
+}
+
 function hasRouteReturnState(state: ReturnType<typeof routeReturnStateFromUnknown>): boolean {
     return Boolean(state.returnTo || state.returnFocusEventId);
 }
@@ -39,6 +47,7 @@ export function useOverlayRouteState() {
     const [isUiSettingsDialogOpen, setIsUiSettingsDialogOpen] = useState(false);
 
     const activeAgoraHashtag = activeAgoraHashtagFromLocation(location.pathname, location.search);
+    const activeArticlesHashtag = activeArticlesHashtagFromLocation(location.pathname, location.search);
     const activeAgoraNoteEventId = noteDetailEventIdFromPathname(location.pathname);
     const activeSettingsView = settingsViewFromPathname(location.pathname);
 
@@ -60,7 +69,7 @@ export function useOverlayRouteState() {
         }
 
         if (!activeSettingsView) {
-            navigate(buildSettingsPath('zaps'), { replace: true });
+            navigate(buildSettingsPath('shortcuts'), { replace: true });
         }
     }, [location.pathname, activeSettingsView, navigate]);
 
@@ -72,7 +81,7 @@ export function useOverlayRouteState() {
         setIsUiSettingsDialogOpen(false);
     };
 
-    const openSettingsPage = (view: SettingsRouteView = 'zaps'): void => {
+    const openSettingsPage = (view: SettingsRouteView = 'shortcuts'): void => {
         navigate(buildSettingsPath(view));
     };
 
@@ -113,6 +122,7 @@ export function useOverlayRouteState() {
         navigate,
         location,
         activeAgoraHashtag,
+        activeArticlesHashtag,
         activeAgoraNoteEventId,
         activeSettingsView,
         isMapRoute,

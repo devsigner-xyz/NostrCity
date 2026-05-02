@@ -1,5 +1,5 @@
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
-import { EllipsisVerticalIcon, HeartIcon, MessageCircleIcon, Repeat2Icon, ZapIcon } from 'lucide-react';
+import { ArrowRightIcon, EllipsisVerticalIcon, HeartIcon, MessageCircleIcon, Repeat2Icon, ZapIcon } from 'lucide-react';
 import type { NostrEvent, NostrProfile } from '../../nostr/types';
 import { LONG_FORM_ARTICLE_KIND } from '../../nostr/articles';
 import { profileHasZapEndpoint } from '../../nostr/zaps';
@@ -536,21 +536,9 @@ export function NoteCard({
     };
 
     const openDetail = note.actions?.onViewDetail;
-    const handleCardClick = (event: ReactMouseEvent<HTMLElement>): void => {
-        if (!openDetail) {
-            return;
-        }
-
-        const target = event.target as HTMLElement | null;
-        if (target?.closest('button, a, [role="button"], [data-slot="button"], [data-slot="context-menu-item"], [data-slot="context-menu-content"]')) {
-            return;
-        }
-
-        openDetail();
-    };
 
     return (
-        <article onClick={handleCardClick} className={openDetail ? 'cursor-pointer' : undefined}>
+        <article>
             <Card size={note.variant === 'nested' ? 'sm' : 'default'} className="border border-border/70">
                 <CardHeader className="px-4 py-0 group-data-[size=sm]/card:px-3">
                     <NoteHeaderItem
@@ -604,9 +592,22 @@ export function NoteCard({
                         <div className="flex min-w-0 items-center gap-2">
                     {noteActionState ? <NoteActionGroup actions={noteActionState} t={t} /> : null}
                         </div>
-                        {(note.showCopyId || note.actions?.onViewDetail)
-                            ? <NoteActionsMenu noteId={note.id} t={t} {...(onCopyNoteId ? { onCopyNoteId } : {})} {...(note.actions?.onViewDetail ? { onViewDetail: note.actions.onViewDetail } : {})} />
-                            : null}
+                        <div className="flex shrink-0 items-center gap-2">
+                            {(note.showCopyId || openDetail)
+                                ? <NoteActionsMenu noteId={note.id} t={t} {...(onCopyNoteId ? { onCopyNoteId } : {})} {...(openDetail ? { onViewDetail: openDetail } : {})} />
+                                : null}
+                            {openDetail ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon-sm"
+                                    aria-label={t('note.actions.openDetail', { noteId: note.id })}
+                                    onClick={() => openDetail()}
+                                >
+                                    <ArrowRightIcon aria-hidden="true" />
+                                </Button>
+                            ) : null}
+                        </div>
                     </CardFooter>
                 ) : null}
             </Card>

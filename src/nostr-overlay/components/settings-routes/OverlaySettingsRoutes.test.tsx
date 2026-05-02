@@ -12,7 +12,6 @@ import { SettingsPage, type SettingsPageProps } from '../SettingsPage';
 import { SettingsAboutRoute } from './SettingsAboutRoute';
 import { SettingsAdvancedRoute } from './SettingsAdvancedRoute';
 import { SettingsShortcutsRoute } from './SettingsShortcutsRoute';
-import { SettingsZapsRoute } from './SettingsZapsRoute';
 
 interface RenderResult {
     container: HTMLDivElement;
@@ -65,12 +64,11 @@ function buildSettingsRoutes(props: SettingsPageProps): ReactElement {
     return (
         <Routes>
             <Route path="/settings" element={<SettingsPage {...props} />}>
-                <Route index element={<Navigate to="zaps" replace />} />
+                <Route index element={<Navigate to="shortcuts" replace />} />
                 <Route path="shortcuts" element={<SettingsShortcutsRoute />} />
-                <Route path="zaps" element={<SettingsZapsRoute />} />
                 <Route path="about" element={<SettingsAboutRoute />} />
                 <Route path="advanced" element={<SettingsAdvancedRoute />} />
-                <Route path="*" element={<Navigate to="zaps" replace />} />
+                <Route path="*" element={<Navigate to="shortcuts" replace />} />
             </Route>
             <Route path="/relays" element={<RelaysRoute
                 {...relaysRouteProps}
@@ -138,11 +136,11 @@ afterEach(() => {
 });
 
 describe('Overlay settings routes', () => {
-    test('redirects settings index route to zaps', async () => {
+    test('redirects settings index route to shortcuts', async () => {
         const rendered = await renderSettingsRoute('/settings');
         mounted.push(rendered);
 
-        expect(rendered.container.textContent || '').toContain('Define cantidades rápidas para enviar zaps.');
+        expect(rendered.container.textContent || '').toContain('Atajos de teclado');
     });
 
     test('mounts and unmounts advanced settings host on route lifecycle', async () => {

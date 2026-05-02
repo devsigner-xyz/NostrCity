@@ -624,6 +624,7 @@ export function createRuntimeSocialFeedService(
                     hasMore: false,
                 };
             }
+            const hashtag = input.hashtag ? normalizeHashtag(input.hashtag) : undefined;
 
             return withRelayFallback(async (transport) => {
                 const limit = clampLimit(input.limit, DEFAULT_FEED_LIMIT);
@@ -639,6 +640,9 @@ export function createRuntimeSocialFeedService(
                     };
                     if (typeof input.until === 'number') {
                         filter.until = input.until;
+                    }
+                    if (hashtag) {
+                        filter['#t'] = [hashtag];
                     }
 
                     const events = await fetchBackfillWithTimeout(transport, [filter], backfillTimeoutMs);

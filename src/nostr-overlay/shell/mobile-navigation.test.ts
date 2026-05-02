@@ -40,7 +40,7 @@ describe('mobile navigation route metadata', () => {
         expect(shouldShowMobileBottomNavigation('/agora/articles')).toBe(false);
         expect(shouldShowMobileBottomNavigation('/relays/detail')).toBe(false);
         expect(shouldShowMobileBottomNavigation('/chats')).toBe(false);
-        expect(shouldShowMobileBottomNavigation('/settings/zaps')).toBe(false);
+        expect(shouldShowMobileBottomNavigation('/settings/shortcuts')).toBe(false);
     });
 
     test('uses parent titles for detail routes', () => {
@@ -50,7 +50,7 @@ describe('mobile navigation route metadata', () => {
     });
 
     test('uses settings title for settings routes', () => {
-        expect(resolveMobileAppBarTitle({ pathname: '/settings/zaps', language: 'es' })).toBe('Ajustes');
+        expect(resolveMobileAppBarTitle({ pathname: '/settings/shortcuts', language: 'es' })).toBe('Ajustes');
     });
 
     test('falls back to product title for unknown routes while preserving back visibility', () => {

@@ -322,7 +322,7 @@ describe('NoteCard', () => {
         expect(container.textContent).toContain('# literal heading');
     });
 
-    test('opens note detail on card click when view detail is available', async () => {
+    test('opens note detail from the detail button when view detail is available', async () => {
         const onViewDetail = vi.fn();
         const { container } = await renderNoteCard({
             ...defaultNoteFixture,
@@ -332,15 +332,15 @@ describe('NoteCard', () => {
             },
         });
 
-        const article = container.querySelector('article') as HTMLElement;
+        const detailButton = container.querySelector('button[aria-label="Abrir detalle de la nota note-1"]') as HTMLButtonElement;
         await act(async () => {
-            article.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            detailButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         expect(onViewDetail).toHaveBeenCalledTimes(1);
     });
 
-    test('opens note detail on card click when provided by actions', async () => {
+    test('opens note detail from the detail button when provided by actions', async () => {
         const onViewDetail = vi.fn();
         const { container } = await renderNoteCard({
             ...defaultNoteFixture,
@@ -350,9 +350,9 @@ describe('NoteCard', () => {
             },
         });
 
-        const article = container.querySelector('article') as HTMLElement;
+        const detailButton = container.querySelector('button[aria-label="Abrir detalle de la nota note-1"]') as HTMLButtonElement;
         await act(async () => {
-            article.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            detailButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         expect(onViewDetail).toHaveBeenCalledTimes(1);
@@ -777,6 +777,33 @@ describe('NoteCard', () => {
 
         await act(async () => {
             detailItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onViewDetail).toHaveBeenCalledTimes(1);
+    });
+
+    test('opens note detail only from the dedicated detail button', async () => {
+        const onViewDetail = vi.fn();
+        const { container } = await renderNoteCard({
+            ...defaultNoteFixture,
+            actions: {
+                ...defaultNoteFixture.actions!,
+                onViewDetail,
+            },
+        });
+
+        const article = container.querySelector('article') as HTMLElement;
+        await act(async () => {
+            article.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onViewDetail).not.toHaveBeenCalled();
+
+        const detailButton = container.querySelector('button[aria-label="Abrir detalle de la nota note-1"]') as HTMLButtonElement;
+        expect(detailButton).not.toBeNull();
+
+        await act(async () => {
+            detailButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         expect(onViewDetail).toHaveBeenCalledTimes(1);

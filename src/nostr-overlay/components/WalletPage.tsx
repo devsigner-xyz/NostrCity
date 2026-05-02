@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { OverlaySurface } from './OverlaySurface';
+import { WalletZapSettingsSection, type WalletZapSettingsSectionProps } from './WalletZapSettingsSection';
 
 interface WalletPageProps {
     walletState: WalletSettingsState;
@@ -17,6 +18,7 @@ interface WalletPageProps {
     onConnectWebLn: () => void;
     onDisconnect: () => void;
     onRefresh: () => void;
+    zapSettings?: WalletZapSettingsSectionProps;
 }
 
 export function WalletPage({
@@ -28,6 +30,7 @@ export function WalletPage({
     onConnectWebLn,
     onDisconnect,
     onRefresh,
+    zapSettings,
 }: WalletPageProps) {
     const { t } = useI18n();
     const connection = walletState.activeConnection;
@@ -120,6 +123,8 @@ export function WalletPage({
                                 <Button type="button" variant="outline" onClick={onConnectWebLn}>{t('wallet.connect.webln')}</Button>
                             </CardContent>
                         </Card>
+
+                        {isConnected && zapSettings ? <WalletZapSettingsSection {...zapSettings} /> : null}
 
                         <Card>
                             <CardHeader>

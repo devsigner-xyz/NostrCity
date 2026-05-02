@@ -45,6 +45,16 @@ describe('WalletPage', () => {
                 walletState={{ activeConnection: null }}
                 walletActivity={{ items: [] }}
                 nwcUriInput=""
+                zapSettings={{
+                    zapSettings: { amounts: [21, 128, 256], defaultAmount: 128 },
+                    newZapAmountInput: '512',
+                    defaultZapAmountInput: '128',
+                    onNewZapAmountInputChange: vi.fn(),
+                    onDefaultZapAmountInputChange: vi.fn(),
+                    onUpdateZapAmount: vi.fn(),
+                    onRemoveZapAmount: vi.fn(),
+                    onAddZapAmount: vi.fn(),
+                }}
                 onNwcUriInputChange={vi.fn()}
                 onConnectNwc={vi.fn()}
                 onConnectWebLn={vi.fn()}
@@ -61,6 +71,7 @@ describe('WalletPage', () => {
         expect(rendered.container.textContent || '').toContain('Conectar con WebLN');
         expect(rendered.container.textContent || '').not.toContain('Balance');
         expect(rendered.container.textContent || '').not.toContain('Recibir');
+        expect(rendered.container.textContent || '').not.toContain('Configurar zaps');
     });
 
     test('aligns card headers with card content padding', async () => {
@@ -112,6 +123,16 @@ describe('WalletPage', () => {
                     }],
                 }}
                 nwcUriInput="nostr+walletconnect://demo"
+                zapSettings={{
+                    zapSettings: { amounts: [21, 128, 256], defaultAmount: 128 },
+                    newZapAmountInput: '512',
+                    defaultZapAmountInput: '128',
+                    onNewZapAmountInputChange: vi.fn(),
+                    onDefaultZapAmountInputChange: vi.fn(),
+                    onUpdateZapAmount: vi.fn(),
+                    onRemoveZapAmount: vi.fn(),
+                    onAddZapAmount: vi.fn(),
+                }}
                 onNwcUriInputChange={vi.fn()}
                 onConnectNwc={vi.fn()}
                 onConnectWebLn={vi.fn()}
@@ -125,6 +146,8 @@ describe('WalletPage', () => {
         expect(rendered.container.textContent || '').toContain('Refrescar');
         expect(rendered.container.textContent || '').toContain('Desconectar');
         expect(rendered.container.textContent || '').toContain('21 sats');
+        expect(rendered.container.textContent || '').toContain('Configurar zaps');
+        expect(rendered.container.querySelector('input[aria-label="Cantidad por defecto de zap"]')).not.toBeNull();
     });
 
     test('renders remembered wallet without falling back to disconnected empty state', async () => {
@@ -154,6 +177,7 @@ describe('WalletPage', () => {
 
         expect(rendered.container.textContent || '').toContain('Reconecta WebLN');
         expect(rendered.container.textContent || '').not.toContain('Sin wallet conectada');
+        expect(rendered.container.textContent || '').not.toContain('Configurar zaps');
     });
 
     test('renders english wallet copy when ui language is en', async () => {

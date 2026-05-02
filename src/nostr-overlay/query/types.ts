@@ -10,6 +10,7 @@ export interface FollowingFeedQueryInput {
 export interface ArticlesFeedQueryInput {
     ownerPubkey?: string;
     follows: string[];
+    hashtag?: string;
     pageSize?: number;
 }
 

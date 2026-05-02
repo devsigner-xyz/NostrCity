@@ -9,6 +9,7 @@ export interface ArticlesFeedQuery {
   ownerPubkey: string;
   limit: number;
   until: number;
+  hashtag?: string;
 }
 
 export interface ArticleParams {
@@ -162,6 +163,11 @@ export const articlesFeedQuerySchema = {
     until: {
       type: 'integer',
       minimum: 0,
+    },
+    hashtag: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 64,
     },
   },
 } as const;

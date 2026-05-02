@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { loadZapSettings, saveZapSettings, type ZapSettingsState } from '../../../../nostr/zap-settings';
+import { loadZapSettings, saveZapSettings, type ZapSettingsState } from '../../nostr/zap-settings';
 
 interface UseZapSettingsControllerInput {
     ownerPubkey?: string;

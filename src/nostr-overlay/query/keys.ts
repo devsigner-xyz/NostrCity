@@ -62,6 +62,7 @@ export const nostrOverlayQueryKeys = {
         {
             ownerPubkey: input.ownerPubkey,
             follows: normalizeValues(input.follows),
+            hashtag: normalizeHashtag(input.hashtag),
             pageSize: input.pageSize ?? 20,
         },
     ] as const,

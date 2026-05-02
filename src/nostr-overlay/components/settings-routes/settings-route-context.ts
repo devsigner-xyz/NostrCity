@@ -1,6 +1,5 @@
 import type { RelaySettingsByType } from '../../../nostr/relay-settings';
 import type { UiSettingsState } from '../../../nostr/ui-settings';
-import type { ZapSettingsState } from '../../../nostr/zap-settings';
 import type { RelayConnectionProbe } from '../../hooks/useRelayConnectionSummary';
 import type { MapBridge } from '../../map-bridge';
 import { useOutletContext } from 'react-router';
@@ -13,8 +12,6 @@ export interface SettingsRouteContextValue {
     relayConnectionProbe?: RelayConnectionProbe;
     relayConnectionRefreshIntervalMs?: number;
     onUiSettingsChange?: (nextState: UiSettingsState) => void;
-    zapSettings?: ZapSettingsState;
-    onZapSettingsChange?: (nextState: ZapSettingsState) => void;
     onClose: () => void;
 }
 

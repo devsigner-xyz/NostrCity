@@ -20,7 +20,7 @@ function formatPublishedDate(createdAt: number, publishedAt: number | undefined)
 }
 
 const MarkdownParagraph: NonNullable<Components['p']> = ({ node: _node, className, ...props }) => {
-    return <p className={cn('my-4 text-[1.05rem] font-normal leading-8 text-foreground/90', className)} {...props} />;
+    return <p className={cn('my-4 text-[1.05rem] font-normal leading-7 text-foreground/90', className)} {...props} />;
 };
 
 const markdownComponents: Components = {
@@ -44,7 +44,7 @@ const markdownComponents: Components = {
         return <ol className={cn('my-5 list-decimal ps-7', className)} {...props} />;
     },
     li({ node: _node, className, children, ...props }) {
-        return <li className={cn('my-2 font-normal leading-8 text-foreground/90', className)} {...props}>{unwrapListParagraphs(children)}</li>;
+        return <li className={cn('my-2 font-normal leading-7 text-foreground/90', className)} {...props}>{unwrapListParagraphs(children)}</li>;
     },
     strong({ node: _node, className, ...props }) {
         return <strong className={cn('font-semibold text-foreground', className)} {...props} />;
@@ -84,7 +84,7 @@ export function ArticleMarkdownContent({ event }: ArticleMarkdownContentProps) {
             ) : null}
             <div
                 data-testid="article-markdown-body"
-                className="prose prose-neutral max-w-none font-normal dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-h1:mt-10 prose-h1:mb-5 prose-h1:text-4xl prose-h1:leading-tight prose-h2:mt-12 prose-h2:mb-5 prose-h2:text-3xl prose-h2:leading-tight prose-h3:mt-10 prose-h3:mb-4 prose-h3:text-2xl prose-h3:leading-snug prose-p:my-5 prose-p:font-normal prose-p:leading-8 prose-li:my-2 prose-li:font-normal prose-li:leading-8 prose-ul:my-6 prose-ol:my-6 prose-hr:my-10 prose-hr:border-border"
+                className="prose prose-neutral max-w-none font-normal dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-h1:mt-10 prose-h1:mb-5 prose-h1:text-4xl prose-h1:leading-tight prose-h2:mt-12 prose-h2:mb-5 prose-h2:text-3xl prose-h2:leading-tight prose-h3:mt-10 prose-h3:mb-4 prose-h3:text-2xl prose-h3:leading-snug prose-p:my-5 prose-p:font-normal prose-p:leading-7 prose-li:my-2 prose-li:font-normal prose-li:leading-7 prose-ul:my-6 prose-ol:my-6 prose-hr:my-10 prose-hr:border-border"
             >
                 <Markdown components={markdownComponents} rehypePlugins={[rehypeSanitize]} skipHtml>
                     {event.content}

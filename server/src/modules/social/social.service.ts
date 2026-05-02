@@ -421,7 +421,7 @@ class GatewaySocialService implements SocialService {
 
   async getArticlesFeed(query: ArticlesFeedQuery): Promise<FollowingFeedResponseDto> {
     return this.articlesFeedGateway.query({
-      key: `social:articles:${query.ownerPubkey}:${query.limit}:${query.until}`,
+      key: `social:articles:${query.ownerPubkey}:${query.limit}:${query.until}:${query.hashtag ?? ''}`,
       params: query,
     });
   }
@@ -651,12 +651,18 @@ const createPoolFetchers = (options: {
         };
       }
 
-      const events = await options.pool.querySync(relays, {
+      const filter: Filter = {
         authors: follows,
         kinds: [LONG_FORM_ARTICLE_KIND],
         until: query.until,
         limit: query.limit + 1,
-      });
+      };
+
+      if (query.hashtag) {
+        filter['#t'] = [query.hashtag.toLowerCase()];
+      }
+
+      const events = await options.pool.querySync(relays, filter);
       const sorted = dedupeById(events).sort(byCreatedAtDesc);
       const pagination = paginateEvents(sorted, query.limit);
 

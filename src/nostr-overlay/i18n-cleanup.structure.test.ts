@@ -10,7 +10,7 @@ const sourceFiles = [
     'src/nostr-overlay/components/NoteCard.tsx',
     'src/nostr-overlay/components/PeopleListTab.tsx',
     'src/nostr-overlay/components/WalletPage.tsx',
-    'src/nostr-overlay/components/settings-pages/SettingsZapsPage.tsx',
+    'src/nostr-overlay/components/WalletZapSettingsSection.tsx',
 ];
 
 const disallowedFragments = [

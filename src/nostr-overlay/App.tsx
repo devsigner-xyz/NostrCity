@@ -118,6 +118,7 @@ export function App({ mapBridge, services }: AppProps) {
         navigate,
         location,
         activeAgoraHashtag,
+        activeArticlesHashtag,
         activeAgoraNoteEventId,
         isMapRoute,
         isAgoraRoute,
@@ -389,6 +390,7 @@ export function App({ mapBridge, services }: AppProps) {
     const articles = useOverlayArticlesController({
         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
         follows: overlay.follows,
+        ...(activeArticlesHashtag ? { activeHashtag: activeArticlesHashtag } : {}),
         isArticlesRoute: isArticlesRoute || isArticleDetailRoute,
         service: overlay.socialFeedService,
     });
@@ -731,6 +733,19 @@ export function App({ mapBridge, services }: AppProps) {
 
         overlay.closeActiveProfileDialog();
         navigate(`/agora?tag=${encodeURIComponent(normalized)}`);
+    };
+
+    const selectArticleHashtag = (hashtag: string): void => {
+        const normalized = normalizeHashtag(hashtag);
+        if (!normalized) {
+            return;
+        }
+
+        navigate(`/agora/articles?tag=${encodeURIComponent(normalized)}`);
+    };
+
+    const clearArticleHashtag = (): void => {
+        navigate('/agora/articles');
     };
 
     const openThreadFromProfileDialog = (eventId: string): void => {
@@ -1236,7 +1251,7 @@ export function App({ mapBridge, services }: AppProps) {
                     }}
                     zapAmounts={zapSettings.amounts}
                     {...(overlay.canWrite ? { onZapPerson: (pubkey: string, amount: number) => requestZapPayment({ targetPubkey: pubkey, amount }) } : {})}
-                    onConfigureZapAmounts={() => openSettingsPage('zaps')}
+                    onConfigureZapAmounts={() => navigate('/wallet')}
                     verificationByPubkey={verificationByPubkey}
                 />
             )}
@@ -1275,7 +1290,7 @@ export function App({ mapBridge, services }: AppProps) {
                         onOpenProfile={overlay.openActiveProfile}
                         {...(canUsePrivateMuteList ? { onToggleMutePerson: handleToggleMutedPerson } : {})}
                         onRequestZapPayment={requestZapPayment}
-                        onConfigureZapAmounts={() => openSettingsPage('zaps')}
+                        onConfigureZapAmounts={() => navigate('/wallet')}
                     />
 
                     <Toaster richColors position="bottom-center" closeButton={false} theme={resolvedOverlayTheme} />
@@ -1337,7 +1352,7 @@ export function App({ mapBridge, services }: AppProps) {
                         onOpenQuoteComposer: openQuoteComposer,
                         requestZapPayment,
                         zapAmounts: zapSettings.amounts,
-                        onConfigureZapAmounts: () => openSettingsPage('zaps'),
+                        onConfigureZapAmounts: () => navigate('/wallet'),
                         onSearchUsers: overlay.searchUsers,
                         ownerPubkey: overlay.ownerPubkey,
                         searchRelaySetKey: userSearchRelaySetKey,
@@ -1351,11 +1366,14 @@ export function App({ mapBridge, services }: AppProps) {
                         isLoadingMore: articles.isLoadingMore,
                         error: articles.error,
                         hasMore: articles.hasMore,
+                        ...(activeArticlesHashtag ? { activeHashtag: activeArticlesHashtag } : {}),
                         agoraFeedLayout: uiSettings.agoraFeedLayout,
                         onAgoraFeedLayoutChange: setAgoraFeedLayout,
                         onRefresh: articles.refresh,
                         onLoadMore: articles.loadMore,
                         onOpenArticle: (eventId) => navigate(`/agora/articles/${eventId}`),
+                        onSelectHashtag: selectArticleHashtag,
+                        onClearHashtag: clearArticleHashtag,
                     }}
                     articleDetail={{
                         items: articles.items,
@@ -1460,6 +1478,7 @@ export function App({ mapBridge, services }: AppProps) {
                     }}
                     wallet={{
                         canWrite: overlay.canWrite,
+                        ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
                         walletSettings,
                         walletActivity,
                         walletNwcUriInput,
@@ -1468,6 +1487,8 @@ export function App({ mapBridge, services }: AppProps) {
                         connectWebLnWallet,
                         disconnectWallet,
                         refreshWallet,
+                        zapSettings,
+                        onZapSettingsChange: setZapSettings,
                     }}
                     profile={{
                         ownerPubkey: overlay.ownerPubkey ?? '',
@@ -1507,8 +1528,6 @@ export function App({ mapBridge, services }: AppProps) {
                         suggestedRelaysByType: overlay.suggestedRelaysByType,
                         onUiSettingsChange: persistUiSettings,
                         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
-                        zapSettings,
-                        onZapSettingsChange: setZapSettings,
                         onClose: () => navigate('/'),
                     }}
                     donation={{
@@ -1565,7 +1584,7 @@ export function App({ mapBridge, services }: AppProps) {
                     onOpenQuoteComposer={openQuoteComposer}
                     onRequestZapPayment={requestZapPayment}
                     zapAmounts={zapSettings.amounts}
-                    onConfigureZapAmounts={() => openSettingsPage('zaps')}
+                    onConfigureZapAmounts={() => navigate('/wallet')}
                     {...(STRHODLER_DONATION_PUBKEY ? { donationPubkey: STRHODLER_DONATION_PUBKEY } : {})}
                     canDonateWithWallet={canDonateWithWallet}
                     onResolveProfiles={resolveMentionProfiles}

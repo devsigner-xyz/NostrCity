@@ -220,6 +220,8 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             connectWebLnWallet: async () => true,
             disconnectWallet: noop,
             refreshWallet: asyncNoop,
+            zapSettings: { amounts: [], defaultAmount: 0 },
+            onZapSettingsChange: noop,
         },
         profile: {
             ownerPubkey: 'f'.repeat(64),
@@ -252,8 +254,6 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             suggestedRelays: [],
             suggestedRelaysByType: {},
             onUiSettingsChange: noop,
-            zapSettings: { amounts: [], defaultAmount: 0 },
-            onZapSettingsChange: noop,
             onClose: noop,
         },
         donation: {

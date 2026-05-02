@@ -186,6 +186,46 @@ describe('social service pagination', () => {
     );
   });
 
+  it('filters articles by hashtag when requested', async () => {
+    const pool = {
+      querySync: vi.fn(async (_relays: string[], filter: Record<string, unknown>) => {
+        if (Array.isArray(filter.kinds) && filter.kinds[0] === 3) {
+          return [
+            {
+              id: '1'.repeat(64),
+              pubkey: OWNER,
+              kind: 3,
+              created_at: 100,
+              tags: [['p', FOLLOW]],
+              content: '',
+            },
+          ];
+        }
+
+        return [];
+      }),
+    } as unknown as SimplePool;
+
+    const service = createSocialService({
+      pool,
+      bootstrapRelays: ['wss://relay.damus.io'],
+    });
+
+    await service.getArticlesFeed({
+      ownerPubkey: OWNER,
+      limit: 2,
+      until: 999,
+      hashtag: 'Maps',
+    });
+
+    expect(pool.querySync).toHaveBeenLastCalledWith(
+      ['wss://relay.damus.io'],
+      expect.objectContaining({
+        '#t': ['maps'],
+      }),
+    );
+  });
+
   it('loads article detail by id with NIP-23 kind guard', async () => {
     const pool = {
       querySync: vi.fn(async () => [

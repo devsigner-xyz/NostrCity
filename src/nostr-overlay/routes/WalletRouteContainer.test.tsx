@@ -54,6 +54,7 @@ const walletActivity: WalletActivityState = {
 function buildProps(overrides: Partial<WalletRouteContainerProps> = {}): WalletRouteContainerProps {
     return {
         canWrite: true,
+        ownerPubkey: 'f'.repeat(64),
         walletSettings,
         walletActivity,
         walletNwcUriInput: 'nostr+walletconnect://input.example',
@@ -62,6 +63,8 @@ function buildProps(overrides: Partial<WalletRouteContainerProps> = {}): WalletR
         connectWebLnWallet: vi.fn(async () => true),
         disconnectWallet: vi.fn(),
         refreshWallet: vi.fn(async () => undefined),
+        zapSettings: { amounts: [21, 128, 256], defaultAmount: 128 },
+        onZapSettingsChange: vi.fn(),
         ...overrides,
     };
 }
@@ -145,5 +148,29 @@ describe('WalletRouteContainer', () => {
         const walletPageProps = getLatestWalletPageProps();
         expect(walletPageProps.onNwcUriInputChange).toBe(setWalletNwcUriInput);
         expect(walletPageProps.onDisconnect).toBe(disconnectWallet);
+    });
+
+    test('passes zap settings controls through when the wallet is connected', async () => {
+        const onZapSettingsChange = vi.fn<WalletRouteContainerProps['onZapSettingsChange']>();
+        const props = buildProps({ onZapSettingsChange });
+
+        await renderRoute(props);
+
+        const walletPageProps = getLatestWalletPageProps();
+        expect(walletPageProps.zapSettings?.zapSettings).toEqual(props.zapSettings);
+
+        await act(async () => {
+            walletPageProps.zapSettings?.onUpdateZapAmount(1, 42);
+        });
+
+        expect(onZapSettingsChange).toHaveBeenCalledWith({ amounts: [21, 42, 256], defaultAmount: 21 });
+    });
+
+    test('hides zap settings controls when the wallet is not connected', async () => {
+        const props = buildProps({ walletSettings: { activeConnection: null } });
+
+        await renderRoute(props);
+
+        expect(getLatestWalletPageProps().zapSettings).toBeUndefined();
     });
 });

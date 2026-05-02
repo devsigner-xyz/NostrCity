@@ -1,6 +1,6 @@
 import type { RelayType } from '../../../nostr/relay-settings';
 
-export type SettingsView = 'advanced' | 'ui' | 'shortcuts' | 'relays' | 'relay-detail' | 'about' | 'zaps';
+export type SettingsView = 'advanced' | 'ui' | 'shortcuts' | 'relays' | 'relay-detail' | 'about';
 
 export type RelaySource = 'configured' | 'suggested';
 

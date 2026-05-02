@@ -1382,7 +1382,8 @@ describe('FollowingFeedSurface', () => {
     test('uses the xl breakpoint before switching masonry to two columns', () => {
         const styles = readOverlayStyles();
 
-        expect(styles).toMatch(/@media \(min-width:\s*1280px\)\s*\{\s*\.nostr-following-feed-list-layout-masonry\s*\{\s*column-count:\s*2;/s);
+        expect(styles).toMatch(/\.nostr-following-feed-list-layout-masonry\s*\{[^}]*max-width:\s*var\(--nostr-masonry-column-width\);/s);
+        expect(styles).toMatch(/@media \(min-width:\s*1280px\)\s*\{\s*\.nostr-following-feed-list-layout-masonry\s*\{\s*column-count:\s*2;[^}]*max-width:\s*calc\(\(var\(--nostr-masonry-column-width\) \* 2\) \+ var\(--nostr-masonry-gap\)\);/s);
         expect(styles).not.toMatch(/@media \(min-width:\s*900px\)\s*\{\s*\.nostr-following-feed-list-layout-masonry\s*\{/s);
     });
 
@@ -1512,9 +1513,9 @@ describe('FollowingFeedSurface', () => {
         expect(rendered.container.querySelector('button[aria-label="Repostear (2)"]')).toBeDefined();
         expect(rendered.container.querySelector('[aria-label="Sats recibidos: 210"]')).toBeDefined();
 
-        const article = rendered.container.querySelector('article') as HTMLElement;
+        const detailButton = rendered.container.querySelector('button[aria-label="Abrir detalle de la nota note-1"]') as HTMLButtonElement;
         await act(async () => {
-            article.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            detailButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         expect(onOpenThread).toHaveBeenCalledWith('note-1');

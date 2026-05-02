@@ -29,6 +29,7 @@ interface UseFollowingFeedInfiniteQueryOptions {
 interface UseArticlesFeedInfiniteQueryOptions {
     ownerPubkey?: string;
     follows: string[];
+    hashtag?: string;
     service: SocialFeedService;
     enabled: boolean;
     pageSize?: number;
@@ -119,18 +120,21 @@ export function useFollowingFeedInfiniteQuery(options: UseFollowingFeedInfiniteQ
 
 export function useArticlesFeedInfiniteQuery(options: UseArticlesFeedInfiniteQueryOptions) {
     const follows = normalizeEventIds(options.follows);
+    const hashtag = normalizeHashtag(options.hashtag);
     const pageSize = Math.max(1, options.pageSize ?? DEFAULT_FEED_PAGE_SIZE);
 
     return useInfiniteQuery<SocialFeedPage, Error>(createSocialQueryOptions({
         queryKey: nostrOverlayQueryKeys.articlesFeed({
             ...(options.ownerPubkey ? { ownerPubkey: options.ownerPubkey } : {}),
             follows,
+            ...(hashtag ? { hashtag } : {}),
             pageSize,
         }),
         queryFn: ({ pageParam }: { pageParam: unknown }) => {
             const until = typeof pageParam === 'number' ? pageParam : undefined;
             return options.service.loadArticlesFeed({
                 authors: follows,
+                ...(hashtag ? { hashtag } : {}),
                 limit: pageSize,
                 ...(until !== undefined ? { until } : {}),
             });

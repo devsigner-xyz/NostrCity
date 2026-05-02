@@ -434,13 +434,6 @@ function SidebarActionsMenu({
                             </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                            <SidebarMenuSubButton asChild isActive={activeSettingsView === 'zaps'}>
-                                <button type="button" aria-label={t('sidebar.settingsZaps')} onClick={() => runNavigationAction(() => onOpenSettings('zaps'))}>
-                                    <span>{t('sidebar.zaps')}</span>
-                                </button>
-                            </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={activeSettingsView === 'shortcuts'}>
                                 <button type="button" aria-label={t('sidebar.settingsShortcuts')} onClick={() => runNavigationAction(() => onOpenSettings('shortcuts'))}>
                                     <span>{t('sidebar.shortcuts')}</span>

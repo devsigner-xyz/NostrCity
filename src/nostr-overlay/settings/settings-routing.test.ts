@@ -17,7 +17,7 @@ describe('settings-routing', () => {
     });
 
     test('extracts first settings segment from pathname', () => {
-        expect(settingsViewFromPathname('/settings/zaps/anything')).toBe('zaps');
+        expect(settingsViewFromPathname('/settings/shortcuts/anything')).toBe('shortcuts');
     });
 
     test('returns null when pathname is not a supported settings route', () => {
@@ -25,10 +25,11 @@ describe('settings-routing', () => {
         expect(settingsViewFromPathname('/settings')).toBeNull();
         expect(settingsViewFromPathname('/settings/relay-detail')).toBeNull();
         expect(settingsViewFromPathname('/settings/unknown')).toBeNull();
+        expect(settingsViewFromPathname('/settings/zaps')).toBeNull();
     });
 
     test('builds canonical settings paths', () => {
-        expect(buildSettingsPath('zaps')).toBe('/settings/zaps');
+        expect(buildSettingsPath('shortcuts')).toBe('/settings/shortcuts');
         expect(buildSettingsPath('advanced')).toBe('/settings/advanced');
     });
 });

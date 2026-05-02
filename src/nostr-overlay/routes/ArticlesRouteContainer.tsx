@@ -11,12 +11,15 @@ export interface ArticlesRouteContainerProps {
     isLoadingMore: boolean;
     error: string | null;
     hasMore: boolean;
+    activeHashtag?: string;
     agoraFeedLayout: AgoraFeedLayout;
     isMobile?: boolean;
     onAgoraFeedLayoutChange: (layout: AgoraFeedLayout) => void;
     onRefresh: () => Promise<void> | void;
     onLoadMore: () => Promise<void> | void;
     onOpenArticle: (eventId: string) => void;
+    onSelectHashtag?: (hashtag: string) => void;
+    onClearHashtag?: () => void;
 }
 
 export function ArticlesRouteContainer(_props: ArticlesRouteContainerProps) {

@@ -1,7 +1,9 @@
 import type { SocialFeedItem } from '../../nostr/social-feed-service';
 import type { NostrProfile } from '../../nostr/types';
 import type { AgoraFeedLayout } from '../../nostr/ui-settings';
+import { parseArticleMetadata } from '../../nostr/articles';
 import { useI18n } from '@/i18n/useI18n';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
@@ -20,12 +22,15 @@ interface ArticlesSurfaceProps {
     isLoadingMore: boolean;
     error: string | null;
     hasMore: boolean;
+    activeHashtag?: string;
     agoraFeedLayout?: AgoraFeedLayout;
     isMobile?: boolean;
     onAgoraFeedLayoutChange?: (layout: AgoraFeedLayout) => void;
     onRefresh: () => Promise<void> | void;
     onLoadMore: () => Promise<void> | void;
     onOpenArticle: (eventId: string) => void;
+    onSelectHashtag?: (hashtag: string) => void;
+    onClearHashtag?: () => void;
 }
 
 const AGORA_LAYOUT_TOGGLE_ITEM_CLASS = 'data-[state=on]:border-primary! data-[state=on]:bg-primary! data-[state=on]:text-primary-foreground! data-[state=on]:hover:bg-primary/90!';
@@ -39,6 +44,11 @@ function shouldLoadMore(container: HTMLDivElement): boolean {
     return distanceToBottom < 80;
 }
 
+function topicsFromArticles(items: SocialFeedItem[]): string[] {
+    return [...new Set(items.flatMap((item) => parseArticleMetadata(item.rawEvent).topics))]
+        .sort((left, right) => left.localeCompare(right));
+}
+
 export function ArticlesSurface({
     items,
     profilesByPubkey,
@@ -47,14 +57,18 @@ export function ArticlesSurface({
     isLoadingMore,
     error,
     hasMore,
+    activeHashtag,
     agoraFeedLayout = 'list',
     isMobile = false,
     onAgoraFeedLayoutChange,
     onRefresh,
     onLoadMore,
     onOpenArticle,
+    onSelectHashtag,
+    onClearHashtag,
 }: ArticlesSurfaceProps) {
     const { t } = useI18n();
+    const topics = topicsFromArticles(items);
 
     const onScroll = (container: HTMLDivElement | null): void => {
         if (!container || isLoading || isRefreshing || isLoadingMore || !hasMore) {
@@ -75,7 +89,7 @@ export function ArticlesSurface({
             >
                 <OverlayPageHeader
                     title={t('articles.title')}
-                    description={t('articles.subtitle')}
+                    description={activeHashtag ? t('articles.subtitle.hashtag', { hashtag: activeHashtag }) : t('articles.subtitle')}
                     actions={(
                         <>
                             {onAgoraFeedLayoutChange ? (
@@ -109,9 +123,27 @@ export function ArticlesSurface({
                             >
                                 {isRefreshing ? t('articles.refreshing') : t('articles.refresh')}
                             </Button>
+                            {activeHashtag && onClearHashtag ? (
+                                <Button type="button" variant="outline" size="sm" onClick={onClearHashtag}>
+                                    {t('articles.clearFilter')}
+                                </Button>
+                            ) : null}
                         </>
                     )}
                 />
+
+                {topics.length > 0 && onSelectHashtag ? (
+                    <div className="flex flex-wrap items-center gap-2" aria-label={t('articles.categoryFilters')}>
+                        {topics.map((topic) => {
+                            const isActive = topic === activeHashtag;
+                            return (
+                                <button key={topic} type="button" onClick={() => onSelectHashtag(topic)}>
+                                    <Badge variant={isActive ? 'default' : 'secondary'}>{topic}</Badge>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : null}
 
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
 
@@ -147,6 +179,7 @@ export function ArticlesSurface({
                                         event={item.rawEvent}
                                         authorLabel={profileLabel(item.pubkey, profilesByPubkey[item.pubkey])}
                                         onOpenArticle={onOpenArticle}
+                                        {...(onSelectHashtag ? { onSelectHashtag } : {})}
                                     />
                                 </div>
                             ))}

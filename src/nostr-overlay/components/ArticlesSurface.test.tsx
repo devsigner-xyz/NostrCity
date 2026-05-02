@@ -23,7 +23,7 @@ function articleItem(id = 'article-1'): SocialFeedItem {
             pubkey: 'a'.repeat(64),
             kind: LONG_FORM_ARTICLE_KIND,
             created_at: 1710000000,
-            tags: [['title', 'Article title'], ['summary', 'Article summary']],
+            tags: [['title', 'Article title'], ['summary', 'Article summary'], ['t', 'nostr'], ['t', 'maps']],
             content: 'Article body',
         },
     };
@@ -119,6 +119,33 @@ describe('ArticlesSurface', () => {
         expect(onRefresh).toHaveBeenCalledTimes(1);
         expect(onOpenArticle).toHaveBeenCalledWith('article-1');
         expect(buttons.find((button) => button.textContent === 'Cargar mas')).toBeUndefined();
+    });
+
+    test('renders article category filters and calls selection actions', async () => {
+        const onSelectHashtag = vi.fn();
+        const onClearHashtag = vi.fn();
+        const rendered = await renderElement(surface({
+            items: [articleItem('article-1')],
+            activeHashtag: 'nostr',
+            onSelectHashtag,
+            onClearHashtag,
+        }));
+        mounted.push(rendered);
+
+        expect(rendered.container.textContent).toContain('Lecturas largas etiquetadas con #nostr');
+        expect(rendered.container.querySelector('[aria-label="Filtros de categoría de artículos"]')).not.toBeNull();
+
+        const buttons = Array.from(rendered.container.querySelectorAll('button'));
+        const mapsFilter = buttons.find((button) => button.textContent === 'maps');
+        const clearFilter = buttons.find((button) => button.textContent === 'Quitar filtro');
+
+        await act(async () => {
+            mapsFilter?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            clearFilter?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onSelectHashtag).toHaveBeenCalledWith('maps');
+        expect(onClearHashtag).toHaveBeenCalledTimes(1);
     });
 
     test('uses the shared overlay page header slots for mobile header rules', async () => {
