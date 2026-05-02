@@ -19,6 +19,7 @@ import { ProfileRouteContainer, type ProfileRouteContainerProps } from './Profil
 import { SettingsRouteContainer, type SettingsRouteContainerProps } from './SettingsRouteContainer';
 import { UserSearchRouteContainer, type UserSearchRouteContainerProps } from './UserSearchRouteContainer';
 import { WalletRouteContainer, type WalletRouteContainerProps } from './WalletRouteContainer';
+import { isWriteEnabled } from '../../nostr/auth/session';
 import type { NostrProfile } from '../../nostr/types';
 
 interface DonationRouteProps {
@@ -68,6 +69,12 @@ export function OverlayRoutes({
     settings,
     donation,
 }: OverlayRoutesProps) {
+    const groupsRouteElement = !groups
+        ? <GroupsRouteContainer />
+        : isWriteEnabled(groups.session ?? undefined)
+            ? <GroupsPage {...groups} />
+            : <Navigate to="/" replace />;
+
     return (
         <Routes>
             {showLoginGate ? (
@@ -88,7 +95,7 @@ export function OverlayRoutes({
                     <Route path="/notifications" element={notifications.canAccessSocialNotifications ? <NotificationsRouteContainer {...notifications} /> : <Navigate to="/" replace />} />
                     <Route path="/chats" element={chats.canDirectMessages ? <ChatsRouteContainer {...chats} /> : <Navigate to="/" replace />} />
                     <Route path="/open" element={<Navigate to={`/groups${locationSearch}`} replace />} />
-                    <Route path="/groups" element={groups ? <GroupsPage {...groups} /> : <GroupsRouteContainer />} />
+                    <Route path="/groups" element={groupsRouteElement} />
                     <Route path="/relays" element={<RelaysRoute {...relays} />} />
                     <Route path="/relays/detail" element={<RelayDetailRoute {...relayDetail} />} />
                     <Route path="/discover" element={<DiscoverRouteContainer {...discover} />} />

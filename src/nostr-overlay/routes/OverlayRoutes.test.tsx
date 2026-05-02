@@ -397,6 +397,48 @@ describe('OverlayRoutes', () => {
         expect(lastLocation(rendered.locations)).toBe('/groups');
     });
 
+    test('redirects readonly /groups requests back to the map', async () => {
+        const noop = () => undefined;
+        const rendered = await renderOverlayRoutes('/groups', {
+            groups: {
+                groups: [],
+                selectedGroupId: null,
+                isLoading: false,
+                error: null,
+                session: {
+                    method: 'npub',
+                    pubkey: 'f'.repeat(64),
+                    readonly: true,
+                    locked: false,
+                    createdAt: 1,
+                    capabilities: {
+                        canSign: false,
+                        canEncrypt: false,
+                        encryptionSchemes: [],
+                    },
+                },
+                messageDraft: '',
+                timeline: [],
+                onSelectGroup: noop,
+                onMessageDraftChange: noop,
+                onPublishMessage: noop,
+                onSaveGroup: noop,
+                onSyncPublicGroups: noop,
+                onJoinGroup: noop,
+                onLeaveGroup: noop,
+                onRetry: noop,
+                hasGroupRelaysConfigured: false,
+                onAddSuggestedGroupRelays: noop,
+                onManageGroupRelays: noop,
+            },
+        });
+        mounted.push(rendered);
+
+        await waitFor(() => lastLocation(rendered.locations) === '/');
+
+        expect(lastLocation(rendered.locations)).toBe('/');
+    });
+
     test('redirects /open invite links to /groups with search params', async () => {
         const locationSearch = '?relay=wss%3A%2F%2Frelay.example&group=parks&code=invite';
         const rendered = await renderOverlayRoutes(`/open${locationSearch}`, { locationSearch });

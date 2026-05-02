@@ -276,17 +276,20 @@ function SidebarActionsMenu({
                 ) : null}
 
                 <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activePath === '/groups'}>
-                        <button
-                            type="button"
-                            aria-label={t('sidebar.openGroups')}
-                            title={t('sidebar.groups')}
-                            onClick={() => runNavigationAction(onOpenGroups)}
-                        >
-                            <UsersIcon />
-                            <span>{t('sidebar.groups')}</span>
-                        </button>
-                    </SidebarMenuButton>
+                    <SigningRequiredTooltip enabled={isReadonlySession} label={readonlyReason}>
+                        <SidebarMenuButton asChild isActive={activePath === '/groups'}>
+                            <button
+                                type="button"
+                                aria-label={t('sidebar.openGroups')}
+                                title={isReadonlySession ? readonlyReason : t('sidebar.groups')}
+                                disabled={isReadonlySession}
+                                onClick={() => runNavigationAction(onOpenGroups)}
+                            >
+                                <UsersIcon />
+                                <span>{t('sidebar.groups')}</span>
+                            </button>
+                        </SidebarMenuButton>
+                    </SigningRequiredTooltip>
                 </SidebarMenuItem>
 
                 {showPrimaryActionsInSidebar ? (

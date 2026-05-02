@@ -339,31 +339,37 @@ describe('OverlaySidebar', () => {
         const readonlyReason = 'Estás en modo lectura, accede con firma.';
         const publishButton = rendered.container.querySelector('button[aria-label="Abrir publicar"]') as HTMLButtonElement | null;
         const chatButton = rendered.container.querySelector('button[aria-label="Abrir chats"]') as HTMLButtonElement | null;
+        const groupsButton = rendered.container.querySelector('button[aria-label="Abrir grupos"]') as HTMLButtonElement | null;
         const notificationsButton = rendered.container.querySelector('button[aria-label="Abrir notificaciones"]') as HTMLButtonElement | null;
         const walletButton = rendered.container.querySelector('button[aria-label="Abrir Wallet"]') as HTMLButtonElement | null;
 
         expect(publishButton).not.toBeNull();
         expect(chatButton).not.toBeNull();
+        expect(groupsButton).not.toBeNull();
         expect(notificationsButton).not.toBeNull();
         expect(walletButton).not.toBeNull();
         expect(publishButton?.disabled).toBe(true);
         expect(chatButton?.disabled).toBe(true);
+        expect(groupsButton?.disabled).toBe(true);
         expect(notificationsButton?.disabled).toBe(true);
         expect(walletButton?.disabled).toBe(true);
         expect(publishButton?.title).toBe(readonlyReason);
         expect(chatButton?.title).toBe(readonlyReason);
+        expect(groupsButton?.title).toBe(readonlyReason);
         expect(notificationsButton?.title).toBe(readonlyReason);
         expect(walletButton?.title).toBe(readonlyReason);
 
         await act(async () => {
             publishButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             chatButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            groupsButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             notificationsButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             walletButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         expect(rendered.onOpenPublish).not.toHaveBeenCalled();
         expect(rendered.onOpenChat).not.toHaveBeenCalled();
+        expect(rendered.onOpenGroups).not.toHaveBeenCalled();
         expect(rendered.onOpenNotifications).not.toHaveBeenCalled();
         expect(rendered.onOpenWallet).not.toHaveBeenCalled();
     });
