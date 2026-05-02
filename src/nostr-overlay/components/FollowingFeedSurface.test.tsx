@@ -663,6 +663,7 @@ describe('FollowingFeedSurface', () => {
             <FollowingFeedSurface
                 {...buildProps({
                     isMobile: true,
+                    items: [createFeedNote('note-1')],
                     onRefreshFeed,
                 })}
             />
@@ -672,9 +673,38 @@ describe('FollowingFeedSurface', () => {
         const refreshButtons = Array.from(rendered.container.querySelectorAll('button')).filter((button) =>
             (button.textContent || '').trim() === 'Actualizar'
         ) as HTMLButtonElement[];
+        const screenReaderRefreshButton = refreshButtons.find((button) =>
+            button.className.includes('sr-only')
+        );
+
+        expect(screenReaderRefreshButton).toBeDefined();
+        expect(screenReaderRefreshButton?.className).toContain('focus:not-sr-only');
+
+        await act(async () => {
+            screenReaderRefreshButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onRefreshFeed).toHaveBeenCalledTimes(1);
+    });
+
+    test('mobile empty no-posts state exposes only one refresh action and uses the empty-state CTA', async () => {
+        const onRefreshFeed = vi.fn(async () => {});
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    onRefreshFeed,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const refreshButtons = Array.from(rendered.container.querySelectorAll('button')).filter((button) =>
+            (button.textContent || '').trim() === 'Actualizar'
+        ) as HTMLButtonElement[];
+
         expect(refreshButtons).toHaveLength(1);
-        expect(refreshButtons[0]?.className).toContain('sr-only');
-        expect(refreshButtons[0]?.className).toContain('focus:not-sr-only');
+        expect(refreshButtons[0]?.className).not.toContain('sr-only');
 
         await act(async () => {
             refreshButtons[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -1176,6 +1206,67 @@ describe('FollowingFeedSurface', () => {
         expect(surfaceContent.classList.contains('nostr-following-feed-dialog')).toBe(false);
         expect(rendered.container.querySelector('[data-slot="overlay-page-header"]')).not.toBeNull();
         expect(composeCard).toBeNull();
+    });
+
+    test('renders refresh CTA in the no-posts empty state and triggers refresh', async () => {
+        const onRefreshFeed = vi.fn(async () => {});
+        const rendered = await renderElement(<FollowingFeedSurface {...buildProps({ onRefreshFeed })} />);
+        mounted.push(rendered);
+
+        const emptyState = rendered.container.querySelector('[data-slot="empty"]') as HTMLDivElement | null;
+        const button = Array.from(emptyState?.querySelectorAll('button') ?? []).find((candidate) =>
+            (candidate.textContent || '').includes('Actualizar')
+        ) as HTMLButtonElement | undefined;
+
+        expect(button).toBeDefined();
+
+        await act(async () => {
+            button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onRefreshFeed).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not render refresh CTA in the no-follows empty state', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface {...buildProps({ hasFollows: false, items: [] })} />
+        );
+        mounted.push(rendered);
+
+        const emptyState = rendered.container.querySelector('[data-slot="empty"]') as HTMLDivElement | null;
+
+        expect(emptyState?.textContent || '').toContain('No sigues a nadie todavía');
+        expect(Array.from(emptyState?.querySelectorAll('button') ?? []).some((candidate) =>
+            (candidate.textContent || '').includes('Actualizar')
+        )).toBe(false);
+    });
+
+    test('renders refresh CTA in the no-posts empty state when a hashtag filter is active', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface {...buildProps({ hasFollows: false, activeHashtag: 'nostr', items: [] })} />
+        );
+        mounted.push(rendered);
+
+        const emptyState = rendered.container.querySelector('[data-slot="empty"]') as HTMLDivElement | null;
+
+        expect(emptyState?.textContent || '').toContain('Sin notas');
+        expect(Array.from(emptyState?.querySelectorAll('button') ?? []).some((candidate) =>
+            (candidate.textContent || '').includes('Actualizar')
+        )).toBe(true);
+    });
+
+    test('shows refreshing state on the empty-state CTA while refresh is in flight', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface {...buildProps({ isRefreshingFeed: true })} />
+        );
+        mounted.push(rendered);
+
+        const emptyState = rendered.container.querySelector('[data-slot="empty"]') as HTMLDivElement | null;
+        const button = Array.from(emptyState?.querySelectorAll('button') ?? []).find((candidate) =>
+            (candidate.textContent || '').includes('Actualizando')
+        ) as HTMLButtonElement | undefined;
+
+        expect(button?.disabled).toBe(true);
     });
 
     test('does not render main composer in the primary agora feed', async () => {

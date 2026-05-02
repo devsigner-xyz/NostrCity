@@ -25,7 +25,7 @@ import { NoteCard } from './NoteCard';
 import { OverlayPageHeader } from './OverlayPageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { useI18n } from '@/i18n/useI18n';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
@@ -696,6 +696,16 @@ export function FollowingFeedContent({
                                         <EmptyTitle>{t('feed.emptyNoPostsTitle')}</EmptyTitle>
                                         <EmptyDescription>{t('feed.emptyNoPostsDescription')}</EmptyDescription>
                                     </EmptyHeader>
+                                    <EmptyContent>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => void onRefreshFeed()}
+                                            disabled={isRefreshingFeed}
+                                        >
+                                            {isRefreshingFeed ? t('feed.refreshing') : t('feed.refresh')}
+                                        </Button>
+                                    </EmptyContent>
                                 </Empty>
                             )
                         ) : (

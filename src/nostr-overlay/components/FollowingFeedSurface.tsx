@@ -27,6 +27,9 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
         ? t('feed.subtitle.hashtag', { hashtag: activeHashtag })
         : t('feed.subtitle.following');
     const showFeedHeaderActions = !feedProps.activeThread;
+    const isEmptyNoPostsState = !feedProps.isLoadingFeed
+        && feedProps.items.length === 0
+        && (Boolean(activeHashtag) || feedProps.hasFollows);
     const pendingItemsLabel = feedProps.pendingNewCount === 1
         ? t('feed.newPosts.one')
         : t('feed.newPosts.many', { count: feedProps.pendingNewCount });
@@ -69,21 +72,23 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
                         {pendingItemsLabel}
                     </Button>
                 ) : null}
-                <Button type="button" variant="outline" size="sm" className={feedProps.isMobile ? 'sr-only focus:not-sr-only focus:absolute focus:right-3 focus:top-3 focus:z-20' : undefined} onClick={() => {
-                    void onRefreshFeedWithCooldown();
-                }} disabled={feedProps.isRefreshingFeed}>
-                    {feedProps.isRefreshingFeed ? (
-                        <>
-                            <Spinner />
-                            {t('feed.refreshing')}
-                        </>
-                    ) : (
-                        <>
-                            <RefreshCwIcon data-icon="inline-start" aria-hidden="true" />
-                            {t('feed.refresh')}
-                        </>
-                    )}
-                </Button>
+                {!(feedProps.isMobile && isEmptyNoPostsState) ? (
+                    <Button type="button" variant="outline" size="sm" className={feedProps.isMobile ? 'sr-only focus:not-sr-only focus:absolute focus:right-3 focus:top-3 focus:z-20' : undefined} onClick={() => {
+                        void onRefreshFeedWithCooldown();
+                    }} disabled={feedProps.isRefreshingFeed}>
+                        {feedProps.isRefreshingFeed ? (
+                            <>
+                                <Spinner />
+                                {t('feed.refreshing')}
+                            </>
+                        ) : (
+                            <>
+                                <RefreshCwIcon data-icon="inline-start" aria-hidden="true" />
+                                {t('feed.refresh')}
+                            </>
+                        )}
+                    </Button>
+                ) : null}
                 {activeHashtag && onClearHashtag ? (
                     <Button type="button" variant="outline" size="sm" onClick={onClearHashtag}>
                         {t('feed.clearFilter')}
