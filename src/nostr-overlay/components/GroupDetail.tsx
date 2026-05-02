@@ -70,6 +70,16 @@ function shortPubkey(pubkey: string): string {
     return pubkey.slice(0, 8);
 }
 
+function profileDisplayName(pubkey: string, profile: NostrProfile | undefined): string {
+    return profile?.displayName?.trim() || profile?.name?.trim() || shortPubkey(pubkey);
+}
+
+function authorProfileButtonClassName(enabled: boolean): string {
+    return enabled
+        ? 'nostr-chat-message-author cursor-pointer rounded-sm text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+        : 'nostr-chat-message-author';
+}
+
 function appendImageUrl(content: string, url: string | undefined): string {
     if (!url) {
         return content;
@@ -272,7 +282,12 @@ export function GroupDetail({
                         ) : timelineItems.length === 0 ? (
                             <Empty className="min-h-[14rem] justify-center border border-dashed">
                                 <EmptyHeader>
-                                    <EmptyTitle>{t('groups.timeline.empty')}</EmptyTitle>
+                                    {membershipStatus === 'pending' ? (
+                                        <>
+                                            <EmptyTitle>{t('groups.join.pending.action')}</EmptyTitle>
+                                            <EmptyDescription>{t('groups.join.pending.description')}</EmptyDescription>
+                                        </>
+                                    ) : <EmptyTitle>{t('groups.timeline.empty')}</EmptyTitle>}
                                 </EmptyHeader>
                             </Empty>
                         ) : (
@@ -280,7 +295,19 @@ export function GroupDetail({
                                 {timelineItems.map((event) => (
                                     <li key={event.id} className="nostr-chat-message is-incoming">
                                         <div className="nostr-chat-message-header">
-                                            <strong className="nostr-chat-message-author" title={event.pubkey}>{shortPubkey(event.pubkey)}</strong>
+                                            {onSelectProfile ? (
+                                                <button
+                                                    type="button"
+                                                    className={authorProfileButtonClassName(true)}
+                                                    title={event.pubkey}
+                                                    aria-label={t('richContent.openProfile', { label: profileDisplayName(event.pubkey, profilesByPubkey?.[event.pubkey]) })}
+                                                    onClick={() => onSelectProfile(event.pubkey)}
+                                                >
+                                                    {profileDisplayName(event.pubkey, profilesByPubkey?.[event.pubkey])}
+                                                </button>
+                                            ) : (
+                                                <strong className={authorProfileButtonClassName(false)} title={event.pubkey}>{profileDisplayName(event.pubkey, profilesByPubkey?.[event.pubkey])}</strong>
+                                            )}
                                             <span className="nostr-chat-message-timestamp">{formatMessageTimestamp(event.created_at, locale)}</span>
                                         </div>
                                         <RichNostrContent

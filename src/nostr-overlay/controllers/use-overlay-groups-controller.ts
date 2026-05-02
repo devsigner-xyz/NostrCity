@@ -131,6 +131,12 @@ function canUseGroupWrites(session: AuthSessionState | null | undefined): boolea
     return isWriteEnabled(session ?? undefined);
 }
 
+function shouldRememberJoinRequest(response: GroupPublishResponse | void, relay: string): boolean {
+    return response === undefined
+        || response.publish.ackedRelays.includes(relay)
+        || response.publish.failedRelays.some((failure) => failure.relay === relay && failure.error.code === 'pending');
+}
+
 function dedupeGroupAddresses(addresses: GroupAddressValue[]): GroupAddressValue[] {
     const byKey = new Map<string, GroupAddressValue>();
     for (const address of addresses) {
@@ -396,8 +402,7 @@ export function useOverlayGroupsController({
         const routeInviteCode = selectedGroupAddress && canonicalizeGroupAddress(selectedGroupAddress).key === canonicalAddress.key ? selectedInviteCode : undefined;
         const joinCode = code ?? routeInviteCode;
         const response = await service.requestJoin(joinCode ? { group: address, code: joinCode } : { group: address });
-        const acknowledged = response === undefined || response.publish.ackedRelays.includes(canonicalAddress.relay);
-        if (!acknowledged) {
+        if (!shouldRememberJoinRequest(response, canonicalAddress.relay)) {
             return;
         }
 

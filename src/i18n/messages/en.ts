@@ -798,7 +798,7 @@ export const enMessages = {
     'groups.sync.aria': 'Sync public relays',
     'groups.join.action': 'Join group',
     'groups.join.aria': 'Join {{name}}',
-    'groups.join.pending.action': 'Join pending confirmation',
+    'groups.join.pending.action': 'Request sent, awaiting approval',
     'groups.join.pending.description': 'You signed the request, but the relay has not confirmed you as a member yet.',
     'groups.joined.action': 'Joined',
     'groups.joined.aria': 'Joined {{name}}',

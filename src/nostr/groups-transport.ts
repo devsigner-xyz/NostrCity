@@ -15,7 +15,7 @@ interface FetchNip11RelayInfoOptions {
     timeoutMs?: number;
 }
 
-export type GroupRelayErrorCode = 'restricted' | 'blocked' | 'duplicate' | 'unknown';
+export type GroupRelayErrorCode = 'pending' | 'restricted' | 'blocked' | 'duplicate' | 'unknown';
 
 export interface GroupRelayError {
     code: GroupRelayErrorCode;
@@ -34,6 +34,7 @@ export interface GroupRelayPublishResult {
 }
 
 const RELAY_ERROR_MESSAGES: Record<GroupRelayErrorCode, string> = {
+    pending: 'Your request is awaiting approval.',
     restricted: 'This group is restricted.',
     blocked: 'The relay blocked this action.',
     duplicate: 'This event was already published.',
@@ -96,6 +97,11 @@ export async function fetchNip11RelayInfo(relayUrl: string, options: FetchNip11R
 }
 
 export function mapGroupRelayError(reason: string): GroupRelayError {
+    const normalizedReason = reason.toLowerCase();
+    if (normalizedReason.includes('pending') || normalizedReason.includes('approval') || normalizedReason.includes('review')) {
+        return { code: 'pending', message: RELAY_ERROR_MESSAGES.pending };
+    }
+
     if (reason.startsWith('restricted:')) {
         return { code: 'restricted', message: RELAY_ERROR_MESSAGES.restricted };
     }

@@ -3,7 +3,7 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { AuthSessionState } from '../../nostr/auth/session';
-import type { GroupsRuntimeSnapshot } from '../../nostr/groups-runtime-service';
+import type { GroupPublishResponse, GroupsRuntimeSnapshot } from '../../nostr/groups-runtime-service';
 import { createNostrOverlayQueryClient } from '../query/query-client';
 import { useOverlayGroupsController, type OverlayGroupsService } from './use-overlay-groups-controller';
 
@@ -286,6 +286,52 @@ describe('useOverlayGroupsController', () => {
         });
 
         expect(savePublicGroups).toHaveBeenCalledWith({ groups: [{ relay: 'wss://relay.example', id: 'parks' }] });
+    });
+
+    test('marks join requests pending when the relay reports pending review without an ack', async () => {
+        let controller: OverlayGroupsController | undefined;
+        const requestJoin = vi.fn(async (): Promise<GroupPublishResponse> => ({
+            event: { id: 'e'.repeat(64), pubkey: 'a'.repeat(64), kind: 9021, created_at: 1, tags: [['h', 'parks']], content: '' },
+            publish: {
+                ackedRelays: [],
+                failedRelays: [
+                    { relay: 'wss://relay.example', error: { code: 'pending', message: 'Your request is awaiting approval.' } },
+                ],
+                timeoutRelays: [],
+            },
+        }));
+        const rememberGroup = vi.fn();
+        const service: OverlayGroupsService = {
+            loadGroups: vi.fn(async () => ({ saved: [], remembered: [], discovered: [{ relay: 'wss://relay.example', id: 'parks' }] })),
+            loadGroup: vi.fn(async () => snapshot('wss://relay.example', 'parks', 'parks')),
+            publishMessage: vi.fn(),
+            requestJoin,
+            requestLeave: vi.fn(),
+            savePublicGroups: vi.fn(),
+        };
+
+        function Harness() {
+            controller = useOverlayGroupsController({
+                enabled: true,
+                ownerPubkey: 'a'.repeat(64),
+                session: session(),
+                service,
+                configuredGroupRelays: ['wss://relay.example'],
+                onRememberGroup: rememberGroup,
+                errorFallbackMessage: 'Could not load groups',
+            });
+            return null;
+        }
+
+        await render(<Harness />);
+        await waitFor(() => controller?.selectedGroupId === "wss://relay.example'parks");
+
+        await act(async () => {
+            await controller?.requestJoin("wss://relay.example'parks");
+        });
+
+        expect(rememberGroup).toHaveBeenCalledWith({ relay: 'wss://relay.example', id: 'parks' });
+        expect(controller?.groups.find((group) => group.name === 'parks')?.membershipStatus).toBe('pending');
     });
 
     test('reuses cached groups after remounting with the same owner and relays', async () => {

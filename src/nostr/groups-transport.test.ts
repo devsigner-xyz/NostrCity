@@ -15,6 +15,10 @@ describe('groups transport helpers', () => {
             code: 'duplicate',
             message: 'This event was already published.',
         });
+        expect(mapGroupRelayError('restricted: request pending moderator review')).toEqual({
+            code: 'pending',
+            message: 'Your request is awaiting approval.',
+        });
     });
 
     test('does not expose raw relay error details for unknown failures', () => {

@@ -418,8 +418,10 @@ describe('GroupsPage', () => {
         const rendered = await renderElement(page({ selectedGroupId: "wss://relay.example'builders" }));
         mounted.push(rendered);
 
-        expect(rendered.container.textContent || '').toContain('Unión pendiente de confirmación');
+        expect(rendered.container.textContent || '').toContain('Solicitud enviada, pendiente de aprobación');
         expect(rendered.container.textContent || '').toContain('Firmaste la solicitud, pero el relay todavía no te confirma como miembro.');
+        expect(rendered.container.querySelector('[data-testid="groups-timeline"]')?.textContent || '').toContain('Solicitud enviada, pendiente de aprobación');
+        expect(rendered.container.querySelector('[data-testid="groups-timeline"]')?.textContent || '').not.toContain('Aún no hay mensajes en el grupo.');
         expect(rendered.container.querySelector('textarea[aria-label="Mensaje para Builders Guild"]')).toBeNull();
         expect(rendered.container.querySelector('button[aria-label="Publicar mensaje en Builders Guild"]')).toBeNull();
         expect(rendered.container.querySelector('button[aria-label="Unirse a Builders Guild"]')).toBeNull();
@@ -700,11 +702,19 @@ describe('GroupsPage', () => {
         }));
         mounted.push(rendered);
 
-        const mention = rendered.container.querySelector('button[aria-label="Abrir perfil de Alice"]') as HTMLButtonElement | null;
+        const mention = Array.from(rendered.container.querySelectorAll('button[aria-label="Abrir perfil de Alice"]')).find((button) =>
+            button.textContent === '@Alice'
+        ) as HTMLButtonElement | undefined;
+        const author = rendered.container.querySelector('.nostr-chat-message-author');
+        expect(author?.textContent).toBe('Alice');
+        expect(author?.getAttribute('title')).toBe(pubkey);
         expect(mention?.textContent).toBe('@Alice');
 
-        await clickElement(mention);
+        await clickElement(author);
         expect(onSelectProfile).toHaveBeenCalledWith(pubkey);
+
+        await clickElement(mention);
+        expect(onSelectProfile).toHaveBeenCalledTimes(2);
         expect(rendered.container.textContent || '').toContain('Referenced note content');
     });
 

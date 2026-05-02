@@ -796,7 +796,7 @@ export const esMessages = {
     'groups.sync.aria': 'Sincronizar relays públicos',
     'groups.join.action': 'Unirse al grupo',
     'groups.join.aria': 'Unirse a {{name}}',
-    'groups.join.pending.action': 'Unión pendiente de confirmación',
+    'groups.join.pending.action': 'Solicitud enviada, pendiente de aprobación',
     'groups.join.pending.description': 'Firmaste la solicitud, pero el relay todavía no te confirma como miembro.',
     'groups.joined.action': 'Unido',
     'groups.joined.aria': 'Unido a {{name}}',
