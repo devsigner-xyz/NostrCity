@@ -3,11 +3,11 @@ import { OverlayPageHeader } from './OverlayPageHeader';
 import { useI18n } from '@/i18n/useI18n';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { OverlaySurface } from './OverlaySurface';
 import { WalletZapSettingsSection, type WalletZapSettingsSectionProps } from './WalletZapSettingsSection';
+import { Separator } from '@/components/ui/separator';
 
 interface WalletPageProps {
     walletState: WalletSettingsState;
@@ -34,14 +34,13 @@ export function WalletPage({
 }: WalletPageProps) {
     const { t } = useI18n();
     const connection = walletState.activeConnection;
-    const hasRememberedConnection = connection !== null;
     const isConnected = connection !== null && connection.restoreState === 'connected';
     const statusLabel = connection?.method === 'nwc'
         ? (connection.restoreState === 'connected' ? t('wallet.status.connectedNwc') : t('wallet.status.reconnectNwc'))
         : connection?.method === 'webln'
             ? (connection.restoreState === 'connected' ? t('wallet.status.connectedWebln') : t('wallet.status.reconnectWebln'))
             : t('wallet.status.disconnected');
-    const reconnectAction = connection?.method === 'webln' ? onConnectWebLn : undefined;
+    const pageTitle = t('wallet.title');
     const formatActivityAmount = (amountMsats: number): string => t('wallet.activity.amountSats', {
         amount: String(Math.round(amountMsats / 1000)),
     });
@@ -58,80 +57,60 @@ export function WalletPage({
     };
 
     return (
-        <OverlaySurface ariaLabel={t('wallet.title')}>
+        <OverlaySurface ariaLabel={pageTitle}>
             <div data-testid="wallet-page" className="flex min-h-0 flex-1 flex-col">
                 <div className="nostr-routed-surface-panel nostr-page-layout gap-3">
                     <OverlayPageHeader
-                        title={t('wallet.title')}
+                        title={pageTitle}
                         description={t('wallet.description')}
-                        indicator={<Badge variant={isConnected ? 'secondary' : 'outline'}>{statusLabel}</Badge>}
                     />
 
                     <div className="grid gap-3">
-                        <Card>
+                        <Card data-testid="wallet-active-section">
                             <CardHeader>
-                                <CardTitle>{t('wallet.active.title')}</CardTitle>
-                                <CardDescription>{statusLabel}</CardDescription>
+                                {isConnected ? <CardAction><Badge>{statusLabel}</Badge></CardAction> : null}
+                                <CardTitle>{isConnected ? t('wallet.active.title') : t('wallet.connect.title')}</CardTitle>
+                                {isConnected ? <CardDescription>{statusLabel}</CardDescription> : null}
                             </CardHeader>
+                            <Separator />
                             <CardContent className="grid gap-3">
-                                {connection?.method === 'nwc' ? (
+                                {isConnected && connection?.method === 'nwc' ? (
                                     <div className="grid gap-1 text-sm text-muted-foreground">
                                         <span>{connection.relays[0] || ''}</span>
                                     </div>
                                 ) : null}
-                                <div className="flex flex-wrap gap-2">
-                                    {isConnected ? (
-                                        <>
-                                            <Button type="button" variant="outline" onClick={onRefresh}>{t('wallet.refresh')}</Button>
-                                            <Button type="button" variant="outline" onClick={onDisconnect}>{t('wallet.disconnect')}</Button>
-                                            <Button type="button" onClick={connection?.method === 'nwc' ? onConnectWebLn : onConnectNwc}>{t('wallet.change')}</Button>
-                                        </>
-                                    ) : hasRememberedConnection ? (
-                                        <>
-                                            {reconnectAction ? <Button type="button" onClick={reconnectAction}>{t('wallet.reconnect')}</Button> : null}
-                                            <Button type="button" variant="outline" onClick={onDisconnect}>{t('wallet.disconnect')}</Button>
-                                        </>
-                                    ) : (
-                                        <Empty>
-                                            <EmptyHeader>
-                                                <EmptyTitle>{t('wallet.empty.title')}</EmptyTitle>
-                                                <EmptyDescription>{t('wallet.empty.description')}</EmptyDescription>
-                                            </EmptyHeader>
-                                        </Empty>
-                                    )}
-                                </div>
+                                {isConnected ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button type="button" variant="outline" onClick={onRefresh}>{t('wallet.refresh')}</Button>
+                                        <Button type="button" variant="outline" onClick={onDisconnect}>{t('wallet.disconnect')}</Button>
+                                        <Button type="button" onClick={connection?.method === 'nwc' ? onConnectWebLn : onConnectNwc}>{t('wallet.change')}</Button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                        <Input
+                                            type="text"
+                                            aria-label={t('wallet.connect.nwcUri')}
+                                            placeholder="nostr+walletconnect://..."
+                                            value={nwcUriInput}
+                                            onChange={(event) => onNwcUriInputChange(event.target.value)}
+                                        />
+                                        <p className="w-full text-sm text-muted-foreground">
+                                            {t('wallet.connect.warning')}
+                                        </p>
+                                        <Button type="button" onClick={onConnectNwc}>{t('wallet.connect.nwc')}</Button>
+                                        <Button type="button" variant="outline" onClick={onConnectWebLn}>{t('wallet.connect.webln')}</Button>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 
-                        {!isConnected ? (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>{t('wallet.connect.title')}</CardTitle>
-                                    <CardDescription>{t('wallet.connect.description')}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="flex flex-wrap gap-2">
-                                    <Input
-                                        type="text"
-                                        aria-label={t('wallet.connect.nwcUri')}
-                                        placeholder="nostr+walletconnect://..."
-                                        value={nwcUriInput}
-                                        onChange={(event) => onNwcUriInputChange(event.target.value)}
-                                    />
-                                    <p className="w-full text-sm text-muted-foreground">
-                                        {t('wallet.connect.warning')}
-                                    </p>
-                                    <Button type="button" onClick={onConnectNwc}>{t('wallet.connect.nwc')}</Button>
-                                    <Button type="button" variant="outline" onClick={onConnectWebLn}>{t('wallet.connect.webln')}</Button>
-                                </CardContent>
-                            </Card>
-                        ) : null}
-
                         {isConnected && zapSettings ? <WalletZapSettingsSection {...zapSettings} /> : null}
 
-                        <Card>
+                        <Card data-testid="wallet-activity-section">
                             <CardHeader>
                                 <CardTitle>{t('wallet.activity.title')}</CardTitle>
                             </CardHeader>
+                            <Separator />
                             <CardContent>
                                 {walletActivity.items.length === 0 ? (
                                     <span className="text-sm text-muted-foreground">{t('wallet.activity.empty')}</span>

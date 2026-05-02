@@ -1,10 +1,24 @@
+import { Fragment, useEffect, useState } from 'react';
+import { RefreshCwIcon } from 'lucide-react';
 import type { SocialFeedItem } from '../../nostr/social-feed-service';
 import type { NostrProfile } from '../../nostr/types';
 import type { AgoraFeedLayout } from '../../nostr/ui-settings';
 import { parseArticleMetadata } from '../../nostr/articles';
 import { useI18n } from '@/i18n/useI18n';
 import { Button } from '@/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import {
+    Combobox,
+    ComboboxChip,
+    ComboboxChips,
+    ComboboxChipsInput,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxItem,
+    ComboboxList,
+    ComboboxValue,
+    useComboboxAnchor,
+} from '@/components/ui/combobox';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { OverlaySurface } from './OverlaySurface';
@@ -33,6 +47,9 @@ interface ArticlesSurfaceProps {
 }
 
 const AGORA_LAYOUT_TOGGLE_ITEM_CLASS = 'data-[state=on]:border-primary! data-[state=on]:bg-primary! data-[state=on]:text-primary-foreground! data-[state=on]:hover:bg-primary/90!';
+const EMPTY_HASHTAGS: string[] = [];
+const TOPIC_KEY_SEPARATOR = '\u0000';
+const ARTICLES_EMPTY_STATE_CLASS = 'min-h-[50vh] max-w-none justify-self-stretch';
 
 function profileLabel(pubkey: string, profile: NostrProfile | undefined): string {
     return profile?.displayName?.trim() || profile?.name?.trim() || `${pubkey.slice(0, 8)}...${pubkey.slice(-6)}`;
@@ -43,8 +60,21 @@ function shouldLoadMore(container: HTMLDivElement): boolean {
     return distanceToBottom < 80;
 }
 
-function topicsFromArticles(items: SocialFeedItem[]): string[] {
-    return [...new Set(items.flatMap((item) => parseArticleMetadata(item.rawEvent).topics))]
+function normalizeTopics(values: string[]): string[] {
+    return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+        .sort((left, right) => left.localeCompare(right));
+}
+
+function topicsKey(values: string[]): string {
+    return values.join(TOPIC_KEY_SEPARATOR);
+}
+
+function topicsFromKey(key: string): string[] {
+    return key ? key.split(TOPIC_KEY_SEPARATOR) : [];
+}
+
+function topicsFromArticles(items: SocialFeedItem[], extraTopics: string[] = []): string[] {
+    return normalizeTopics([...items.flatMap((item) => parseArticleMetadata(item.rawEvent).topics), ...extraTopics])
         .sort((left, right) => left.localeCompare(right));
 }
 
@@ -56,7 +86,7 @@ export function ArticlesSurface({
     isLoadingMore,
     error,
     hasMore,
-    activeHashtags = [],
+    activeHashtags = EMPTY_HASHTAGS,
     agoraFeedLayout = 'list',
     isMobile = false,
     onAgoraFeedLayoutChange,
@@ -64,21 +94,32 @@ export function ArticlesSurface({
     onLoadMore,
     onOpenArticle,
     onSelectedHashtagsChange,
-    onClearHashtag,
 }: ArticlesSurfaceProps) {
     const { t } = useI18n();
-    const topics = topicsFromArticles(items);
-    const selectedTopics = [...new Set(activeHashtags)].sort((left, right) => left.localeCompare(right));
+    const categoryAnchor = useComboboxAnchor();
+    const selectedTopics = normalizeTopics(activeHashtags);
+    const selectedTopicsKey = topicsKey(selectedTopics);
+    const [draftTopics, setDraftTopics] = useState<string[]>(() => normalizeTopics(activeHashtags));
+    const topics = topicsFromArticles(items, [...selectedTopics, ...draftTopics]);
     const hasSelectedTopics = selectedTopics.length > 0;
+    const isEmptyArticlesState = !isLoading && items.length === 0;
+    const usesEmptyLayout = isLoading || isEmptyArticlesState;
 
-    const selectTopics = (select: HTMLSelectElement): void => {
-        if (!onSelectedHashtagsChange) {
-            return;
-        }
+    useEffect(() => {
+        setDraftTopics(topicsFromKey(selectedTopicsKey));
+    }, [selectedTopicsKey]);
 
-        onSelectedHashtagsChange(Array.from(select.selectedOptions)
-            .map((option) => option.value)
-            .sort((left, right) => left.localeCompare(right)));
+    const selectTopics = (values: string[]): void => {
+        setDraftTopics(normalizeTopics(values));
+    };
+
+    const applyTopicFilter = (): void => {
+        onSelectedHashtagsChange?.(draftTopics);
+    };
+
+    const clearTopicSelection = (): void => {
+        setDraftTopics([]);
+        onSelectedHashtagsChange?.([]);
     };
 
     const onScroll = (container: HTMLDivElement | null): void => {
@@ -94,7 +135,10 @@ export function ArticlesSurface({
     return (
         <OverlaySurface ariaLabel={t('articles.title')} contentClassName="gap-0">
             <div
-                className="nostr-articles-page nostr-routed-surface-panel nostr-page-layout flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-3"
+                className={cn(
+                    'nostr-articles-page nostr-routed-surface-panel nostr-page-layout flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-3',
+                    usesEmptyLayout && 'nostr-articles-page-empty-state'
+                )}
                 data-testid="articles-scroll-area"
                 onScroll={(event) => onScroll(event.currentTarget)}
             >
@@ -124,19 +168,26 @@ export function ArticlesSurface({
                                     </ToggleGroupItem>
                                 </ToggleGroup>
                             ) : null}
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className={isMobile ? 'sr-only focus:not-sr-only focus:absolute focus:right-3 focus:top-3 focus:z-20' : undefined}
-                                disabled={isRefreshing}
-                                onClick={() => { void onRefresh(); }}
-                            >
-                                {isRefreshing ? t('articles.refreshing') : t('articles.refresh')}
-                            </Button>
-                            {hasSelectedTopics && onClearHashtag ? (
-                                <Button type="button" variant="outline" size="sm" onClick={onClearHashtag}>
-                                    {t('articles.clearFilter')}
+                            {!(isMobile && isEmptyArticlesState) ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className={isMobile ? 'sr-only focus:not-sr-only focus:absolute focus:right-3 focus:top-3 focus:z-20' : undefined}
+                                    disabled={isRefreshing}
+                                    onClick={() => { void onRefresh(); }}
+                                >
+                                    {isRefreshing ? (
+                                        <>
+                                            <Spinner data-icon="inline-start" />
+                                            {t('articles.refreshing')}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <RefreshCwIcon data-icon="inline-start" aria-hidden="true" />
+                                            {t('articles.refresh')}
+                                        </>
+                                    )}
                                 </Button>
                             ) : null}
                         </>
@@ -144,27 +195,57 @@ export function ArticlesSurface({
                 />
 
                 {topics.length > 0 && onSelectedHashtagsChange ? (
-                    <label className="flex max-w-[320px] flex-col gap-2 text-sm font-medium text-foreground">
-                        {t('articles.categorySelectLabel')}
-                        <select
-                            multiple
-                            size={Math.min(4, Math.max(2, topics.length))}
-                            value={selectedTopics}
-                            className="min-h-20 rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                            data-testid="articles-category-select"
-                            onChange={(event) => selectTopics(event.currentTarget)}
-                        >
-                            {topics.map((topic) => (
-                                <option key={topic} value={topic}>{topic}</option>
-                            ))}
-                        </select>
-                    </label>
+                    <div className="flex flex-col gap-2 text-sm font-medium text-foreground">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                            <Combobox
+                                multiple
+                                autoHighlight
+                                items={topics}
+                                value={draftTopics}
+                                onValueChange={(values) => selectTopics(Array.isArray(values) ? values : [])}
+                            >
+                                <ComboboxChips ref={categoryAnchor} className="w-full max-w-xs" aria-label={t('articles.categorySelectLabel')}>
+                                    <ComboboxValue>
+                                        {(values) => (
+                                            <Fragment>
+                                                {values.map((value: string) => (
+                                                    <ComboboxChip key={value}>{value}</ComboboxChip>
+                                                ))}
+                                                <ComboboxChipsInput
+                                                    aria-label={t('articles.categorySelectLabel')}
+                                                    placeholder={t('articles.categorySelectLabel')}
+                                                />
+                                            </Fragment>
+                                        )}
+                                    </ComboboxValue>
+                                </ComboboxChips>
+                                <ComboboxContent anchor={categoryAnchor}>
+                                    <ComboboxEmpty>{t('articles.categoryEmpty')}</ComboboxEmpty>
+                                    <ComboboxList>
+                                        {(topic) => (
+                                            <ComboboxItem key={topic} value={topic}>
+                                                {topic}
+                                            </ComboboxItem>
+                                        )}
+                                    </ComboboxList>
+                                </ComboboxContent>
+                            </Combobox>
+                            <div className="flex gap-2">
+                                <Button type="button" size="sm" onClick={applyTopicFilter}>
+                                    {t('articles.searchFilter')}
+                                </Button>
+                                <Button type="button" variant="outline" size="sm" onClick={clearTopicSelection} disabled={draftTopics.length === 0}>
+                                    {t('articles.clearSelection')}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                 ) : null}
 
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
 
                 {isLoading ? (
-                    <Empty className="articles-loading-state w-full max-w-[600px] self-start">
+                    <Empty className={cn('articles-loading-state', ARTICLES_EMPTY_STATE_CLASS)}>
                         <EmptyHeader>
                             <Spinner />
                             <EmptyTitle>{t('articles.loadingTitle')}</EmptyTitle>
@@ -172,11 +253,31 @@ export function ArticlesSurface({
                         </EmptyHeader>
                     </Empty>
                 ) : items.length === 0 ? (
-                    <Empty>
+                    <Empty data-testid="articles-empty-state" className={ARTICLES_EMPTY_STATE_CLASS}>
                         <EmptyHeader>
                             <EmptyTitle>{t('articles.emptyTitle')}</EmptyTitle>
                             <EmptyDescription>{t('articles.emptyDescription')}</EmptyDescription>
                         </EmptyHeader>
+                        <EmptyContent>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => { void onRefresh(); }}
+                                disabled={isRefreshing}
+                            >
+                                {isRefreshing ? (
+                                    <>
+                                        <Spinner data-icon="inline-start" />
+                                        {t('articles.refreshing')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCwIcon data-icon="inline-start" aria-hidden="true" />
+                                        {t('articles.refresh')}
+                                    </>
+                                )}
+                            </Button>
+                        </EmptyContent>
                     </Empty>
                 ) : (
                     <>

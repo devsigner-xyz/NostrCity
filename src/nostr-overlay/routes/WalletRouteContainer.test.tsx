@@ -63,7 +63,7 @@ function buildProps(overrides: Partial<WalletRouteContainerProps> = {}): WalletR
         connectWebLnWallet: vi.fn(async () => true),
         disconnectWallet: vi.fn(),
         refreshWallet: vi.fn(async () => undefined),
-        zapSettings: { amounts: [21, 128, 256], defaultAmount: 128 },
+        zapSettings: { amounts: [21, 128, 256] },
         onZapSettingsChange: vi.fn(),
         ...overrides,
     };
@@ -160,10 +160,10 @@ describe('WalletRouteContainer', () => {
         expect(walletPageProps.zapSettings?.zapSettings).toEqual(props.zapSettings);
 
         await act(async () => {
-            walletPageProps.zapSettings?.onUpdateZapAmount(1, 42);
+            walletPageProps.zapSettings?.onRemoveZapAmount(1);
         });
 
-        expect(onZapSettingsChange).toHaveBeenCalledWith({ amounts: [21, 42, 256], defaultAmount: 21 });
+        expect(onZapSettingsChange).toHaveBeenCalledWith({ amounts: [21, 256] });
     });
 
     test('hides zap settings controls when the wallet is not connected', async () => {

@@ -2,22 +2,31 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@/components/ui/item';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useI18n } from '@/i18n/useI18n';
+import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
-import type { NostrGroupSummary } from './GroupsPage';
+import type { GroupMembershipStatus, NostrGroupSummary } from './GroupsPage';
 import { formatGroupDisplayId } from './group-display';
 
 interface GroupListProps {
     groups: NostrGroupSummary[];
     selectedGroupId: string | null;
     onSelectGroup: (groupId: string) => void;
+    canWrite: boolean;
+    disabledReason: string | null;
+    onJoinGroup: (groupId: string) => void;
     emptyTitle?: string;
     emptyDescription?: string;
     onEmptyRetry?: () => Promise<void> | void;
 }
 
-export function GroupList({ groups, selectedGroupId, onSelectGroup, emptyTitle, emptyDescription, onEmptyRetry }: GroupListProps) {
+function membershipStatus(group: NostrGroupSummary): GroupMembershipStatus {
+    return group.membershipStatus ?? (group.isRemembered ? 'pending' : group.isSaved ? 'confirmed' : 'none');
+}
+
+export function GroupList({ groups, selectedGroupId, onSelectGroup, canWrite, disabledReason, onJoinGroup, emptyTitle, emptyDescription, onEmptyRetry }: GroupListProps) {
     const { t } = useI18n();
     const selectedGroup = groups.find((group) => group.id === selectedGroupId);
     const joinedGroups = groups.filter((group) => group.isSaved || group.isRemembered);
@@ -46,28 +55,70 @@ export function GroupList({ groups, selectedGroupId, onSelectGroup, emptyTitle, 
                     ) : null}
                 </Empty>
             ) : null}
-            {items.map((group) => {
-                const isSelected = group.id === selectedGroupId;
+            {items.length > 0 ? (
+                <ItemGroup className="gap-2">
+                    {items.map((group) => {
+                        const isSelected = group.id === selectedGroupId;
+                        const status = membershipStatus(group);
 
-                return (
-                    <Button
-                        key={group.id}
-                        type="button"
-                        variant={isSelected ? 'secondary' : 'ghost'}
-                        className="h-auto w-full justify-start px-3 py-3 text-left"
-                        aria-pressed={isSelected}
-                        onClick={() => onSelectGroup(group.id)}
-                    >
-                        <span className="flex min-w-0 flex-1 flex-col gap-1">
-                            <span className="truncate font-medium">{group.name}</span>
-                            <span className="truncate text-xs text-muted-foreground">{formatGroupDisplayId(group.id)}</span>
-                            <span className="flex flex-wrap gap-1">
-                                {group.isSaved ? <Badge variant="secondary">{t('groups.status.saved')}</Badge> : null}
-                            </span>
-                        </span>
-                    </Button>
-                );
-            })}
+                        return (
+                            <Item
+                                key={group.id}
+                                role="listitem"
+                                variant="outline"
+                                size="sm"
+                                data-selected={isSelected ? 'true' : undefined}
+                                className={cn('relative shrink-0', isSelected ? 'border-primary/50 bg-muted/70' : undefined)}
+                            >
+                                <ItemContent className="relative min-w-0">
+                                    <button
+                                        type="button"
+                                        className="absolute inset-0 z-10 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                        aria-pressed={isSelected}
+                                        onClick={() => onSelectGroup(group.id)}
+                                    >
+                                        <span className="sr-only">{group.name}</span>
+                                    </button>
+                                    <ItemTitle className="w-full truncate">{group.name}</ItemTitle>
+                                    <ItemDescription className="truncate">{formatGroupDisplayId(group.id)}</ItemDescription>
+                                    {group.isSaved ? (
+                                        <div className="flex flex-wrap gap-1">
+                                            <Badge variant="secondary">{t('groups.status.saved')}</Badge>
+                                        </div>
+                                    ) : null}
+                                </ItemContent>
+                                {status === 'none' ? (
+                                    <ItemActions className="relative z-20">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={!canWrite}
+                                            title={disabledReason ?? undefined}
+                                            aria-label={t('groups.join.aria', { name: group.name })}
+                                            onClick={() => {
+                                                if (!canWrite) {
+                                                    return;
+                                                }
+
+                                                onJoinGroup(group.id);
+                                            }}
+                                        >
+                                            {t('groups.join.action')}
+                                        </Button>
+                                    </ItemActions>
+                                ) : status === 'pending' ? (
+                                    <ItemActions className="relative z-20">
+                                        <Button type="button" variant="secondary" size="sm" disabled>
+                                            {t('groups.join.pending.action')}
+                                        </Button>
+                                    </ItemActions>
+                                ) : null}
+                            </Item>
+                        );
+                    })}
+                </ItemGroup>
+            ) : null}
         </nav>
     );
 

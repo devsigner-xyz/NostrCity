@@ -220,7 +220,7 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             connectWebLnWallet: async () => true,
             disconnectWallet: noop,
             refreshWallet: asyncNoop,
-            zapSettings: { amounts: [], defaultAmount: 0 },
+            zapSettings: { amounts: [] },
             onZapSettingsChange: noop,
         },
         profile: {

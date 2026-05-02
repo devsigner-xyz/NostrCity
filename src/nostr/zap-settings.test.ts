@@ -6,7 +6,6 @@ import {
     loadZapSettings,
     removeZapAmount,
     saveZapSettings,
-    updateZapAmount,
 } from './zap-settings';
 
 describe('zap settings', () => {
@@ -17,7 +16,6 @@ describe('zap settings', () => {
     test('loads default zap amounts when nothing is stored', () => {
         const state = loadZapSettings();
         expect(state.amounts).toEqual(DEFAULT_ZAP_AMOUNTS);
-        expect(state.defaultAmount).toBe(DEFAULT_ZAP_AMOUNTS[0]);
     });
 
     test('adds and persists a new zap amount sorted and deduped', () => {
@@ -28,11 +26,8 @@ describe('zap settings', () => {
         expect(window.localStorage.getItem(ZAP_SETTINGS_STORAGE_KEY) || '').toContain('64');
     });
 
-    test('updates and removes zap amounts safely', () => {
-        const updated = updateZapAmount(loadZapSettings(), 1, 333);
-        expect(updated.amounts).toEqual([21, 256, 333]);
-
-        const removed = removeZapAmount(updated, 0);
+    test('removes zap amounts safely', () => {
+        const removed = removeZapAmount({ amounts: [21, 256, 333] }, 0);
         expect(removed.amounts).toEqual([256, 333]);
     });
 
@@ -40,7 +35,7 @@ describe('zap settings', () => {
         const ownerA = 'a'.repeat(64);
         const ownerB = 'b'.repeat(64);
 
-        const savedA = saveZapSettings({ amounts: [34, 55, 89], defaultAmount: 34 }, { ownerPubkey: ownerA });
+        const savedA = saveZapSettings({ amounts: [34, 55, 89] }, { ownerPubkey: ownerA });
         const loadedA = loadZapSettings({ ownerPubkey: ownerA });
         const loadedB = loadZapSettings({ ownerPubkey: ownerB });
 
@@ -49,13 +44,17 @@ describe('zap settings', () => {
         expect(loadedB.amounts).toEqual([...DEFAULT_ZAP_AMOUNTS]);
     });
 
-    test('persists a normalized default zap amount', () => {
-        const saved = saveZapSettings({
+    test('ignores legacy default zap amount from stored settings', () => {
+        window.localStorage.setItem(ZAP_SETTINGS_STORAGE_KEY, JSON.stringify({
             amounts: [21, 64, 128],
             defaultAmount: 64,
-        });
+        }));
 
-        expect(saved.defaultAmount).toBe(64);
-        expect(loadZapSettings().defaultAmount).toBe(64);
+        const loaded = loadZapSettings();
+        const saved = saveZapSettings(loaded);
+
+        expect(loaded).toEqual({ amounts: [21, 64, 128] });
+        expect(saved).toEqual({ amounts: [21, 64, 128] });
+        expect(window.localStorage.getItem(ZAP_SETTINGS_STORAGE_KEY) || '').not.toContain('defaultAmount');
     });
 });

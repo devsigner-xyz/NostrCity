@@ -272,6 +272,43 @@ describe('GroupsPage', () => {
         expect(othersRendered.container.textContent || '').not.toContain('Builders Guild');
     });
 
+    test('renders small shadcn item rows with an inline join action', async () => {
+        const onJoinGroup = vi.fn();
+        const onSelectGroup = vi.fn();
+        const rendered = await renderElement(page({
+            selectedGroupId: "wss://relay.example'artists",
+            onJoinGroup,
+            onSelectGroup,
+        }));
+        mounted.push(rendered);
+
+        const artistsTitle = Array.from(rendered.container.querySelectorAll('[data-slot="item-title"]')).find((title) =>
+            title.textContent === 'Street Artists'
+        );
+        const artistsItem = artistsTitle?.closest('[data-slot="item"]') as HTMLElement | null;
+        expect(artistsItem).not.toBeNull();
+        expect(artistsItem?.getAttribute('data-size')).toBe('sm');
+        expect(artistsItem?.getAttribute('data-variant')).toBe('outline');
+        expect(artistsItem?.querySelector('[data-slot="item-content"]')).not.toBeNull();
+        expect(artistsItem?.querySelector('[data-slot="item-description"]')?.textContent).toContain("relay.example'artists");
+
+        const joinButton = artistsItem?.querySelector('button[aria-label="Unirse a Street Artists"]') as HTMLButtonElement | null;
+        expect(joinButton?.textContent).toBe('Unirse al grupo');
+        expect(joinButton?.getAttribute('data-size')).toBe('sm');
+
+        await clickElement(joinButton);
+
+        expect(onJoinGroup).toHaveBeenCalledWith("wss://relay.example'artists");
+        expect(onSelectGroup).not.toHaveBeenCalled();
+
+        const selectButton = Array.from(artistsItem?.querySelectorAll('button') ?? []).find((button) =>
+            button.textContent === 'Street Artists'
+        );
+        await clickElement(selectButton);
+
+        expect(onSelectGroup).toHaveBeenCalledWith("wss://relay.example'artists");
+    });
+
     test('centers shadcn empty states for relay groups and missing group detail', async () => {
         const rendered = await renderElement(page({ selectedRelayUrl: 'wss://groups.extra.example', selectedGroupId: null }));
         mounted.push(rendered);
@@ -379,9 +416,11 @@ describe('GroupsPage', () => {
         const other = await renderElement(page({ selectedGroupId: "wss://relay.example'artists", onJoinGroup }));
         mounted.push(other);
 
-        const joinButton = other.container.querySelector('button[aria-label="Unirse a Street Artists"]') as HTMLButtonElement | null;
+        const detail = other.container.querySelector('article[aria-label="Detalle del grupo Street Artists"]');
+        expect(detail?.querySelector('button[aria-label="Unirse a Street Artists"]')).toBeNull();
+        const joinButton = other.container.querySelector('nav [data-slot="item"] button[aria-label="Unirse a Street Artists"]') as HTMLButtonElement | null;
         expect(joinButton?.textContent).toBe('Unirse al grupo');
-        expect(joinButton?.className).toContain('w-full');
+        expect(joinButton?.getAttribute('data-size')).toBe('sm');
         expect(other.container.querySelector('textarea[aria-label="Mensaje para Street Artists"]')).toBeNull();
         expect(other.container.querySelector('button[aria-label="Publicar mensaje en Street Artists"]')).toBeNull();
         await act(async () => {
@@ -418,9 +457,13 @@ describe('GroupsPage', () => {
         const rendered = await renderElement(page({ selectedGroupId: "wss://relay.example'builders" }));
         mounted.push(rendered);
 
-        expect(rendered.container.textContent || '').toContain('Solicitud enviada, pendiente de aprobación');
-        expect(rendered.container.textContent || '').toContain('Firmaste la solicitud, pero el relay todavía no te confirma como miembro.');
-        expect(rendered.container.querySelector('[data-testid="groups-timeline"]')?.textContent || '').toContain('Solicitud enviada, pendiente de aprobación');
+        expect(rendered.container.textContent || '').toContain('Solicitud enviada');
+        expect(rendered.container.textContent || '').not.toContain('Firmaste la solicitud, pero el relay todavía no te confirma como miembro.');
+        expect(rendered.container.querySelector('[data-testid="groups-timeline"] button')?.textContent).toBe('Solicitud enviada');
+        expect(rendered.container.querySelector('[data-testid="groups-timeline"] button')?.hasAttribute('disabled')).toBe(true);
+        const pendingButtons = Array.from(rendered.container.querySelectorAll('button')).filter((button) => button.textContent === 'Solicitud enviada');
+        expect(pendingButtons).toHaveLength(2);
+        expect(pendingButtons.every((button) => button.hasAttribute('disabled'))).toBe(true);
         expect(rendered.container.querySelector('[data-testid="groups-timeline"]')?.textContent || '').not.toContain('Aún no hay mensajes en el grupo.');
         expect(rendered.container.querySelector('textarea[aria-label="Mensaje para Builders Guild"]')).toBeNull();
         expect(rendered.container.querySelector('button[aria-label="Publicar mensaje en Builders Guild"]')).toBeNull();

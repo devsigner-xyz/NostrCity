@@ -238,6 +238,9 @@ export function GroupsPage({
                                 groups={relayGroups}
                                 selectedGroupId={group?.id ?? null}
                                 onSelectGroup={onSelectGroup}
+                                canWrite={canWrite}
+                                disabledReason={disabledReason}
+                                onJoinGroup={onJoinGroup}
                                 {...(selectedRelayHasNoGroups ? {
                                     emptyTitle: t('groups.list.relayEmptyTitle'),
                                     emptyDescription: t('groups.list.relayEmptyDescription'),
@@ -256,7 +259,6 @@ export function GroupsPage({
                                 onPublishMessage={onPublishMessage}
                                 {...(onUploadImage ? { onUploadImage } : {})}
                                 onSaveGroup={onSaveGroup}
-                                onJoinGroup={onJoinGroup}
                                 onLeaveGroup={onLeaveGroup}
                                 onRetryGroupDetail={onRetryGroupDetail}
                                 {...(profilesByPubkey !== undefined ? { profilesByPubkey } : {})}

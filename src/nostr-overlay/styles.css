@@ -1002,6 +1002,12 @@
     padding: 0.9rem;
 }
 
+.nostr-articles-page-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-content: stretch;
+}
+
 .nostr-city-kpi-grid {
     display: grid;
     gap: 0.46rem;

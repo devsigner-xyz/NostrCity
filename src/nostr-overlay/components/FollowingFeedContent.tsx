@@ -139,6 +139,7 @@ const PULL_TO_REFRESH_THRESHOLD_PX = 72;
 const PULL_TO_REFRESH_LOADING_PX = 56;
 const PULL_TO_REFRESH_SETTLE_START_MS = 16;
 const PULL_TO_REFRESH_SETTLE_MS = 160;
+const FEED_EMPTY_STATE_CLASS = 'nostr-following-feed-empty min-h-[50vh] max-w-none justify-self-stretch';
 
 function prefersReducedMotion(): boolean {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -674,7 +675,7 @@ export function FollowingFeedContent({
                         ) : null}
                         {items.length === 0 ? (
                             isLoadingFeed ? (
-                                <Empty className="nostr-following-feed-empty">
+                                <Empty className={FEED_EMPTY_STATE_CLASS}>
                                     <EmptyHeader>
                                         <EmptyMedia variant="icon">
                                             <Spinner />
@@ -684,14 +685,14 @@ export function FollowingFeedContent({
                                     </EmptyHeader>
                                 </Empty>
                             ) : !activeHashtag && !hasFollows ? (
-                                <Empty className="nostr-following-feed-empty">
+                                <Empty className={FEED_EMPTY_STATE_CLASS}>
                                     <EmptyHeader>
                                         <EmptyTitle>{t('feed.emptyNoFollowsTitle')}</EmptyTitle>
                                         <EmptyDescription>{t('feed.emptyNoFollowsDescription')}</EmptyDescription>
                                     </EmptyHeader>
                                 </Empty>
                             ) : (
-                                <Empty className="nostr-following-feed-empty">
+                                <Empty className={FEED_EMPTY_STATE_CLASS}>
                                     <EmptyHeader>
                                         <EmptyTitle>{t('feed.emptyNoPostsTitle')}</EmptyTitle>
                                         <EmptyDescription>{t('feed.emptyNoPostsDescription')}</EmptyDescription>
@@ -703,7 +704,17 @@ export function FollowingFeedContent({
                                             onClick={() => void onRefreshFeed()}
                                             disabled={isRefreshingFeed}
                                         >
-                                            {isRefreshingFeed ? t('feed.refreshing') : t('feed.refresh')}
+                                            {isRefreshingFeed ? (
+                                                <>
+                                                    <Spinner data-icon="inline-start" />
+                                                    {t('feed.refreshing')}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <RefreshCwIcon data-icon="inline-start" aria-hidden="true" />
+                                                    {t('feed.refresh')}
+                                                </>
+                                            )}
                                         </Button>
                                     </EmptyContent>
                                 </Empty>

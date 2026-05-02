@@ -125,6 +125,47 @@ describe('useOverlayGroupsController', () => {
         expect(controller?.groups.find((group) => group.name === 'parks')?.isRemembered).toBe(true);
     });
 
+    test('keeps all relays selected when the relay filter is cleared', async () => {
+        let controller: OverlayGroupsController | undefined;
+        const service: OverlayGroupsService = {
+            loadGroups: vi.fn(async () => ({
+                saved: [{ relay: 'wss://relay.example', id: 'maps' }],
+                remembered: [],
+                discovered: [{ relay: 'wss://fallback.example', id: 'artists' }],
+            })),
+            loadGroup: vi.fn(async ({ group }) => {
+                const address = group as { relay: string; id: string };
+                return snapshot(address.relay, address.id, address.id);
+            }),
+            publishMessage: vi.fn(),
+            requestJoin: vi.fn(),
+            requestLeave: vi.fn(),
+            savePublicGroups: vi.fn(),
+        };
+
+        function Harness() {
+            controller = useOverlayGroupsController({
+                enabled: true,
+                ownerPubkey: 'a'.repeat(64),
+                session: session(),
+                service,
+                configuredGroupRelays: ['wss://relay.example', 'wss://fallback.example'],
+                errorFallbackMessage: 'Could not load groups',
+            });
+            return null;
+        }
+
+        await render(<Harness />);
+        await waitFor(() => controller?.groups.length === 2);
+
+        await act(async () => {
+            controller?.selectRelay(null);
+        });
+
+        await waitFor(() => controller?.selectedRelayUrl === null);
+        expect(controller?.selectedRelayGroups.map((group) => group.name)).toEqual(['maps', 'artists']);
+    });
+
     test('does not preload every group detail while loading the group list', async () => {
         let controller: OverlayGroupsController | undefined;
         const service: OverlayGroupsService = {

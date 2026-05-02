@@ -82,8 +82,8 @@ describe('ArticlesSurface', () => {
 
         expect(rendered.container.textContent).toContain('Cargando artículos');
         expect(rendered.container.querySelector('[role="status"]')).not.toBeNull();
-        expect(rendered.container.querySelector('.articles-loading-state')?.className).toContain('max-w-[600px]');
-        expect(rendered.container.querySelector('.articles-loading-state')?.className).toContain('self-start');
+        expect(rendered.container.querySelector('.articles-loading-state')?.className).toContain('min-h-[50vh]');
+        expect(rendered.container.querySelector('.articles-loading-state')?.className).not.toContain('self-start');
     });
 
     test('renders empty state', async () => {
@@ -92,6 +92,52 @@ describe('ArticlesSurface', () => {
 
         expect(rendered.container.textContent).toContain('Sin artículos');
         expect(rendered.container.textContent).toContain('Todavía no hay artículos');
+
+        const empty = rendered.container.querySelector('[data-testid="articles-empty-state"]');
+        const page = rendered.container.querySelector('.nostr-articles-page');
+        expect(empty).not.toBeNull();
+        expect(page?.className).toContain('nostr-articles-page-empty-state');
+        expect(empty?.className).toContain('min-h-[50vh]');
+        expect(empty?.className).toContain('max-w-none');
+        expect(empty?.className).toContain('justify-self-stretch');
+    });
+
+    test('mobile empty state exposes only one visible refresh action and uses the empty-state CTA', async () => {
+        const onRefresh = vi.fn();
+        const rendered = await renderElement(surface({
+            isMobile: true,
+            onRefresh,
+        }));
+        mounted.push(rendered);
+
+        const refreshButtons = Array.from(rendered.container.querySelectorAll('button')).filter((button) =>
+            (button.textContent || '').trim() === 'Actualizar'
+        ) as HTMLButtonElement[];
+
+        expect(refreshButtons).toHaveLength(1);
+        expect(refreshButtons[0]?.className).not.toContain('sr-only');
+
+        await act(async () => {
+            refreshButtons[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onRefresh).toHaveBeenCalledTimes(1);
+        expect(refreshButtons[0]?.querySelector('svg[data-icon="inline-start"]')).not.toBeNull();
+    });
+
+    test('empty state refresh action shows spinner while refreshing', async () => {
+        const rendered = await renderElement(surface({
+            isMobile: true,
+            isRefreshing: true,
+        }));
+        mounted.push(rendered);
+
+        const refreshButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            (button.textContent || '').trim() === 'Actualizando'
+        );
+
+        expect(refreshButton).toBeDefined();
+        expect(refreshButton?.querySelector('[role="status"]')).not.toBeNull();
     });
 
     test('renders articles and calls actions', async () => {
@@ -121,7 +167,7 @@ describe('ArticlesSurface', () => {
         expect(buttons.find((button) => button.textContent === 'Cargar mas')).toBeUndefined();
     });
 
-    test('renders article category multi-select and calls selection actions', async () => {
+    test('renders article category multi-select combobox and applies selection only when searching', async () => {
         const onSelectedHashtagsChange = vi.fn();
         const onClearHashtag = vi.fn();
         const rendered = await renderElement(surface({
@@ -133,27 +179,71 @@ describe('ArticlesSurface', () => {
         mounted.push(rendered);
 
         expect(rendered.container.textContent).toContain('Lecturas largas etiquetadas con #nostr');
-        expect(rendered.container.textContent).toContain('Seleccionar categorías de artículos');
+        expect(rendered.container.textContent).not.toContain('Seleccionar categorías de artículos');
         expect(rendered.container.querySelector('[aria-label="Filtros de categoría de artículos"]')).toBeNull();
+        expect(rendered.container.querySelector('[data-testid="articles-category-select"]')).toBeNull();
+        expect(rendered.container.querySelector('[data-slot="dropdown-menu-trigger"]')).toBeNull();
 
-        const categorySelect = rendered.container.querySelector('[data-testid="articles-category-select"]') as HTMLSelectElement | null;
+        const chips = rendered.container.querySelector('[data-slot="combobox-chips"]');
+        const input = rendered.container.querySelector('[data-slot="combobox-chip-input"]') as HTMLInputElement | null;
         const buttons = Array.from(rendered.container.querySelectorAll('button'));
-        const clearFilter = buttons.find((button) => button.textContent === 'Quitar filtro');
+        const searchFilter = buttons.find((button) => button.textContent === 'Buscar');
+        const clearSelection = buttons.find((button) => button.textContent === 'Limpiar');
 
-        expect(categorySelect?.multiple).toBe(true);
-
-        const mapsOption = Array.from(categorySelect?.options ?? []).find((option) => option.value === 'maps');
-        if (mapsOption) {
-            mapsOption.selected = true;
-        }
+        expect(chips?.className).toContain('max-w-xs');
+        expect(chips?.textContent).toContain('nostr');
+        expect(input?.getAttribute('aria-label')).toBe('Seleccionar categorías de artículos');
+        expect(searchFilter).toBeDefined();
+        expect(clearSelection).toBeDefined();
 
         await act(async () => {
-            categorySelect?.dispatchEvent(new Event('change', { bubbles: true }));
-            clearFilter?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            input?.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+            input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+        });
+
+        const options = Array.from(document.body.querySelectorAll('[data-slot="combobox-item"]'));
+        const mapsItem = options.find((item) => (item.textContent || '').includes('maps'));
+        const nostrItem = options.find((item) => (item.textContent || '').includes('nostr'));
+
+        expect(mapsItem).toBeDefined();
+        expect(nostrItem).toBeDefined();
+
+        await act(async () => {
+            mapsItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onSelectedHashtagsChange).not.toHaveBeenCalled();
+
+        await act(async () => {
+            searchFilter?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         expect(onSelectedHashtagsChange).toHaveBeenCalledWith(['maps', 'nostr']);
-        expect(onClearHashtag).toHaveBeenCalledTimes(1);
+        expect(onClearHashtag).not.toHaveBeenCalled();
+
+        onSelectedHashtagsChange.mockClear();
+
+        await act(async () => {
+            clearSelection?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onSelectedHashtagsChange).toHaveBeenCalledWith([]);
+        expect((clearSelection as HTMLButtonElement | undefined)?.disabled).toBe(true);
+    });
+
+    test('disables article category clear action when no categories are selected', async () => {
+        const rendered = await renderElement(surface({
+            items: [articleItem('article-1')],
+            onSelectedHashtagsChange: vi.fn(),
+        }));
+        mounted.push(rendered);
+
+        const clearSelection = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            button.textContent === 'Limpiar'
+        ) as HTMLButtonElement | undefined;
+
+        expect(clearSelection).toBeDefined();
+        expect(clearSelection?.disabled).toBe(true);
     });
 
     test('uses the shared overlay page header slots for mobile header rules', async () => {
@@ -212,7 +302,10 @@ describe('ArticlesSurface', () => {
     });
 
     test('keeps refresh keyboard-accessible without showing a distinct mobile header action', async () => {
-        const rendered = await renderElement(surface({ isMobile: true } as Partial<React.ComponentProps<typeof ArticlesSurface>>));
+        const rendered = await renderElement(surface({
+            isMobile: true,
+            items: [articleItem('article-1')],
+        } as Partial<React.ComponentProps<typeof ArticlesSurface>>));
         mounted.push(rendered);
 
         const refreshButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>

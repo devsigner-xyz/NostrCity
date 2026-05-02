@@ -35,7 +35,6 @@ interface GroupDetailProps {
     onPublishMessage: (groupId: string, message: string, options?: { tags?: string[][] }) => void;
     onUploadImage?: (file: File) => Promise<UploadedImageAttachment | undefined> | UploadedImageAttachment | undefined;
     onSaveGroup: (groupId: string) => void;
-    onJoinGroup: (groupId: string) => void;
     onLeaveGroup: (groupId: string) => void;
     onRetryGroupDetail: () => Promise<void> | void;
     profilesByPubkey?: Record<string, NostrProfile>;
@@ -100,7 +99,6 @@ export function GroupDetail({
     onPublishMessage,
     onUploadImage,
     onSaveGroup,
-    onJoinGroup,
     onLeaveGroup,
     onRetryGroupDetail,
     profilesByPubkey,
@@ -181,14 +179,6 @@ export function GroupDetail({
         }
 
         onSaveGroup(group.id);
-    };
-
-    const handleJoin = (): void => {
-        if (!canWrite) {
-            return;
-        }
-
-        onJoinGroup(group.id);
     };
 
     const handleLeave = (): void => {
@@ -283,10 +273,9 @@ export function GroupDetail({
                             <Empty className="min-h-[14rem] justify-center border border-dashed">
                                 <EmptyHeader>
                                     {membershipStatus === 'pending' ? (
-                                        <>
-                                            <EmptyTitle>{t('groups.join.pending.action')}</EmptyTitle>
-                                            <EmptyDescription>{t('groups.join.pending.description')}</EmptyDescription>
-                                        </>
+                                        <Button type="button" variant="secondary" disabled>
+                                            {t('groups.join.pending.action')}
+                                        </Button>
                                     ) : <EmptyTitle>{t('groups.timeline.empty')}</EmptyTitle>}
                                 </EmptyHeader>
                             </Empty>
@@ -322,88 +311,72 @@ export function GroupDetail({
                         )}
                     </section>
                 </CardContent>
-                <CardFooter className="flex flex-col items-stretch gap-2">
-                    {membershipStatus === 'confirmed' ? (
-                        <form
-                            className="nostr-group-composer"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                void handlePublish();
-                            }}
-                        >
-                            <Textarea
-                                id={textareaId}
-                                className="nostr-chat-composer-input"
-                                aria-label={t('groups.composer.aria', { name: group.name })}
-                                {...(actionDescription ? { 'aria-describedby': textareaDescriptionId } : {})}
-                                disabled={!canWrite}
-                                value={messageDraft}
-                                onChange={(event) => onMessageDraftChange(event.currentTarget.value)}
-                                placeholder={t('groups.composer.placeholder')}
-                            />
-                            {onUploadImage ? (
-                                <>
-                                    <ComposerImageAttachmentPreview
-                                        value={image}
-                                        onChange={(value) => {
-                                            if (!value) {
-                                                removeImage();
-                                            }
-                                        }}
-                                        onEdit={() => imageInputRef.current?.click()}
-                                        compact
-                                        disabled={!canWrite}
-                                    />
-                                    <div className="sr-only" role="status" aria-live="polite">
-                                        {imageStatus}
-                                    </div>
-                                    {imageError ? (
-                                        <p className="text-xs text-destructive" role="alert">
-                                            {imageError}
-                                        </p>
-                                    ) : null}
-                                </>
-                            ) : null}
-                            <div className="flex items-center justify-between gap-2">
-                                {onUploadImage ? (
-                                    <ComposerImageAttachmentButton
-                                        inputRef={imageInputRef}
-                                        disabled={!canWrite}
-                                        onSelect={selectImage}
-                                        onReject={rejectImage}
-                                    />
-                                ) : <span />}
-                            <Button
-                                type="submit"
-                                disabled={!canWrite || (messageDraft.trim().length === 0 && !image)}
-                                title={disabledReason ?? undefined}
-                                aria-label={t('groups.publish.aria', { name: group.name })}
+                {membershipStatus === 'confirmed' || actionDescription ? (
+                    <CardFooter className="flex flex-col items-stretch gap-2">
+                        {membershipStatus === 'confirmed' ? (
+                            <form
+                                className="nostr-group-composer"
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    void handlePublish();
+                                }}
                             >
-                                {t('groups.publish.action')}
-                            </Button>
-                            </div>
-                        </form>
-                    ) : membershipStatus === 'pending' ? (
-                        <div className="flex flex-col gap-1">
-                            <Button type="button" className="w-full" variant="secondary" disabled>
-                                {t('groups.join.pending.action')}
-                            </Button>
-                            <FieldDescription className="text-center">{t('groups.join.pending.description')}</FieldDescription>
-                        </div>
-                    ) : (
-                        <Button
-                            type="button"
-                            className="w-full"
-                            disabled={!canWrite}
-                            title={disabledReason ?? undefined}
-                            aria-label={t('groups.join.aria', { name: group.name })}
-                            onClick={handleJoin}
-                        >
-                            {t('groups.join.action')}
-                        </Button>
-                    )}
-                    {actionDescription ? <FieldDescription id={textareaDescriptionId}>{actionDescription}</FieldDescription> : null}
-                </CardFooter>
+                                <Textarea
+                                    id={textareaId}
+                                    className="nostr-chat-composer-input"
+                                    aria-label={t('groups.composer.aria', { name: group.name })}
+                                    {...(actionDescription ? { 'aria-describedby': textareaDescriptionId } : {})}
+                                    disabled={!canWrite}
+                                    value={messageDraft}
+                                    onChange={(event) => onMessageDraftChange(event.currentTarget.value)}
+                                    placeholder={t('groups.composer.placeholder')}
+                                />
+                                {onUploadImage ? (
+                                    <>
+                                        <ComposerImageAttachmentPreview
+                                            value={image}
+                                            onChange={(value) => {
+                                                if (!value) {
+                                                    removeImage();
+                                                }
+                                            }}
+                                            onEdit={() => imageInputRef.current?.click()}
+                                            compact
+                                            disabled={!canWrite}
+                                        />
+                                        <div className="sr-only" role="status" aria-live="polite">
+                                            {imageStatus}
+                                        </div>
+                                        {imageError ? (
+                                            <p className="text-xs text-destructive" role="alert">
+                                                {imageError}
+                                            </p>
+                                        ) : null}
+                                    </>
+                                ) : null}
+                                <div className="flex items-center justify-between gap-2">
+                                    {onUploadImage ? (
+                                        <ComposerImageAttachmentButton
+                                            inputRef={imageInputRef}
+                                            disabled={!canWrite}
+                                            onSelect={selectImage}
+                                            onReject={rejectImage}
+                                        />
+                                    ) : <span />}
+                                    <Button
+                                        type="submit"
+                                        disabled={!canWrite || (messageDraft.trim().length === 0 && !image)}
+                                        title={disabledReason ?? undefined}
+                                        aria-label={t('groups.publish.aria', { name: group.name })}
+                                    >
+                                        {t('groups.publish.action')}
+                                    </Button>
+                                </div>
+                            </form>
+                        ) : null}
+                        {actionDescription ? <FieldDescription id={textareaDescriptionId}>{actionDescription}</FieldDescription> : null}
+                    </CardFooter>
+                ) : null}
             </Card>
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
                 <DialogContent>

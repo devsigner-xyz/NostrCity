@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { WalletActivityState, WalletSettingsState } from '../../nostr/wallet-types';
-import { addZapAmount, removeZapAmount, updateDefaultZapAmount, updateZapAmount, type ZapSettingsState } from '../../nostr/zap-settings';
+import { addZapAmount, removeZapAmount, type ZapSettingsState } from '../../nostr/zap-settings';
 import { WalletPage } from '../components/WalletPage';
 import { useZapSettingsController } from '../controllers/use-zap-settings-controller';
 
@@ -38,30 +38,12 @@ export function WalletRouteContainer({
         onZapSettingsChange,
     });
     const [newZapAmountInput, setNewZapAmountInput] = useState('');
-    const [defaultZapAmountInput, setDefaultZapAmountInput] = useState(String(zapSettingsState.defaultAmount));
     const isConnected = walletSettings.activeConnection?.restoreState === 'connected';
-
-    useEffect(() => {
-        setDefaultZapAmountInput(String(zapSettingsState.defaultAmount));
-    }, [zapSettingsState.defaultAmount]);
 
     const zapSettingsSection = isConnected ? {
         zapSettings: zapSettingsState,
         newZapAmountInput,
-        defaultZapAmountInput,
         onNewZapAmountInputChange: setNewZapAmountInput,
-        onDefaultZapAmountInputChange: (value: string) => {
-            setDefaultZapAmountInput(value);
-            const nextValue = Number(value.trim());
-            if (!Number.isFinite(nextValue)) {
-                return;
-            }
-
-            persistZapSettings(updateDefaultZapAmount(zapSettingsState, nextValue));
-        },
-        onUpdateZapAmount: (index: number, value: number) => {
-            persistZapSettings(updateZapAmount(zapSettingsState, index, value));
-        },
         onRemoveZapAmount: (index: number) => {
             persistZapSettings(removeZapAmount(zapSettingsState, index));
         },

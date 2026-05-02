@@ -290,7 +290,7 @@ export function useOverlayGroupsController({
     const snapshot = canLoadGroups ? groupsQuery.data ?? EMPTY_GROUPS_SNAPSHOT : EMPTY_GROUPS_SNAPSHOT;
     const { savedAddresses, addressesById } = snapshot;
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(snapshot.selectedGroupId);
-    const [selectedRelayUrl, setSelectedRelayUrl] = useState<string | null>(selectedRouteGroupRelay ?? snapshot.selectedRelayUrl);
+    const [selectedRelayUrl, setSelectedRelayUrl] = useState<string | null | undefined>(selectedRouteGroupRelay ?? snapshot.selectedRelayUrl ?? undefined);
     const [messageDraft, setMessageDraft] = useState('');
     const canWrite = canUseGroupWrites(session);
     const selectedGroupAddressValue = selectedGroupId ? addressesById[selectedGroupId] : undefined;
@@ -332,9 +332,13 @@ export function useOverlayGroupsController({
                 return selectedRouteGroupRelay;
             }
 
+            if (current === null) {
+                return null;
+            }
+
             return current && groups.some((group) => group.relayUrl === current)
                 ? current
-                : snapshot.selectedRelayUrl;
+                : snapshot.selectedRelayUrl ?? undefined;
         });
         setSelectedGroupId((current) => {
             if (selectedRouteGroupKey && groups.some((group) => group.id === selectedRouteGroupKey)) {
@@ -438,7 +442,7 @@ export function useOverlayGroupsController({
     return {
         groups,
         relays,
-        selectedRelayUrl,
+        selectedRelayUrl: selectedRelayUrl ?? null,
         selectedRelayGroups,
         selectedGroupId,
         isLoading: enabled && canLoadGroups && groupsQuery.isPending && groups.length === 0,

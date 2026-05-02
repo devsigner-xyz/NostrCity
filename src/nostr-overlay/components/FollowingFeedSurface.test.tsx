@@ -705,12 +705,46 @@ describe('FollowingFeedSurface', () => {
 
         expect(refreshButtons).toHaveLength(1);
         expect(refreshButtons[0]?.className).not.toContain('sr-only');
+        expect(refreshButtons[0]?.querySelector('svg[data-icon="inline-start"]')).not.toBeNull();
 
         await act(async () => {
             refreshButtons[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         expect(onRefreshFeed).toHaveBeenCalledTimes(1);
+    });
+
+    test('empty feed refresh action shows spinner while refreshing', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface
+                {...buildProps({
+                    isMobile: true,
+                    isRefreshingFeed: true,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const refreshButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            (button.textContent || '').trim() === 'Actualizando'
+        );
+
+        expect(refreshButton).toBeDefined();
+        expect(refreshButton?.querySelector('[role="status"]')).not.toBeNull();
+    });
+
+    test('empty feed state uses the available surface width', async () => {
+        const rendered = await renderElement(
+            <FollowingFeedSurface {...buildProps()} />
+        );
+        mounted.push(rendered);
+
+        const empty = rendered.container.querySelector('.nostr-following-feed-empty');
+
+        expect(empty).not.toBeNull();
+        expect(empty?.className).toContain('min-h-[50vh]');
+        expect(empty?.className).toContain('max-w-none');
+        expect(empty?.className).toContain('justify-self-stretch');
     });
 
     test('mobile pull-to-refresh at the top calls the refresh handler', async () => {
