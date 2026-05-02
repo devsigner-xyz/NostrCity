@@ -701,12 +701,6 @@ function SidebarUserMenu({
 }
 
 function SidebarSocialContent({ children }: { children: ReactNode }) {
-    const { state, isMobile } = useSidebar();
-
-    if (!isMobile && state === 'collapsed') {
-        return null;
-    }
-
     return <>{children}</>;
 }
 
@@ -773,12 +767,9 @@ export function OverlaySidebar({
             >
                 <SidebarPlatformHeader resolvedTheme={resolvedTheme} />
                 <SidebarCollapsedTrigger />
-                <SidebarContent>
-                    <SidebarGroup className="min-h-0 flex-1 pt-1">
-                        <SidebarSocialContent>{children}</SidebarSocialContent>
-                    </SidebarGroup>
-                </SidebarContent>
+                <SidebarContent />
                 <SidebarFooter className="pt-0">
+                    <SidebarSocialContent>{children}</SidebarSocialContent>
                     <SidebarActionsMenu
                         isReadonlySession={Boolean(authSession?.readonly)}
                         canAccessDirectMessages={canAccessDirectMessages}

@@ -112,8 +112,24 @@ describe('ProfileEditorPage', () => {
         for (const name of ['name', 'displayName', 'about', 'website', 'nip05', 'lud16', 'lud06', 'birthday', 'bot']) {
             expect(rendered.container.querySelector(`[name="${name}"]`)).not.toBeNull();
         }
-        expect(rendered.container.textContent).toContain('Choose an avatar image. It will be cropped square.');
-        expect(rendered.container.textContent).toContain('Choose a banner image. It will be cropped wide.');
+        expect(rendered.container.textContent).not.toContain('Choose an avatar image. It will be cropped square.');
+        expect(rendered.container.textContent).not.toContain('Choose a banner image. It will be cropped wide.');
+
+        await act(async () => rendered.root.unmount());
+    });
+
+    test('places avatar and banner image editors directly on the preview', async () => {
+        window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
+        const rendered = await renderPage();
+
+        const preview = rendered.container.querySelector('[data-testid="profile-editor-preview"]') as HTMLElement;
+        const avatarInput = preview.querySelector('input[data-profile-image-kind="avatar"]');
+        const bannerInput = preview.querySelector('input[data-profile-image-kind="banner"]');
+
+        expect(avatarInput).not.toBeNull();
+        expect(bannerInput).not.toBeNull();
+        expect(preview.querySelector('button[aria-label="Edit avatar image"]')).not.toBeNull();
+        expect(preview.querySelector('button[aria-label="Edit banner image"]')).not.toBeNull();
 
         await act(async () => rendered.root.unmount());
     });

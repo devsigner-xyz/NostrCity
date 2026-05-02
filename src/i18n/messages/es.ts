@@ -77,6 +77,8 @@ export const esMessages = {
     'profileEditor.formTitle': 'Metadatos del perfil',
     'profileEditor.avatarPreviewAlt': 'Previsualización del avatar de perfil',
     'profileEditor.bannerPreviewAlt': 'Previsualización del banner de perfil',
+    'profileEditor.editAvatarImage': 'Editar imagen de avatar',
+    'profileEditor.editBannerImage': 'Editar imagen de banner',
     'profileEditor.avatarLabel': 'Imagen de avatar',
     'profileEditor.bannerLabel': 'Imagen de banner',
     'profileEditor.avatarInstructions': 'Elige una imagen de avatar. Se recortará en cuadrado.',

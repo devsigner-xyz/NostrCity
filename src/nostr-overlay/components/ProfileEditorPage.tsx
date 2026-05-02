@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowLeftIcon, ImageIcon } from 'lucide-react';
+import { ArrowLeftIcon, PencilIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -200,15 +200,39 @@ export function ProfileEditorPage({
                     </CardHeader>
                     <CardContent className="flex flex-col gap-4">
                         <div className="overflow-hidden rounded-xl border bg-muted/30" data-testid="profile-editor-preview">
-                            <div className={`nostr-profile-dialog-banner-shell${safeBanner ? '' : ' is-placeholder'}`}>
+                            <div className={`nostr-profile-dialog-banner-shell relative${safeBanner ? '' : ' is-placeholder'}`}>
                                 {safeBanner ? <img className="nostr-profile-dialog-banner" src={safeBanner} alt={t('profileEditor.bannerPreviewAlt')} /> : null}
+                                <div className="absolute top-3 right-3">
+                                    <ImageFilePickerButton
+                                        ariaLabel={t('profileEditor.editBannerImage')}
+                                        disabled={isBusy || !canWrite}
+                                        inputProps={{ 'data-profile-image-kind': 'banner' }}
+                                        onSelect={(file) => openCropDialog('banner', file)}
+                                        onReject={rejectImage}
+                                    >
+                                        <PencilIcon data-icon="inline-start" aria-hidden="true" />
+                                    </ImageFilePickerButton>
+                                </div>
                             </div>
 
                             <div className="nostr-dialog-header flex items-center gap-3 px-4 py-3">
-                                <Avatar className="size-14 border border-border/70 shadow-xs">
-                                    {safePicture ? <img data-slot="avatar-image" src={safePicture} alt={t('profileEditor.avatarPreviewAlt')} className="aspect-square size-full rounded-full object-cover" /> : null}
-                                    {safePicture ? null : <AvatarFallback>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>}
-                                </Avatar>
+                                <div className="relative shrink-0">
+                                    <Avatar className="size-14 border border-border/70 shadow-xs">
+                                        {safePicture ? <img data-slot="avatar-image" src={safePicture} alt={t('profileEditor.avatarPreviewAlt')} className="aspect-square size-full rounded-full object-cover" /> : null}
+                                        {safePicture ? null : <AvatarFallback>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>}
+                                    </Avatar>
+                                    <div className="absolute -right-1 -bottom-1">
+                                        <ImageFilePickerButton
+                                            ariaLabel={t('profileEditor.editAvatarImage')}
+                                            disabled={isBusy || !canWrite}
+                                            inputProps={{ 'data-profile-image-kind': 'avatar' }}
+                                            onSelect={(file) => openCropDialog('avatar', file)}
+                                            onReject={rejectImage}
+                                        >
+                                            <PencilIcon data-icon="inline-start" aria-hidden="true" />
+                                        </ImageFilePickerButton>
+                                    </div>
+                                </div>
 
                                 <div className="flex min-w-0 flex-col gap-0.5">
                                     <p className="nostr-dialog-name inline-flex max-w-full items-center gap-2 text-base font-semibold leading-tight text-foreground">
@@ -240,25 +264,6 @@ export function ProfileEditorPage({
                     </CardHeader>
                     <CardContent>
                         <FieldGroup>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <ProfileImageControl
-                                    kind="avatar"
-                                    label={t('profileEditor.avatarLabel')}
-                                    description={t('profileEditor.avatarInstructions')}
-                                    disabled={isBusy || !canWrite}
-                                    onSelect={openCropDialog}
-                                    onReject={rejectImage}
-                                />
-                                <ProfileImageControl
-                                    kind="banner"
-                                    label={t('profileEditor.bannerLabel')}
-                                    description={t('profileEditor.bannerInstructions')}
-                                    disabled={isBusy || !canWrite}
-                                    onSelect={openCropDialog}
-                                    onReject={rejectImage}
-                                />
-                            </div>
-
                             <TextField name="name" label={t('profileEditor.nameLabel')} value={form.name} disabled={isBusy || !canWrite} onChange={(value) => updateField('name', value)} />
                             <TextField name="displayName" label={t('profileEditor.displayNameLabel')} value={form.displayName} disabled={isBusy || !canWrite} onChange={(value) => updateField('displayName', value)} />
                             <Field>
@@ -305,38 +310,6 @@ export function ProfileEditorPage({
             ) : null}
         </main>
         </OverlaySurface>
-    );
-}
-
-function ProfileImageControl({
-    kind,
-    label,
-    description,
-    disabled,
-    onSelect,
-    onReject,
-}: {
-    kind: ProfileImageKind;
-    label: string;
-    description: string;
-    disabled: boolean;
-    onSelect: (kind: ProfileImageKind, file: File) => void;
-    onReject: (reason: ImageFileRejectionReason) => void;
-}) {
-    return (
-        <Field>
-            <FieldLabel>{label}</FieldLabel>
-            <FieldDescription>{description}</FieldDescription>
-            <ImageFilePickerButton
-                ariaLabel={label}
-                disabled={disabled}
-                inputProps={{ 'data-profile-image-kind': kind }}
-                onSelect={(file) => onSelect(kind, file)}
-                onReject={onReject}
-            >
-                <ImageIcon aria-hidden="true" />
-            </ImageFilePickerButton>
-        </Field>
     );
 }
 

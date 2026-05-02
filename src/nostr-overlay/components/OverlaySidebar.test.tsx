@@ -119,7 +119,7 @@ async function renderSidebar({
                     mobileAppBarShowBack={mobileAppBarShowBack}
                     onMobileAppBarBack={onMobileAppBarBack}
                 >
-                    <div>Social content</div>
+                    <div data-testid="social-child">Social content</div>
                 </OverlaySidebar>
             </MemoryRouter>
         );
@@ -241,6 +241,17 @@ describe('OverlaySidebar', () => {
 
         expect(labels.slice(0, 4)).toEqual(['Abrir mapa', 'Abrir Ágora', 'Abrir artículos', 'Abrir chats']);
         expect(rendered.container.querySelector('button[aria-label="Abrir artículos"]')).not.toBeNull();
+    });
+
+    test('moves social sidebar content into the footer action area', async () => {
+        const rendered = await renderSidebar({ pathname: '/' });
+        mounted.push(rendered);
+
+        const socialChild = rendered.container.querySelector('[data-testid="social-child"]');
+
+        expect(socialChild).not.toBeNull();
+        expect(socialChild?.closest('[data-slot="sidebar-footer"]')).not.toBeNull();
+        expect(socialChild?.closest('[data-slot="sidebar-content"]')).toBeNull();
     });
 
     test('renders groups immediately below chats and opens the groups route', async () => {

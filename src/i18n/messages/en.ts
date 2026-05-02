@@ -79,6 +79,8 @@ export const enMessages = {
     'profileEditor.formTitle': 'Profile metadata',
     'profileEditor.avatarPreviewAlt': 'Profile avatar preview',
     'profileEditor.bannerPreviewAlt': 'Profile banner preview',
+    'profileEditor.editAvatarImage': 'Edit avatar image',
+    'profileEditor.editBannerImage': 'Edit banner image',
     'profileEditor.avatarLabel': 'Avatar image',
     'profileEditor.bannerLabel': 'Banner image',
     'profileEditor.avatarInstructions': 'Choose an avatar image. It will be cropped square.',

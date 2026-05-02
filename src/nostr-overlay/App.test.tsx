@@ -9484,7 +9484,7 @@ describe('Nostr overlay App', () => {
         await waitFor(() => document.body.querySelector('[aria-label="Descubre easter eggs"]') !== null);
     });
 
-    test('hides social tabs when sidebar is collapsed', async () => {
+    test('keeps social list actions reachable when sidebar is collapsed', async () => {
         const ownerPubkey = 'f'.repeat(64);
         const { bridge } = createMapBridgeStub();
         const rendered = await renderApp(
@@ -9527,8 +9527,8 @@ describe('Nostr overlay App', () => {
             hidePanelButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        expect(rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]')).toBeNull();
-        expect(rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]')).toBeNull();
+        expect(rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]')).not.toBeNull();
+        expect(rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]')).not.toBeNull();
     });
 
     test('filters following tab by name or npub and can clear search', async () => {
