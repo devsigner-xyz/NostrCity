@@ -1,13 +1,16 @@
 import type { SocialFeedItem } from '../../nostr/social-feed-service';
 import type { NostrProfile } from '../../nostr/types';
+import type { AgoraFeedLayout } from '../../nostr/ui-settings';
 import { useI18n } from '@/i18n/useI18n';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { OverlaySurface } from './OverlaySurface';
 import { OverlayPageHeader } from './OverlayPageHeader';
 import { ArticlePreviewCard } from './ArticlePreviewCard';
 import { ListLoadingFooter } from './ListLoadingFooter';
+import { cn } from '@/lib/utils';
 
 interface ArticlesSurfaceProps {
     items: SocialFeedItem[];
@@ -17,11 +20,15 @@ interface ArticlesSurfaceProps {
     isLoadingMore: boolean;
     error: string | null;
     hasMore: boolean;
+    agoraFeedLayout?: AgoraFeedLayout;
     isMobile?: boolean;
+    onAgoraFeedLayoutChange?: (layout: AgoraFeedLayout) => void;
     onRefresh: () => Promise<void> | void;
     onLoadMore: () => Promise<void> | void;
     onOpenArticle: (eventId: string) => void;
 }
+
+const AGORA_LAYOUT_TOGGLE_ITEM_CLASS = 'data-[state=on]:border-primary! data-[state=on]:bg-primary! data-[state=on]:text-primary-foreground! data-[state=on]:hover:bg-primary/90!';
 
 function profileLabel(pubkey: string, profile: NostrProfile | undefined): string {
     return profile?.displayName?.trim() || profile?.name?.trim() || `${pubkey.slice(0, 8)}...${pubkey.slice(-6)}`;
@@ -40,7 +47,9 @@ export function ArticlesSurface({
     isLoadingMore,
     error,
     hasMore,
+    agoraFeedLayout = 'list',
     isMobile = false,
+    onAgoraFeedLayoutChange,
     onRefresh,
     onLoadMore,
     onOpenArticle,
@@ -68,16 +77,39 @@ export function ArticlesSurface({
                     title={t('articles.title')}
                     description={t('articles.subtitle')}
                     actions={(
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className={isMobile ? 'sr-only focus:not-sr-only focus:absolute focus:right-3 focus:top-3 focus:z-20' : undefined}
-                            disabled={isRefreshing}
-                            onClick={() => { void onRefresh(); }}
-                        >
-                            {isRefreshing ? t('articles.refreshing') : t('articles.refresh')}
-                        </Button>
+                        <>
+                            {onAgoraFeedLayoutChange ? (
+                                <ToggleGroup
+                                    type="single"
+                                    variant="outline"
+                                    size="default"
+                                    value={agoraFeedLayout}
+                                    className="hidden xl:flex"
+                                    onValueChange={(value) => {
+                                        if (value === 'list' || value === 'masonry') {
+                                            onAgoraFeedLayoutChange(value);
+                                        }
+                                    }}
+                                >
+                                    <ToggleGroupItem value="list" aria-label={t('feed.viewList')} className={AGORA_LAYOUT_TOGGLE_ITEM_CLASS}>
+                                        {t('settings.ui.agoraLayoutList')}
+                                    </ToggleGroupItem>
+                                    <ToggleGroupItem value="masonry" aria-label={t('feed.viewMasonry')} className={AGORA_LAYOUT_TOGGLE_ITEM_CLASS}>
+                                        {t('settings.ui.agoraLayoutMasonry')}
+                                    </ToggleGroupItem>
+                                </ToggleGroup>
+                            ) : null}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className={isMobile ? 'sr-only focus:not-sr-only focus:absolute focus:right-3 focus:top-3 focus:z-20' : undefined}
+                                disabled={isRefreshing}
+                                onClick={() => { void onRefresh(); }}
+                            >
+                                {isRefreshing ? t('articles.refreshing') : t('articles.refresh')}
+                            </Button>
+                        </>
                     )}
                 />
 
@@ -99,17 +131,28 @@ export function ArticlesSurface({
                         </EmptyHeader>
                     </Empty>
                 ) : (
-                    <div className="flex w-full max-w-[600px] self-start flex-col gap-4" data-testid="articles-list">
-                        {items.map((item) => (
-                            <ArticlePreviewCard
-                                key={item.id}
-                                event={item.rawEvent}
-                                authorLabel={profileLabel(item.pubkey, profilesByPubkey[item.pubkey])}
-                                onOpenArticle={onOpenArticle}
-                            />
-                        ))}
-                        <ListLoadingFooter loading={isLoadingMore} label={t('articles.loadingMore')} className="max-w-[600px]" />
-                    </div>
+                    <>
+                        <div
+                            className={cn(
+                                'nostr-following-feed-items',
+                                agoraFeedLayout === 'masonry'
+                                    ? 'nostr-following-feed-list-layout-masonry'
+                                    : 'nostr-following-feed-list-layout-list'
+                            )}
+                            data-testid="articles-list"
+                        >
+                            {items.map((item) => (
+                                <div key={item.id} className="nostr-following-feed-note-shell">
+                                    <ArticlePreviewCard
+                                        event={item.rawEvent}
+                                        authorLabel={profileLabel(item.pubkey, profilesByPubkey[item.pubkey])}
+                                        onOpenArticle={onOpenArticle}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        <ListLoadingFooter loading={isLoadingMore} label={t('articles.loadingMore')} className="max-w-[600px] justify-self-start" />
+                    </>
                 )}
             </div>
         </OverlaySurface>

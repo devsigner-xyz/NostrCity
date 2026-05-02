@@ -1351,6 +1351,8 @@ export function App({ mapBridge, services }: AppProps) {
                         isLoadingMore: articles.isLoadingMore,
                         error: articles.error,
                         hasMore: articles.hasMore,
+                        agoraFeedLayout: uiSettings.agoraFeedLayout,
+                        onAgoraFeedLayoutChange: setAgoraFeedLayout,
                         onRefresh: articles.refresh,
                         onLoadMore: articles.loadMore,
                         onOpenArticle: (eventId) => navigate(`/agora/articles/${eventId}`),

@@ -1,5 +1,7 @@
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { UI_SETTINGS_STORAGE_KEY } from '../../nostr/ui-settings';
 import { ChatsPage, type ChatConversationSummary, type ChatDetailMessage } from './ChatsPage';
@@ -24,6 +26,10 @@ async function renderElement(element: ReactElement): Promise<RenderResult> {
 }
 
 let mounted: RenderResult[] = [];
+
+function readOverlayStyles(): string {
+    return readFileSync(join(process.cwd(), 'src', 'nostr-overlay', 'styles.css'), 'utf8');
+}
 
 beforeAll(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -212,6 +218,16 @@ describe('ChatsPage', () => {
         expect(list.classList.contains('min-w-0')).toBe(true);
         expect(item.classList.contains('w-full')).toBe(true);
         expect(item.classList.contains('min-w-0')).toBe(true);
+    });
+
+    test('left-aligns chat conversation masonry columns with a single gap value', () => {
+        const styles = readOverlayStyles();
+
+        expect(styles).toMatch(/\.nostr-chat-conversation-list\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(100%,\s*320px\),\s*320px\)\)/s);
+        expect(styles).toMatch(/\.nostr-chat-conversation-list\s*\{[^}]*gap:\s*0\.34rem;/s);
+        expect(styles).toMatch(/\.nostr-chat-conversation-list\s*\{[^}]*align-content:\s*start;/s);
+        expect(styles).toMatch(/\.nostr-chat-conversation-list\s*\{[^}]*justify-content:\s*start;/s);
+        expect(styles).toMatch(/\.nostr-chat-conversation-list\s*\{[^}]*justify-items:\s*start;/s);
     });
 
     test('renders verified badge inside large avatar for verified conversations', async () => {

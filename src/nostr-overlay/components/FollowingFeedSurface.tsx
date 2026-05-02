@@ -63,7 +63,7 @@ export function FollowingFeedSurface({ agoraFeedLayout = 'list', onAgoraFeedLayo
                             {t('settings.ui.agoraLayoutList')}
                         </ToggleGroupItem>
                         <ToggleGroupItem value="masonry" aria-label={t('feed.viewMasonry')} className={AGORA_LAYOUT_TOGGLE_ITEM_CLASS}>
-                            Masonry
+                            {t('settings.ui.agoraLayoutMasonry')}
                         </ToggleGroupItem>
                     </ToggleGroup>
                 ) : null}

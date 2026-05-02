@@ -141,6 +141,8 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             isLoadingMore: false,
             error: null,
             hasMore: false,
+            agoraFeedLayout: 'list',
+            onAgoraFeedLayoutChange: noop,
             onRefresh: asyncNoop,
             onLoadMore: asyncNoop,
             onOpenArticle: noop,

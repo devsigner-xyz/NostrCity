@@ -132,6 +132,30 @@ describe('ArticlesSurface', () => {
         expect(header?.querySelector('[data-slot="overlay-page-header-actions"] button')?.textContent).toBe('Actualizar');
     });
 
+    test('renders the same list and masonry selector as Agora', async () => {
+        const onAgoraFeedLayoutChange = vi.fn();
+        const rendered = await renderElement(surface({
+            agoraFeedLayout: 'list',
+            onAgoraFeedLayoutChange,
+        }));
+        mounted.push(rendered);
+
+        const buttons = Array.from(rendered.container.querySelectorAll('[data-slot="toggle-group-item"]'));
+        const listButton = buttons.find((button) => button.textContent === 'Lista');
+        const masonryButton = buttons.find((button) => button.textContent === 'Masonry');
+
+        expect(listButton).toBeDefined();
+        expect(masonryButton).toBeDefined();
+        expect(listButton?.getAttribute('aria-label')).toBe('Ver Ágora en lista');
+        expect(masonryButton?.getAttribute('aria-label')).toBe('Ver Ágora en mosaico');
+
+        await act(async () => {
+            masonryButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onAgoraFeedLayoutChange).toHaveBeenCalledWith('masonry');
+    });
+
     test('uses the routed surface class so mobile taps reach article actions', async () => {
         const rendered = await renderElement(surface());
         mounted.push(rendered);
@@ -164,17 +188,20 @@ describe('ArticlesSurface', () => {
         expect(refreshButton?.className).toContain('focus:not-sr-only');
     });
 
-    test('constrains the article list width for readable article previews', async () => {
+    test('uses the Agora masonry selector for article previews', async () => {
         const rendered = await renderElement(surface({
             items: [articleItem('article-1')],
+            agoraFeedLayout: 'masonry',
         }));
         mounted.push(rendered);
 
         const articleList = rendered.container.querySelector('[data-testid="articles-list"]');
+        const articleShell = rendered.container.querySelector('.nostr-following-feed-note-shell');
         expect(articleList).not.toBeNull();
-        expect(articleList?.className).toContain('max-w-[600px]');
-        expect(articleList?.className).toContain('w-full');
-        expect(articleList?.className).toContain('self-start');
+        expect(articleList?.className).toContain('nostr-following-feed-items');
+        expect(articleList?.className).toContain('nostr-following-feed-list-layout-masonry');
+        expect(articleShell).not.toBeNull();
+        expect(articleShell?.querySelector('[data-slot="card"]')).not.toBeNull();
         expect(articleList?.className).not.toContain('mx-auto');
     });
 
@@ -210,8 +237,10 @@ describe('ArticlesSurface', () => {
         mounted.push(rendered);
 
         const footer = rendered.container.querySelector('.nostr-list-loading-footer');
+        const articleList = rendered.container.querySelector('[data-testid="articles-list"]');
         expect(footer?.textContent).toContain('Cargando artículos');
         expect(footer?.className).toContain('justify-center');
         expect(footer?.className).toContain('max-w-[600px]');
+        expect(articleList?.contains(footer)).toBe(false);
     });
 });

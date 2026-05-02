@@ -246,7 +246,7 @@ export function SettingsUiPage({
                                 {t('settings.ui.agoraLayoutList')}
                             </ToggleGroupItem>
                             <ToggleGroupItem value="masonry" aria-label={t('settings.ui.agoraLayoutMasonryAria')}>
-                                Masonry
+                                {t('settings.ui.agoraLayoutMasonry')}
                             </ToggleGroupItem>
                         </ToggleGroup>
                     </div>

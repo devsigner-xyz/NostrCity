@@ -315,6 +315,7 @@ export const enMessages = {
     'settings.ui.streetZoom': 'Street labels zoom',
     'settings.ui.agoraLayout': 'Agora layout',
     'settings.ui.agoraLayoutList': 'List',
+    'settings.ui.agoraLayoutMasonry': 'Masonry',
     'settings.ui.agoraLayoutListAria': 'Select list layout for Agora',
     'settings.ui.agoraLayoutMasonryAria': 'Select masonry layout for Agora',
     'settings.ui.trafficCount': 'Cars in city',

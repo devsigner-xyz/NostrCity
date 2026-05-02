@@ -1749,8 +1749,12 @@
 }
 
 .nostr-following-feed-list-layout-masonry {
+    --nostr-masonry-column-width: 600px;
+    --nostr-masonry-gap: 1.2rem;
+
+    max-width: var(--nostr-masonry-column-width);
     column-count: 1;
-    column-gap: 1.2rem;
+    column-gap: var(--nostr-masonry-gap);
 }
 
 .nostr-following-feed-note-shell {
@@ -1773,7 +1777,7 @@
 .nostr-following-feed-list-layout-masonry .nostr-following-feed-note-shell {
     display: inline-grid;
     width: 100%;
-    margin-bottom: 1.2rem;
+    margin-bottom: var(--nostr-masonry-gap);
     break-inside: avoid;
 }
 
@@ -2198,7 +2202,11 @@
     margin: 0;
     padding: 0;
     display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 320px));
     gap: 0.34rem;
+    align-content: start;
+    justify-content: start;
+    justify-items: start;
     min-height: 0;
     height: 100%;
     overflow: auto;
@@ -3066,6 +3074,7 @@
 @media (min-width: 1280px) {
     .nostr-following-feed-list-layout-masonry {
         column-count: 2;
+        max-width: calc((var(--nostr-masonry-column-width) * 2) + var(--nostr-masonry-gap));
     }
 }
 

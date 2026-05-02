@@ -313,6 +313,7 @@ export const esMessages = {
     'settings.ui.streetZoom': 'Zoom de etiquetas de calles',
     'settings.ui.agoraLayout': 'Distribución de Ágora',
     'settings.ui.agoraLayoutList': 'Lista',
+    'settings.ui.agoraLayoutMasonry': 'Masonry',
     'settings.ui.agoraLayoutListAria': 'Seleccionar distribución en lista para Ágora',
     'settings.ui.agoraLayoutMasonryAria': 'Seleccionar distribución en mosaico para Ágora',
     'settings.ui.trafficCount': 'Coches en ciudad',
