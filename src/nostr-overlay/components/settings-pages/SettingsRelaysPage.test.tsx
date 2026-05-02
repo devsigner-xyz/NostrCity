@@ -236,7 +236,7 @@ function buildProps() {
 }
 
 describe('SettingsRelaysPage', () => {
-    test('renders the updated general relay UX with read and write switches', async () => {
+    test('renders the main relay section with the shared add configured and suggested pattern', async () => {
         const props = buildProps();
         const rendered = await renderElement(<SettingsRelaysPage {...props} />);
         mounted.push(rendered);
@@ -244,7 +244,8 @@ describe('SettingsRelaysPage', () => {
         expect(rendered.container.querySelector('button[aria-label="Categoria del relay"]')).toBeNull();
 
         const configuredCard = getCardByTitle(rendered.container, 'Relays configurados');
-        const configuredTable = getTableFromCard(configuredCard);
+        const configuredTable = getTableByHeading(configuredCard, 'Configurados');
+        const suggestedTable = getTableByHeading(configuredCard, 'Sugeridos');
 
         expect(getTableHeaders(configuredTable)).toEqual(['Relay', 'Lectura', 'Escritura', 'Estado', 'Acciones']);
         expect(configuredTable.textContent).toContain('relay.one');
@@ -252,6 +253,12 @@ describe('SettingsRelaysPage', () => {
         expect(configuredTable.textContent).not.toContain('relay.dm');
         expect(configuredTable.querySelector('[data-slot="avatar"]')).toBeNull();
         expect(configuredCard.textContent).toContain('Estado actual y categorías activas de tus relays.');
+        expect(configuredCard.textContent).toContain('Sugeridos');
+        expect(configuredCard.textContent).toContain('Agregar todos');
+        expect(configuredCard.textContent).toContain('Restablecer por defecto');
+        expect(configuredCard.querySelector('input[aria-label="URLs de relay"]')).not.toBeNull();
+        expect(suggestedTable.textContent).toContain('relay.two');
+        expect(getCardTitles(rendered.container)).not.toContain('Relays sugeridos');
 
         const readSwitch = rendered.container.querySelector('button[aria-label="Lectura para wss://relay.one"]');
         const writeSwitch = rendered.container.querySelector('button[aria-label="Escritura para wss://relay.one"]');
@@ -363,11 +370,14 @@ describe('SettingsRelaysPage', () => {
         const props = buildProps();
         const rendered = await renderElement(<SettingsRelaysPage {...props} />);
         mounted.push(rendered);
+        const configuredCard = getCardByTitle(rendered.container, 'Configured relays');
 
         expect(getCardTitles(rendered.container)).toContain('Configured relays');
-        expect(rendered.container.textContent || '').toContain('Add relay');
+        expect(configuredCard.querySelector('input[aria-label="Relay URLs"]')).not.toBeNull();
         expect(rendered.container.textContent || '').toContain('Reset to default');
-        expect(rendered.container.textContent || '').toContain('Suggested relays');
+        expect(getTableByHeading(configuredCard, 'Configured').getAttribute('aria-label')).toBe('Configured relays');
+        expect(getTableByHeading(configuredCard, 'Suggested').getAttribute('aria-label')).toBe('Suggested relays');
+        expect(getCardTitles(rendered.container)).not.toContain('Suggested relays');
         expect(rendered.container.textContent || '').not.toContain('Relays configurados');
     });
 
@@ -413,8 +423,8 @@ describe('SettingsRelaysPage', () => {
         const cardTitles = getCardTitles(rendered.container);
         const dmCard = getCardByTitle(rendered.container, 'Relays de mensajes');
 
-        expect(cardTitles.indexOf('Relays sugeridos')).toBeGreaterThanOrEqual(0);
-        expect(cardTitles.indexOf('Relays de mensajes')).toBeGreaterThan(cardTitles.indexOf('Relays sugeridos'));
+        expect(cardTitles).not.toContain('Relays sugeridos');
+        expect(cardTitles.indexOf('Relays de mensajes')).toBeGreaterThan(cardTitles.indexOf('Relays configurados'));
         expect(cardTitles.indexOf('Relays de búsqueda')).toBeGreaterThan(cardTitles.indexOf('Relays de mensajes'));
 
         expect(dmCard.textContent).toContain('Se usan para recibir mensajes privados.');

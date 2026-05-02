@@ -87,8 +87,12 @@ export function SettingsGroupRelaysSection({
                 <CardDescription>{t('settings.relays.groups.description')}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 px-3 py-3">
+                <label htmlFor="group-relay-urls-input" className="text-sm font-medium">
+                    {t('settings.relays.addRelay')}
+                </label>
                 <InputGroup>
                     <InputGroupInput
+                        id="group-relay-urls-input"
                         aria-label={t('settings.relays.groups.urls')}
                         type="url"
                         inputMode="url"
