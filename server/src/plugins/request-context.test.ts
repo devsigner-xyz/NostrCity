@@ -14,7 +14,8 @@ describe('request context plugin', () => {
       };
     });
 
-    app.post('/v1/test/context-log', async () => {
+    app.post('/v1/test/context-log', async (request) => {
+      request.context.authenticatedPubkey = 'f'.repeat(64);
       return { ok: true };
     });
 
@@ -41,7 +42,7 @@ describe('request context plugin', () => {
 
     await app.inject({
       method: 'POST',
-      url: '/v1/test/context-log?ownerPubkey=abcd&limit=10',
+      url: '/v1/test/context-log?ownerPubkey=abcd&peerPubkey=efgh&q=secret%20search&hashtag=privacy&relayScope=focused&limit=10',
       headers: {
         authorization: 'Nostr sensitive-header-token',
         'x-forwarded-for': '203.0.113.1',
@@ -72,16 +73,27 @@ describe('request context plugin', () => {
     expect(entry).toBeDefined();
 
     const serialized = JSON.stringify(entry);
-    expect(serialized).toContain('ownerPubkey');
     expect(serialized).toContain('eventKind');
     expect(serialized).toContain('relayCount');
+    expect(serialized).toContain('relayScope');
     expect(serialized).not.toContain('credential');
     expect(serialized).not.toContain('passphrase');
     expect(serialized).not.toContain('nsec1super-secret-key');
     expect(serialized).not.toContain('password1234');
     expect(serialized).not.toContain('top-secret-content');
     expect(serialized).not.toContain('deadbeef');
+    expect(serialized).not.toContain('"ownerPubkey":');
+    expect(serialized).not.toContain('"peerPubkey":');
+    expect(serialized).not.toContain('"authenticatedPubkey":');
+    expect(serialized).not.toContain('"q":');
+    expect(serialized).not.toContain('"hashtag":');
     expect(serialized).not.toContain('authorization');
+    expect(serialized).not.toContain('sensitive-header-token');
+    expect(serialized).not.toContain('forwardedFor');
+    expect(serialized).not.toContain('203.0.113.1');
+    expect(serialized).not.toContain('wss://relay.one');
+    expect(serialized).not.toContain('wss://relay.two');
+    expect(serialized).not.toContain('secret search');
 
     infoSpy.mockRestore();
   });

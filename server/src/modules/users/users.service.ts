@@ -3,6 +3,7 @@ import { SimplePool, type Filter, nip19 } from 'nostr-tools';
 import { normalizeHexPubkey } from '../../nostr/nostr-validation';
 import { shouldUseFallbackRelays } from '../../relay/relay-fallback';
 import { createRelayGateway } from '../../relay/relay-gateway';
+import { normalizePublicRelayUrl } from '../../relay/relay-url-policy';
 import type {
   RelayGateway,
   RelayGatewayQueryContext,
@@ -76,22 +77,6 @@ const dedupeById = (events: NostrEventLike[]): NostrEventLike[] => {
 
 const normalizeQueryText = (value: string): string => value.trim().toLowerCase();
 
-const normalizeRelayUrl = (value: string): string | null => {
-  try {
-    const parsed = new URL(value.trim());
-    if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
-      return null;
-    }
-
-    parsed.hash = '';
-    parsed.search = '';
-    const normalized = parsed.toString();
-    return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-  } catch {
-    return null;
-  }
-};
-
 const normalizeSearchRelays = (searchRelays?: string[]): string[] => {
   const source = searchRelays && searchRelays.length > 0
     ? searchRelays
@@ -99,7 +84,7 @@ const normalizeSearchRelays = (searchRelays?: string[]): string[] => {
   const normalized = new Set<string>();
 
   for (const relay of source) {
-    const current = normalizeRelayUrl(relay);
+    const current = normalizePublicRelayUrl(relay);
     if (!current) {
       continue;
     }

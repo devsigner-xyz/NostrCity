@@ -25,6 +25,23 @@ const makeEvent = (event: {
 });
 
 describe('dm service filtering behavior', () => {
+  it('re-fetches inbox events for repeated identical queries', async () => {
+    const fetchInboxEvents = vi.fn(async () => ({
+      items: [],
+      hasMore: false,
+      nextSince: null,
+    }));
+
+    const service = createDmService({
+      fetchInboxEvents,
+    });
+
+    await service.getInboxEvents({ ownerPubkey: OWNER_PUBKEY, limit: 10, since: 0 });
+    await service.getInboxEvents({ ownerPubkey: OWNER_PUBKEY, limit: 10, since: 0 });
+
+    expect(fetchInboxEvents).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps only allowed DM kinds in inbox and only owner-participant events', async () => {
     const ownerToPeerId = '1'.repeat(64);
     const peerToOwnerId = '2'.repeat(64);

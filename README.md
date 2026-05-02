@@ -78,7 +78,7 @@ Stop it with:
 docker compose down
 ```
 
-The compose file binds to `127.0.0.1` by default and builds with `VITE_PUBLIC_DEMO_MODE=false`, so full supported login methods remain available locally.
+The compose file binds to `127.0.0.1` by default and builds with `NOSTR_CITY_PUBLIC_DEMO_MODE=false`, so full supported login methods remain available locally.
 
 ### Install Dependencies
 
@@ -157,11 +157,11 @@ Copy `.env.example` to `.env` only for local overrides. `.env` is ignored by git
 cp .env.example .env
 ```
 
-`VITE_PUBLIC_DEMO_MODE=false` keeps all supported login methods available for local/self-hosted usage. Set `VITE_PUBLIC_DEMO_MODE=true` only for a public read-only demo deployment such as `nostrcity.xyz`.
+`NOSTR_CITY_PUBLIC_DEMO_MODE=false` keeps all supported login methods available for local/self-hosted usage. Set `NOSTR_CITY_PUBLIC_DEMO_MODE=true` only for a public read-only demo deployment such as `nostrcity.xyz`.
 
-Public demo deployments must set `VITE_PUBLIC_DEMO_MODE=true` before `pnpm build`, because Vite inlines frontend env values at build time.
+Public demo deployments must set `NOSTR_CITY_PUBLIC_DEMO_MODE=true` before `pnpm build`, because Vite inlines frontend env values at build time and the BFF reads the same flag at runtime.
 
-`VITE_*` variables are public browser configuration in Vite builds, not secrets.
+`VITE_*` and `NOSTR_CITY_PUBLIC_*` variables are public browser configuration in Vite builds, not secrets.
 
 The BFF reads these environment variables:
 
@@ -187,7 +187,7 @@ Frontend public URL overrides:
 
 | Variable | Description |
 | --- | --- |
-| `VITE_PUBLIC_DEMO_MODE` | Set to `true` only for a public read-only demo that allows `npub` access and hides signer/local account login paths. |
+| `NOSTR_CITY_PUBLIC_DEMO_MODE` | Set to `true` only for a public read-only demo that allows `npub` access and hides signer/local account login paths. |
 | `VITE_APP_URL` | App URL used by docs or landing links when hosted separately. |
 | `VITE_DOCS_URL` | Docs URL used by landing links when hosted separately. |
 

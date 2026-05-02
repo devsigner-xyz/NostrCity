@@ -11,8 +11,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
-ARG VITE_PUBLIC_DEMO_MODE=false
-ENV VITE_PUBLIC_DEMO_MODE=$VITE_PUBLIC_DEMO_MODE
+ARG NOSTR_CITY_PUBLIC_DEMO_MODE=false
+ENV NOSTR_CITY_PUBLIC_DEMO_MODE=$NOSTR_CITY_PUBLIC_DEMO_MODE
 ENV VITEPRESS_LAST_UPDATED=false
 COPY . .
 RUN pnpm build

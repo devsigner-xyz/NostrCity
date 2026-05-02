@@ -210,6 +210,23 @@ describe('useOverlaySessionController', () => {
         expect(latest?.savedLocalAccount).toBeUndefined();
     });
 
+    test('does not configure auth headers in public demo mode', async () => {
+        let configuredGetAuthHeaders: ((context: HttpClientAuthContext) => Promise<Record<string, string> | undefined>) | undefined;
+
+        await renderHarness(
+            <Harness
+                publicDemoMode
+                configureAuthHeaders={(getAuthHeaders) => {
+                    configuredGetAuthHeaders = getAuthHeaders;
+                }}
+                onController={() => {}}
+            />,
+        );
+        await flushEffects();
+
+        expect(configuredGetAuthHeaders).toBeUndefined();
+    });
+
     test('rejects signed and local session starts in public demo mode', async () => {
         let latest: OverlaySessionController | undefined;
         const authService = createFakeAuthService();

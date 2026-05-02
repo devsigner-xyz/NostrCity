@@ -8,6 +8,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from './app';
 
+const expectRouteNotFound = async (
+  appInstance: ReturnType<typeof buildApp>,
+  method: 'GET' | 'POST',
+  url: string,
+  payload?: Record<string, unknown>,
+): Promise<void> => {
+  const response = await appInstance.inject({ method, url, payload });
+  expect(response.statusCode).toBe(404);
+};
+
 describe('buildApp', () => {
   const app = buildApp();
 
@@ -118,6 +128,48 @@ describe('buildApp', () => {
     });
 
     expect(response.statusCode).toBe(404);
+  });
+
+  it('does not register private routes in public demo mode', async () => {
+    const publicDemoApp = buildApp({ publicDemoMode: true });
+    await publicDemoApp.ready();
+
+    try {
+      await expectRouteNotFound(
+        publicDemoApp,
+        'GET',
+        `/v1/dm/events/inbox?ownerPubkey=${'a'.repeat(64)}&limit=1&since=1`,
+      );
+      await expectRouteNotFound(
+        publicDemoApp,
+        'GET',
+        `/v1/dm/stream?ownerPubkey=${'a'.repeat(64)}`,
+      );
+      await expectRouteNotFound(
+        publicDemoApp,
+        'GET',
+        `/v1/notifications?ownerPubkey=${'a'.repeat(64)}&limit=1&since=1`,
+      );
+      await expectRouteNotFound(
+        publicDemoApp,
+        'GET',
+        `/v1/notifications/stream?ownerPubkey=${'a'.repeat(64)}&since=1`,
+      );
+      await expectRouteNotFound(publicDemoApp, 'POST', '/v1/publish/forward', {
+        event: {
+          id: 'b'.repeat(64),
+          pubkey: 'a'.repeat(64),
+          created_at: 1,
+          kind: 1,
+          tags: [],
+          content: '',
+          sig: 'c'.repeat(128),
+        },
+        relays: ['wss://relay.example'],
+      });
+    } finally {
+      await publicDemoApp.close();
+    }
   });
 });
 

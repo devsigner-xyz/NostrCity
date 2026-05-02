@@ -147,11 +147,12 @@ export function useOverlaySessionController(options: UseOverlaySessionController
             return undefined;
         }
     }, [authService, writeGateway]);
+    const configuredAuthHeaders = publicDemoMode ? undefined : getAuthHeaders;
 
     useEffect(() => {
-        options.configureAuthHeaders?.(getAuthHeaders);
+        options.configureAuthHeaders?.(configuredAuthHeaders);
         return () => options.configureAuthHeaders?.(undefined);
-    }, [getAuthHeaders, options]);
+    }, [configuredAuthHeaders, options]);
 
     useEffect(() => {
         options.setWriteGateway?.(writeGateway);

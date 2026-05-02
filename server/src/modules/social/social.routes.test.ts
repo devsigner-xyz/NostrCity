@@ -1,13 +1,53 @@
 // @vitest-environment node
 
+import { createHash } from 'node:crypto';
+import { finalizeEvent, getPublicKey } from 'nostr-tools';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../../app';
 import type { SocialService } from './social.service';
 
+const HOST = 'api.local.test';
+const OWNER_SECRET_KEY = Uint8Array.from(Array.from({ length: 32 }, () => 0x11));
+const OTHER_SECRET_KEY = Uint8Array.from(Array.from({ length: 32 }, () => 0x22));
+const OWNER_PUBKEY = getPublicKey(OWNER_SECRET_KEY);
+
 const VALID_PUBKEY = 'a'.repeat(64);
 const VALID_EVENT_ID = 'b'.repeat(64);
 const VALID_EVENT_ID_2 = 'c'.repeat(64);
+
+const hashPayload = (payload: unknown): string => {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+};
+
+const buildNostrAuthHeader = ({
+  secretKey,
+  method,
+  url,
+  payload,
+}: {
+  secretKey: Uint8Array;
+  method: string;
+  url: string;
+  payload: unknown;
+}): string => {
+  const event = finalizeEvent(
+    {
+      kind: 27_235,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['u', url],
+        ['method', method.toUpperCase()],
+        ['nonce', `nonce-${Math.random().toString(16).slice(2, 12)}`],
+        ['payload', hashPayload(payload)],
+      ],
+      content: '',
+    },
+    secretKey,
+  );
+
+  return `Nostr ${Buffer.from(JSON.stringify(event)).toString('base64')}`;
+};
 
 describe('social routes', () => {
   const socialService: SocialService = {
@@ -84,13 +124,38 @@ describe('social routes', () => {
     }),
   };
   const app = buildApp({ socialService });
+  const publicDemoApp = buildApp({ socialService, publicDemoMode: true });
 
   beforeAll(async () => {
     await app.ready();
+    await publicDemoApp.ready();
   });
 
   afterAll(async () => {
     await app.close();
+    await publicDemoApp.close();
+  });
+
+  it('does not register viewer-specific routes in public demo mode', async () => {
+    const reactions = await publicDemoApp.inject({
+      method: 'POST',
+      url: '/v1/social/viewer-reactions',
+      payload: { ownerPubkey: OWNER_PUBKEY, eventIds: [VALID_EVENT_ID] },
+    });
+    const zaps = await publicDemoApp.inject({
+      method: 'POST',
+      url: '/v1/social/viewer-zaps',
+      payload: { ownerPubkey: OWNER_PUBKEY, eventIds: [VALID_EVENT_ID] },
+    });
+    const replies = await publicDemoApp.inject({
+      method: 'POST',
+      url: '/v1/social/viewer-replies',
+      payload: { ownerPubkey: OWNER_PUBKEY, eventIds: [VALID_EVENT_ID] },
+    });
+
+    expect(reactions.statusCode).toBe(404);
+    expect(zaps.statusCode).toBe(404);
+    expect(replies.statusCode).toBe(404);
   });
 
   it('returns following feed envelope for valid query', async () => {
@@ -203,13 +268,23 @@ describe('social routes', () => {
   });
 
   it('returns viewer reactions envelope for valid body', async () => {
+    const payload = {
+      ownerPubkey: OWNER_PUBKEY,
+      eventIds: [VALID_EVENT_ID],
+    };
     const response = await app.inject({
       method: 'POST',
       url: '/v1/social/viewer-reactions',
-      payload: {
-        ownerPubkey: VALID_PUBKEY,
-        eventIds: [VALID_EVENT_ID],
+      headers: {
+        authorization: buildNostrAuthHeader({
+          secretKey: OWNER_SECRET_KEY,
+          method: 'POST',
+          url: `http://${HOST}/v1/social/viewer-reactions`,
+          payload,
+        }),
+        host: HOST,
       },
+      payload,
     });
 
     expect(response.statusCode).toBe(200);
@@ -226,13 +301,23 @@ describe('social routes', () => {
   });
 
   it('returns viewer zaps envelope for valid body', async () => {
+    const payload = {
+      ownerPubkey: OWNER_PUBKEY,
+      eventIds: [VALID_EVENT_ID],
+    };
     const response = await app.inject({
       method: 'POST',
       url: '/v1/social/viewer-zaps',
-      payload: {
-        ownerPubkey: VALID_PUBKEY,
-        eventIds: [VALID_EVENT_ID],
+      headers: {
+        authorization: buildNostrAuthHeader({
+          secretKey: OWNER_SECRET_KEY,
+          method: 'POST',
+          url: `http://${HOST}/v1/social/viewer-zaps`,
+          payload,
+        }),
+        host: HOST,
       },
+      payload,
     });
 
     expect(response.statusCode).toBe(200);
@@ -249,13 +334,23 @@ describe('social routes', () => {
   });
 
   it('returns viewer replies envelope for valid body', async () => {
+    const payload = {
+      ownerPubkey: OWNER_PUBKEY,
+      eventIds: [VALID_EVENT_ID],
+    };
     const response = await app.inject({
       method: 'POST',
       url: '/v1/social/viewer-replies',
-      payload: {
-        ownerPubkey: VALID_PUBKEY,
-        eventIds: [VALID_EVENT_ID],
+      headers: {
+        authorization: buildNostrAuthHeader({
+          secretKey: OWNER_SECRET_KEY,
+          method: 'POST',
+          url: `http://${HOST}/v1/social/viewer-replies`,
+          payload,
+        }),
+        host: HOST,
       },
+      payload,
     });
 
     expect(response.statusCode).toBe(200);
@@ -268,6 +363,65 @@ describe('social routes', () => {
         },
       },
     });
+  });
+
+  it('returns 401 for viewer reactions without auth in full mode', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/social/viewer-reactions',
+      payload: {
+        ownerPubkey: OWNER_PUBKEY,
+        eventIds: [VALID_EVENT_ID],
+      },
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('returns 403 for viewer reactions when auth pubkey mismatches ownerPubkey', async () => {
+    const payload = {
+      ownerPubkey: OWNER_PUBKEY,
+      eventIds: [VALID_EVENT_ID],
+    };
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/social/viewer-reactions',
+      headers: {
+        authorization: buildNostrAuthHeader({
+          secretKey: OTHER_SECRET_KEY,
+          method: 'POST',
+          url: `http://${HOST}/v1/social/viewer-reactions`,
+          payload,
+        }),
+        host: HOST,
+      },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('returns 200 for viewer reactions when auth pubkey matches ownerPubkey', async () => {
+    const payload = {
+      ownerPubkey: OWNER_PUBKEY,
+      eventIds: [VALID_EVENT_ID],
+    };
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/social/viewer-reactions',
+      headers: {
+        authorization: buildNostrAuthHeader({
+          secretKey: OWNER_SECRET_KEY,
+          method: 'POST',
+          url: `http://${HOST}/v1/social/viewer-reactions`,
+          payload,
+        }),
+        host: HOST,
+      },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(200);
   });
 
   it('returns 400 when following query is missing ownerPubkey', async () => {

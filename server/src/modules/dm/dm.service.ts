@@ -450,10 +450,6 @@ export const createDmService = (options: DmServiceOptions = {}): DmService => {
     createRelayGateway<DmInboxQuery, DmEventsResponseDto>({
       queryFn: options.fetchInboxEvents ?? fetchers.fetchInboxEvents,
       defaultTimeoutMs: options.defaultTimeoutMs,
-      cache: {
-        ttlMs: 10_000,
-        maxEntries: 300,
-      },
     });
 
   const conversationGateway =
@@ -461,10 +457,6 @@ export const createDmService = (options: DmServiceOptions = {}): DmService => {
     createRelayGateway<DmConversationQuery, DmEventsResponseDto>({
       queryFn: options.fetchConversationEvents ?? fetchers.fetchConversationEvents,
       defaultTimeoutMs: options.defaultTimeoutMs,
-      cache: {
-        ttlMs: 10_000,
-        maxEntries: 300,
-      },
     });
 
   const streamGateway =
@@ -472,10 +464,6 @@ export const createDmService = (options: DmServiceOptions = {}): DmService => {
     createRelayGateway<DmStreamQuery, DmEventDto[]>({
       queryFn: options.fetchStreamEvents ?? fetchers.fetchStreamEvents,
       defaultTimeoutMs: options.defaultTimeoutMs,
-      cache: {
-        ttlMs: 2_000,
-        maxEntries: 200,
-      },
     });
 
   return new GatewayDmService(inboxGateway, conversationGateway, streamGateway);

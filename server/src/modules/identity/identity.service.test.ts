@@ -199,6 +199,10 @@ describe('identity service nip05 verification', () => {
   it.each([
     'alice@localhost',
     'alice@localhost.localdomain',
+    'alice@host.docker.internal',
+    'alice@gateway.docker.internal',
+    'alice@service.local',
+    'alice@kubernetes.default.svc',
     'alice@127.0.0.1',
     'alice@127.1.2.3',
     'alice@0.0.0.0',

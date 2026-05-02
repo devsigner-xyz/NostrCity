@@ -156,6 +156,7 @@ export interface NotificationsService {
 
 const STREAM_POLL_INTERVAL_MS = 1_500;
 const STREAM_FETCH_LIMIT = 50;
+const STREAM_SEEN_IDS_MAX = 5_000;
 
 const waitWithSignal = async (
   timeoutMs: number,
@@ -203,6 +204,7 @@ class GatewayNotificationsService implements NotificationsService {
     signal?: AbortSignal,
   ): AsyncIterable<NotificationItemDto> {
     const seenIds = new Set<string>();
+    const seenOrder: string[] = [];
     let since = query.since ?? 0;
 
     while (!signal?.aborted) {
@@ -223,6 +225,13 @@ class GatewayNotificationsService implements NotificationsService {
         }
 
         seenIds.add(item.id);
+        seenOrder.push(item.id);
+        if (seenOrder.length > STREAM_SEEN_IDS_MAX) {
+          const oldestSeenId = seenOrder.shift();
+          if (oldestSeenId) {
+            seenIds.delete(oldestSeenId);
+          }
+        }
         emitted = true;
         since = Math.max(since, item.createdAt);
         yield item;
@@ -353,10 +362,6 @@ export const createNotificationsService = (
     createRelayGateway<NotificationsQuery, NotificationsResponseDto>({
       queryFn: options.fetchNotifications ?? fetchers.fetchNotifications,
       defaultTimeoutMs: options.defaultTimeoutMs,
-      cache: {
-        ttlMs: 10_000,
-        maxEntries: 300,
-      },
     });
 
   const streamGateway =
@@ -364,10 +369,6 @@ export const createNotificationsService = (
     createRelayGateway<NotificationsStreamQuery, NotificationItemDto[]>({
       queryFn: options.fetchNotificationStream ?? fetchers.fetchNotificationStream,
       defaultTimeoutMs: options.defaultTimeoutMs,
-      cache: {
-        ttlMs: 2_000,
-        maxEntries: 200,
-      },
     });
 
   return new GatewayNotificationsService(listGateway, streamGateway);

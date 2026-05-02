@@ -1,5 +1,6 @@
-import type { FastifyPluginAsync, FastifyReply } from 'fastify';
+import type { FastifyPluginAsync } from 'fastify';
 
+import { writeSseChunk } from '../../sse/sse-writer';
 import {
   dmConversationQuerySchema,
   dmEventsResponseSchema,
@@ -18,47 +19,6 @@ export interface DmRoutesOptions {
 export const dmRoutes: FastifyPluginAsync<DmRoutesOptions> = async (app, options) => {
   const service = options.service ?? createDmService();
   const eventIdPattern = /^[0-9a-f]{64}$/;
-
-  const waitForDrainOrClose = async (reply: FastifyReply): Promise<void> => {
-    await new Promise<void>((resolve) => {
-      const onDrain = () => {
-        cleanup();
-      };
-
-      const onClose = () => {
-        cleanup();
-      };
-
-      const onError = () => {
-        cleanup();
-      };
-
-      const cleanup = () => {
-        reply.raw.off('drain', onDrain);
-        reply.raw.off('close', onClose);
-        reply.raw.off('error', onError);
-        resolve();
-      };
-
-      reply.raw.on('drain', onDrain);
-      reply.raw.on('close', onClose);
-      reply.raw.on('error', onError);
-    });
-  };
-
-  const writeSseChunk = async (payload: string, reply: FastifyReply): Promise<boolean> => {
-    if (reply.raw.writableEnded || reply.raw.destroyed) {
-      return false;
-    }
-
-    const writable = reply.raw.write(payload);
-    if (writable) {
-      return true;
-    }
-
-    await waitForDrainOrClose(reply);
-    return !reply.raw.writableEnded && !reply.raw.destroyed;
-  };
 
   app.get<{
     Querystring: DmInboxQuery;

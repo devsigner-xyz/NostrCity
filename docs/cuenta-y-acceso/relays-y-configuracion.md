@@ -12,6 +12,14 @@ Un relay almacena y reenvía eventos. Si tu configuración no incluye relays don
 - Si tienes duplicados o endpoints poco fiables.
 - Si estás usando una mezcla razonable de relays públicos y personales.
 
+## Privacidad y límites de relay
+
+Los relays ven metadatos de consulta aunque el contenido final que busques sea público: clave pública consultada, tipos de eventos, marcas de tiempo, ritmo de peticiones y qué relay recibió la consulta.
+
+Cuando una consulta pasa por el BFF de Nostr City, la capa endurecida de servidor solo reenviará peticiones a relays públicos `wss://`. Quedan fuera `ws://`, hostnames locales o internos, IPs privadas, endpoints con credenciales embebidas y otros destinos que puedan usarse para SSRF o para filtrar tráfico a redes internas.
+
+Ese límite protege despliegues públicos y también afecta instalaciones completas/locales cuando usan las rutas del BFF: si dependes de relays privados o internos, el BFF actual no los consultará.
+
 ## Relays de grupos
 
 Los grupos NIP-29 usan relays especializados. En `/relays`, la sección **Group relays** permite añadir o quitar relays dedicados a descubrir grupos. Estos relays son opt-in y se guardan localmente por defecto: sirven para consultar grupos, pero no cambian tus relays sociales, de mensajes privados o de búsqueda.

@@ -15,14 +15,10 @@ declare module 'fastify' {
 }
 
 const LOGGABLE_FIELD_KEYS = new Set([
-  'ownerPubkey',
-  'peerPubkey',
-  'q',
   'limit',
   'since',
   'until',
   'relayScope',
-  'hashtag',
 ]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -51,6 +47,27 @@ const pickLoggableFields = (value: unknown): Record<string, string | number | bo
   return output;
 };
 
+const addDerivedSensitiveFieldMetadata = (
+  sanitized: Record<string, unknown>,
+  value: Record<string, unknown>,
+): void => {
+  if (typeof value.ownerPubkey === 'string') {
+    sanitized.hasOwnerPubkey = true;
+  }
+
+  if (typeof value.peerPubkey === 'string') {
+    sanitized.hasPeerPubkey = true;
+  }
+
+  if (typeof value.q === 'string') {
+    sanitized.queryLength = value.q.trim().length;
+  }
+
+  if (typeof value.hashtag === 'string') {
+    sanitized.hasHashtag = value.hashtag.trim().length > 0;
+  }
+};
+
 export const sanitizeRequestBody = (body: unknown): Record<string, unknown> | undefined => {
   if (!isRecord(body)) {
     return undefined;
@@ -59,6 +76,8 @@ export const sanitizeRequestBody = (body: unknown): Record<string, unknown> | un
   const sanitized: Record<string, unknown> = {
     ...pickLoggableFields(body),
   };
+
+  addDerivedSensitiveFieldMetadata(sanitized, body);
 
   if (isRecord(body.event) && typeof body.event.kind === 'number') {
     sanitized.eventKind = body.event.kind;
@@ -75,26 +94,18 @@ export const sanitizeRequestQuery = (
   query: FastifyRequest['query'],
 ): Record<string, string | number | boolean> | undefined => {
   const sanitized = pickLoggableFields(query);
+  if (isRecord(query)) {
+    addDerivedSensitiveFieldMetadata(sanitized, query);
+  }
+
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 };
 
 export const sanitizeRequestHeaders = (
   headers: FastifyRequest['headers'],
 ): Record<string, string> | undefined => {
-  const sanitized: Record<string, string> = {};
-
-  if (typeof headers['user-agent'] === 'string' && headers['user-agent'].length > 0) {
-    sanitized.userAgent = headers['user-agent'];
-  }
-
-  if (
-    typeof headers['x-forwarded-for'] === 'string' &&
-    headers['x-forwarded-for'].length > 0
-  ) {
-    sanitized.forwardedFor = headers['x-forwarded-for'];
-  }
-
-  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+  void headers;
+  return undefined;
 };
 
 export const requestContextPlugin: FastifyPluginAsync = async (app) => {
@@ -136,7 +147,7 @@ export const requestContextPlugin: FastifyPluginAsync = async (app) => {
       query: sanitizeRequestQuery(request.query),
       body: sanitizeRequestBody(request.body),
       headers: sanitizeRequestHeaders(request.headers),
-      authenticatedPubkey: request.context.authenticatedPubkey,
+      authenticated: Boolean(request.context.authenticatedPubkey),
     });
   });
 };

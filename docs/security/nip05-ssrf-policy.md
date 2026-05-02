@@ -8,12 +8,13 @@ This policy applies to server-side NIP-05 verification requests under `/v1/ident
 
 Only HTTPS public hostnames are allowed for `/.well-known/nostr.json?name=<local-part>` requests.
 
-The service rejects IP literals in NIP-05 identifiers before any DNS lookup or fetch. Public hostnames are resolved before fetch, and every resolved address must be public.
+The service rejects known internal hostnames and IP literals in NIP-05 identifiers before any DNS lookup or fetch. Public hostnames are resolved before fetch, and every resolved address must be public.
 
 ## Blocked Targets
 
 - `localhost`, `localhost.localdomain`, and `*.localhost` names.
-- Known metadata/internal names, including `metadata.google.internal`.
+- Docker, Kubernetes, metadata, and other internal names such as `host.docker.internal`, `gateway.docker.internal`, `kubernetes.default.svc`, and `metadata.google.internal`.
+- Hostnames ending in `.local`.
 - IPv4 literals in the identifier domain.
 - IPv4 loopback, private, carrier-grade NAT, link-local, protocol-assignment, benchmarking, documentation, multicast, reserved, and unspecified ranges returned by DNS.
 - IPv6 unspecified, loopback, unique-local, link-local, multicast, documentation, 6to4, and IPv4-mapped private/reserved ranges returned by DNS.

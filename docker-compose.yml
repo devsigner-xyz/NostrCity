@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_PUBLIC_DEMO_MODE: ${VITE_PUBLIC_DEMO_MODE:-false}
+        NOSTR_CITY_PUBLIC_DEMO_MODE: ${NOSTR_CITY_PUBLIC_DEMO_MODE:-false}
     image: nostr-city:local
     ports:
       - "127.0.0.1:3000:3000"

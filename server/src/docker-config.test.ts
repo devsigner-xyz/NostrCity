@@ -17,6 +17,8 @@ describe('Docker local distribution config', () => {
     expect(dockerfile).toContain('pnpm install --frozen-lockfile');
     expect(dockerfile).toContain('pnpm build');
     expect(dockerfile).toContain('pnpm prune --prod');
+    expect(dockerfile).toContain('ARG NOSTR_CITY_PUBLIC_DEMO_MODE=false');
+    expect(dockerfile).toContain('ENV NOSTR_CITY_PUBLIC_DEMO_MODE=$NOSTR_CITY_PUBLIC_DEMO_MODE');
     expect(dockerfile).toContain('USER node');
     expect(dockerfile).toContain('server/dist/main.js');
     expect(dockerfile).toContain('/v1/health');
@@ -26,7 +28,7 @@ describe('Docker local distribution config', () => {
     const compose = await readFile(join(root, 'docker-compose.yml'), 'utf8');
 
     expect(compose).toContain('127.0.0.1:3000:3000');
-    expect(compose).toContain('VITE_PUBLIC_DEMO_MODE: ${VITE_PUBLIC_DEMO_MODE:-false}');
+    expect(compose).toContain('NOSTR_CITY_PUBLIC_DEMO_MODE: ${NOSTR_CITY_PUBLIC_DEMO_MODE:-false}');
     expect(compose).toContain('HOST: 0.0.0.0');
     expect(compose).toContain('PORT: 3000');
     expect(compose).toContain('NOSTR_CITY_DOCKER_LOCAL: "true"');

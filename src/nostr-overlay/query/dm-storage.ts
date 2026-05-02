@@ -70,10 +70,16 @@ function sentIndexIdentity(item: SentIndexItem, fallbackIndex: number): string {
     return `fallback:${item.conversationId}:${toEpochSeconds(item.createdAtSec)}:${fallbackIndex}`;
 }
 
+function stripPlaintext(item: SentIndexItem): SentIndexItem {
+    const { plaintext: _plaintext, ...safeItem } = item;
+    return safeItem;
+}
+
 function normalizeSentIndex(items: SentIndexItem[], nowSec: number): SentIndexItem[] {
     const minCreatedAt = nowSec - DM_SENT_INDEX_MAX_AGE_SECONDS;
 
     const filteredSorted = items
+        .map(stripPlaintext)
         .filter((item) => toEpochSeconds(item.createdAtSec) >= minCreatedAt)
         .sort((left, right) => toEpochSeconds(right.createdAtSec) - toEpochSeconds(left.createdAtSec));
 

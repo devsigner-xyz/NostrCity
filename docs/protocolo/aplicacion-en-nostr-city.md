@@ -38,6 +38,12 @@ Para escribir en grupos, la sesión debe poder firmar. Publicar mensajes, guarda
 
 ## Privacidad y límites
 
+- Los despliegues públicos de producción deben ejecutarse con `NOSTR_CITY_PUBLIC_DEMO_MODE=true`. En ese modo la experiencia es `npub`-only y de solo lectura.
+- La experiencia completa con escritura, DMs, viewer state autenticado y flujos de firma está pensada para instalaciones locales o self-hosted.
+- En demo pública, el BFF no expone rutas de DMs, publish forwarding ni rutas viewer-specific como `/social/viewer-*`.
+- Nostr City no entrega claves privadas al BFF. Las firmas siguen ocurriendo en NIP-07, NIP-46 o en el almacenamiento local del navegador cuando esa modalidad está habilitada.
+- Si en una instalación full/local habilitas DMs o rutas autenticadas, el BFF puede ver metadatos como pubkeys, ids de evento, timestamps, relays objetivo y tiempos de petición. En DMs, el contenido llega cifrado al BFF, pero el cifrado no elimina esos metadatos.
+- El navegador puede conservar estado local de la aplicación y preferencias del usuario. Trata ese almacenamiento como persistencia local del dispositivo; el índice persistido de DMs ya no guarda plaintext de mensajes.
 - Muchos eventos de Nostr son públicos por diseño. No publiques información sensible si no entiendes el tipo de evento y los relays usados.
 - Los relays pueden aceptar, rechazar, ocultar o limitar eventos según sus reglas.
 - Los eventos cifrados protegen contenido, pero no eliminan todos los metadatos de transporte.

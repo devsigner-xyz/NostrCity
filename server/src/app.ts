@@ -30,6 +30,7 @@ import { requestContextPlugin } from './plugins/request-context';
 import { securityHeadersPlugin } from './plugins/security-headers';
 import { staticAssetsPlugin } from './plugins/static-assets';
 import { validateProductionSecurityConfig } from './production-config';
+import { isPublicDemoMode } from './public-demo-mode';
 import type { ReadinessChecks } from './readiness';
 import { healthRoute } from './routes/health.route';
 import { createAppServices } from './services/app-services';
@@ -47,6 +48,7 @@ export interface BuildAppOptions {
   authReplayStore?: AuthReplayStore;
   readinessChecks?: ReadinessChecks;
   staticAssetsPath?: string;
+  publicDemoMode?: boolean;
 }
 
 const resolveTrustProxy = (): FastifyServerOptions['trustProxy'] => {
@@ -77,12 +79,15 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
   const app = Fastify({ logger: false, trustProxy: resolveTrustProxy() });
   const defaultServices = createAppServices();
   const readinessChecks: ReadinessChecks = { ...options.readinessChecks };
+  const publicDemoMode = options.publicDemoMode ?? isPublicDemoMode();
 
   app.register(requestContextPlugin);
   app.register(corsPlugin);
   app.register(securityHeadersPlugin);
   app.register(rateLimitPlugin, { readinessChecks });
-  app.register(ownerAuthPlugin, { authReplayStore: options.authReplayStore });
+  if (!publicDemoMode) {
+    app.register(ownerAuthPlugin, { authReplayStore: options.authReplayStore });
+  }
   app.register(errorHandlerPlugin);
 
   app.register(healthRoute, { prefix: '/v1', readinessChecks });
@@ -105,23 +110,28 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
   app.register(socialRoutes, {
     prefix: '/v1',
     service: options.socialService ?? defaultServices.socialService,
-  });
-  app.register(notificationsRoutes, {
-    prefix: '/v1',
-    service: options.notificationsService ?? defaultServices.notificationsService,
-  });
-  app.register(dmRoutes, {
-    prefix: '/v1',
-    service: options.dmService ?? defaultServices.dmService,
+    publicDemoMode,
   });
   app.register(usersRoutes, {
     prefix: '/v1',
     service: options.usersService ?? defaultServices.usersService,
   });
-  app.register(publishRoutes, {
-    prefix: '/v1',
-    service: options.publishService ?? defaultServices.publishService,
-  });
+
+  if (!publicDemoMode) {
+    app.register(notificationsRoutes, {
+      prefix: '/v1',
+      service: options.notificationsService ?? defaultServices.notificationsService,
+    });
+    app.register(dmRoutes, {
+      prefix: '/v1',
+      service: options.dmService ?? defaultServices.dmService,
+    });
+    app.register(publishRoutes, {
+      prefix: '/v1',
+      service: options.publishService ?? defaultServices.publishService,
+    });
+  }
+
   app.register(staticAssetsPlugin, { rootPath: options.staticAssetsPath });
 
   return app;

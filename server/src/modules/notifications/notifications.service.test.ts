@@ -51,6 +51,23 @@ const makeItem = (item: { id: string; createdAt: number; kind?: number }): Notif
 });
 
 describe('notifications service list behavior', () => {
+  it('re-fetches notifications for repeated identical queries', async () => {
+    const fetchNotifications = vi.fn(async () => ({
+      items: [],
+      hasMore: false,
+      nextSince: null,
+    }));
+
+    const service = createNotificationsService({
+      fetchNotifications,
+    });
+
+    await service.getNotifications({ ownerPubkey: OWNER_PUBKEY, limit: 10, since: 0 });
+    await service.getNotifications({ ownerPubkey: OWNER_PUBKEY, limit: 10, since: 0 });
+
+    expect(fetchNotifications).toHaveBeenCalledTimes(2);
+  });
+
   it('uses an injected relay query executor for list lookups', async () => {
     const id = '1'.repeat(64);
     const query = vi.fn(async <TEvent>() => [
@@ -222,6 +239,59 @@ describe('notifications service list behavior', () => {
 });
 
 describe('notifications service stream behavior', () => {
+  it('evicts the oldest seen notification ids after the cap is reached', async () => {
+    const oldestId = '1'.repeat(64);
+    const firstBatch = [
+      makeItem({ id: oldestId, createdAt: 10_000 }),
+      ...Array.from({ length: 5_000 }, (_, index) =>
+        makeItem({
+          id: (index + 2).toString(16).padStart(64, '0'),
+          createdAt: 9_999 - index,
+        }))
+      ,
+    ];
+    const streamQueryMock = vi
+      .fn<RelayGateway<NotificationsStreamQuery, NotificationItemDto[]>['query']>()
+      .mockImplementationOnce(async () => firstBatch)
+      .mockImplementationOnce(async () => [makeItem({ id: oldestId, createdAt: 10_001 })]);
+
+    const listGateway: RelayGateway<NotificationsQuery, NotificationsResponseDto> = {
+      query: vi.fn(async () => ({
+        items: [],
+        hasMore: false,
+        nextSince: null,
+      })),
+      clearCache: vi.fn(),
+    };
+
+    const streamGateway: RelayGateway<NotificationsStreamQuery, NotificationItemDto[]> = {
+      query: streamQueryMock,
+      clearCache: vi.fn(),
+    };
+
+    const service = createNotificationsService({
+      listGateway,
+      streamGateway,
+    });
+
+    const collected: string[] = [];
+    const abortController = new AbortController();
+
+    for await (const item of service.streamNotifications(
+      { ownerPubkey: OWNER_PUBKEY, since: 0 },
+      abortController.signal,
+    )) {
+      collected.push(item.id);
+      if (collected.length === 5_002) {
+        abortController.abort();
+      }
+    }
+
+    expect(collected[0]).toBe(oldestId);
+    expect(collected.at(-1)).toBe(oldestId);
+    expect(streamQueryMock).toHaveBeenCalledTimes(2);
+  });
+
   it('dedupes events by id across polls and forwards abort signal to gateway', async () => {
     const streamQueryMock = vi
       .fn<RelayGateway<NotificationsStreamQuery, NotificationItemDto[]>['query']>()

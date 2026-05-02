@@ -271,4 +271,56 @@ describe('useDirectMessagesController', () => {
         expect(secondCallInput.plaintext).toBe('hola retry');
         expect(secondCallInput.clientMessageId).toBe(firstCallInput.clientMessageId);
     });
+
+    test('does not retry failed outgoing dm deliveries after reload from persisted sent index', async () => {
+        const memory = new Map<string, string>();
+        const storageBackend: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = {
+            getItem(key: string) {
+                return memory.get(key) ?? null;
+            },
+            setItem(key: string, value: string) {
+                memory.set(key, value);
+            },
+            removeItem(key: string) {
+                memory.delete(key);
+            },
+        };
+
+        const key = `nostr-overlay:dm:v1:sent-index:${OWNER}`;
+        memory.set(key, JSON.stringify([
+            {
+                clientMessageId: 'client-reload',
+                conversationId: 'b'.repeat(64),
+                createdAtSec: 99,
+                deliveryState: 'failed',
+                targetRelays: [],
+                plaintext: 'should not retry after reload',
+            },
+        ]));
+
+        const sendDm = vi.fn();
+        const dmService: DirectMessagesService = {
+            subscribeInbox: vi.fn(() => () => {}),
+            loadInitialConversations: vi.fn(async () => []),
+            sendDm,
+        };
+
+        const rendered = await renderElement(createElement(DirectMessagesProbe, {
+            ownerPubkey: OWNER,
+            enabled: true,
+            failedRetryIntervalMs: 1,
+            storageBackend,
+            dmService,
+            onUpdate: () => {},
+        }));
+        mounted.push(rendered);
+
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        });
+
+        expect(sendDm).not.toHaveBeenCalled();
+        expect(memory.get(key)).not.toContain('plaintext');
+        expect(memory.get(key)).not.toContain('should not retry after reload');
+    });
 });

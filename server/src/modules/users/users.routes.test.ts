@@ -93,6 +93,20 @@ describe('users routes', () => {
     expect(response.statusCode).toBe(200);
   });
 
+  it('returns 400 when searchRelays uses ws scheme', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/users/search?ownerPubkey=${OWNER_PUBKEY}&q=alice&limit=20&searchRelays=${encodeURIComponent('ws://relay.example')}`,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: 'VALIDATION_ERROR',
+      },
+    });
+  });
+
   it('returns 400 when query is missing q', async () => {
     const response = await app.inject({
       method: 'GET',

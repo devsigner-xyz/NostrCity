@@ -75,6 +75,11 @@ const PROFILE_LUD16_MAX_LENGTH = 320;
 const BLOCKED_NIP05_HOSTNAMES = new Set([
   'localhost',
   'localhost.localdomain',
+  'host.docker.internal',
+  'gateway.docker.internal',
+  'kubernetes',
+  'kubernetes.default',
+  'kubernetes.default.svc',
   'metadata.google.internal',
 ]);
 
@@ -147,6 +152,7 @@ const isBlockedIpv6Address = (address: string): boolean => {
 const isUnsafeNip05Hostname = (domain: string): boolean => {
   const hostname = normalizeNip05Hostname(domain);
   return BLOCKED_NIP05_HOSTNAMES.has(hostname) ||
+    hostname.endsWith('.local') ||
     hostname.endsWith('.localhost') ||
     hostname.endsWith('.localhost.localdomain') ||
     isIpv4Literal(hostname);

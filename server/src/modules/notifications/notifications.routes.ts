@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 
+import { writeSseChunk } from '../../sse/sse-writer';
 import {
   notificationsQuerySchema,
   notificationsResponseSchema,
@@ -69,7 +70,10 @@ export const notificationsRoutes: FastifyPluginAsync<NotificationsRoutesOptions>
       reply.raw.setHeader('connection', 'keep-alive');
       reply.raw.setHeader('x-accel-buffering', 'no');
 
-      reply.raw.write(': connected\n\n');
+      const connected = await writeSseChunk(': connected\n\n', reply);
+      if (!connected) {
+        abortStream();
+      }
 
       try {
         for await (const item of service.streamNotifications(request.query, abortController.signal)) {
@@ -83,17 +87,31 @@ export const notificationsRoutes: FastifyPluginAsync<NotificationsRoutesOptions>
             item,
           });
 
-          reply.raw.write(`id: ${item.id}\n`);
-          reply.raw.write('event: notification\n');
-          reply.raw.write(`data: ${payload}\n\n`);
+          const idWritten = await writeSseChunk(`id: ${item.id}\n`, reply);
+          if (!idWritten) {
+            abortStream();
+            break;
+          }
+
+          const eventWritten = await writeSseChunk('event: notification\n', reply);
+          if (!eventWritten) {
+            abortStream();
+            break;
+          }
+
+          const dataWritten = await writeSseChunk(`data: ${payload}\n\n`, reply);
+          if (!dataWritten) {
+            abortStream();
+            break;
+          }
         }
       } catch (error) {
         const disconnected = abortController.signal.aborted || request.raw.aborted;
 
         if (!disconnected && !reply.raw.writableEnded) {
           app.log.error(error, 'notifications stream failed');
-          reply.raw.write('event: error\n');
-          reply.raw.write('data: {"type":"error","message":"stream failed"}\n\n');
+          await writeSseChunk('event: error\n', reply);
+          await writeSseChunk('data: {"type":"error","message":"stream failed"}\n\n', reply);
         }
       } finally {
         abortStream();

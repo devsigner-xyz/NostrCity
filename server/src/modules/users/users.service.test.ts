@@ -188,7 +188,11 @@ describe('users service', () => {
       searchRelays: [
         'wss://search.nos.today/',
         'wss://search.nos.today',
+        'ws://search.nos.today',
         'https://invalid.example',
+        'wss://localhost',
+        'wss://192.168.1.5',
+        'wss://user:pass@relay.example',
         'wss://relay.noswhere.com',
         'wss://filter.nostr.wine',
         'wss://extra-1.example',
@@ -230,7 +234,7 @@ describe('users service', () => {
       ownerPubkey: OWNER_A,
       q: 'alice',
       limit: 5,
-      searchRelays: ['https://invalid.example'],
+      searchRelays: ['https://invalid.example', 'ws://relay.example', 'wss://localhost'],
     });
 
     expect(querySyncSpy.mock.calls[0]?.[0]).toEqual([...DEFAULT_SEARCH_RELAYS]);

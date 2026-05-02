@@ -223,6 +223,16 @@ describe('LoginGateScreen', () => {
         expect(link?.getAttribute('rel')).toBe('noreferrer');
     });
 
+    test('keeps signer login methods hidden in public demo mode', async () => {
+        const rendered = await renderScreen({ publicDemoMode: true });
+        mounted.push(rendered);
+
+        const methodSelectTrigger = rendered.container.querySelector('[data-testid="login-method-trigger"]') as HTMLButtonElement;
+        expect(methodSelectTrigger).toBeDefined();
+        expect(methodSelectTrigger.disabled).toBe(true);
+        expect(methodSelectTrigger.textContent || '').toContain('npub (solo lectura)');
+    });
+
     test('hides saved local account actions in public demo mode', async () => {
         const rendered = await renderScreen({
             publicDemoMode: true,

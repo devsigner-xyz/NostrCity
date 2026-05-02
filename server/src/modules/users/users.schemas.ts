@@ -50,6 +50,7 @@ export const usersSearchQuerySchema = {
       items: {
         type: 'string',
         maxLength: 512,
+        pattern: '^wss:\\/\\/\\S+$',
       },
     },
   },

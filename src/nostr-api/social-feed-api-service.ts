@@ -265,6 +265,7 @@ export function createSocialFeedApiService(options: CreateSocialFeedApiServiceOp
                     ownerPubkey: input.ownerPubkey,
                     eventIds: input.eventIds,
                 },
+                includeAuth: true,
             });
 
             return response.byEventId;
@@ -280,6 +281,7 @@ export function createSocialFeedApiService(options: CreateSocialFeedApiServiceOp
                     ownerPubkey: input.ownerPubkey,
                     eventIds: input.eventIds,
                 },
+                includeAuth: true,
             });
 
             return response.byEventId;
@@ -295,6 +297,7 @@ export function createSocialFeedApiService(options: CreateSocialFeedApiServiceOp
                     ownerPubkey: input.ownerPubkey,
                     eventIds: input.eventIds,
                 },
+                includeAuth: true,
             });
 
             return response.byEventId;

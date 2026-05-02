@@ -31,6 +31,7 @@ import { createSocialService, type SocialService } from './social.service';
 
 export interface SocialRoutesOptions {
   service?: SocialService;
+  publicDemoMode?: boolean;
 }
 
 export const socialRoutes: FastifyPluginAsync<SocialRoutesOptions> = async (
@@ -38,6 +39,7 @@ export const socialRoutes: FastifyPluginAsync<SocialRoutesOptions> = async (
   options,
 ) => {
   const service = options.service ?? createSocialService();
+  const publicDemoMode = options.publicDemoMode ?? false;
 
   app.get<{
     Querystring: FollowingFeedQuery;
@@ -130,54 +132,59 @@ export const socialRoutes: FastifyPluginAsync<SocialRoutesOptions> = async (
     },
   );
 
-  app.post<{
-    Body: ViewerReactionsBody;
-  }>(
-    '/social/viewer-reactions',
-    {
-      schema: {
-        body: viewerReactionsBodySchema,
-        response: {
-          200: viewerReactionsResponseSchema,
+  if (!publicDemoMode) {
+    app.post<{
+      Body: ViewerReactionsBody;
+    }>(
+      '/social/viewer-reactions',
+      {
+        preHandler: app.verifyOwnerAuth,
+        schema: {
+          body: viewerReactionsBodySchema,
+          response: {
+            200: viewerReactionsResponseSchema,
+          },
         },
       },
-    },
-    async (request) => {
-      return service.getViewerReactions(request.body);
-    },
-  );
+      async (request) => {
+        return service.getViewerReactions(request.body);
+      },
+    );
 
-  app.post<{
-    Body: ViewerZapsBody;
-  }>(
-    '/social/viewer-zaps',
-    {
-      schema: {
-        body: viewerZapsBodySchema,
-        response: {
-          200: viewerZapsResponseSchema,
+    app.post<{
+      Body: ViewerZapsBody;
+    }>(
+      '/social/viewer-zaps',
+      {
+        preHandler: app.verifyOwnerAuth,
+        schema: {
+          body: viewerZapsBodySchema,
+          response: {
+            200: viewerZapsResponseSchema,
+          },
         },
       },
-    },
-    async (request) => {
-      return service.getViewerZaps(request.body);
-    },
-  );
+      async (request) => {
+        return service.getViewerZaps(request.body);
+      },
+    );
 
-  app.post<{
-    Body: ViewerRepliesBody;
-  }>(
-    '/social/viewer-replies',
-    {
-      schema: {
-        body: viewerRepliesBodySchema,
-        response: {
-          200: viewerRepliesResponseSchema,
+    app.post<{
+      Body: ViewerRepliesBody;
+    }>(
+      '/social/viewer-replies',
+      {
+        preHandler: app.verifyOwnerAuth,
+        schema: {
+          body: viewerRepliesBodySchema,
+          response: {
+            200: viewerRepliesResponseSchema,
+          },
         },
       },
-    },
-    async (request) => {
-      return service.getViewerReplies(request.body);
-    },
-  );
+      async (request) => {
+        return service.getViewerReplies(request.body);
+      },
+    );
+  }
 };

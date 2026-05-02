@@ -394,21 +394,21 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
         ...(options.ownerPubkey ? { ownerPubkey: options.ownerPubkey } : {}),
         eventIds: viewerReactionEventIds,
         service: options.service,
-        enabled: isOpen,
+        enabled: isOpen && options.canWrite,
     });
 
     const viewerZapQuery = useViewerZapsQuery({
         ...(options.ownerPubkey ? { ownerPubkey: options.ownerPubkey } : {}),
         eventIds: viewerReactionEventIds,
         service: options.service,
-        enabled: isOpen,
+        enabled: isOpen && options.canWrite,
     });
 
     const viewerReplyQuery = useViewerRepliesQuery({
         ...(options.ownerPubkey ? { ownerPubkey: options.ownerPubkey } : {}),
         eventIds: viewerReactionEventIds,
         service: options.service,
-        enabled: isOpen,
+        enabled: isOpen && options.canWrite,
     });
 
     useEffect(() => {

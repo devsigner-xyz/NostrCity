@@ -9,6 +9,7 @@ const landingEntry = fileURLToPath(new URL('./index.html', import.meta.url));
 const appEntry = fileURLToPath(new URL('./app/index.html', import.meta.url));
 
 export default defineConfig({
+  envPrefix: ['VITE_', 'NOSTR_CITY_PUBLIC_'],
   plugins: [createAppHistoryFallbackPlugin(), react(), tailwindcss()],
   server: {
     proxy: {

@@ -109,6 +109,7 @@ export function useDirectMessagesController(options: UseDirectMessagesController
     const hasLoadedInitialConversationsRef = useRef(false);
     const conversationBackfillCountRef = useRef<Record<string, number>>({});
     const retryingFailedClientMessageIdsRef = useRef(new Set<string>());
+    const failedPlaintextByClientMessageIdRef = useRef<Record<string, string>>({});
     const queryClient = useQueryClient();
 
     const storage = useMemo(() => {
@@ -156,6 +157,7 @@ export function useDirectMessagesController(options: UseDirectMessagesController
         setLastReadAtByConversation({});
         hasLoadedInitialConversationsRef.current = false;
         conversationBackfillCountRef.current = {};
+        failedPlaintextByClientMessageIdRef.current = {};
     }, [options.ownerPubkey]);
 
     useEffect(() => {
@@ -300,6 +302,7 @@ export function useDirectMessagesController(options: UseDirectMessagesController
                 const filtered = current.filter((message) => message.id !== context.optimisticId);
                 return mergeMessages(filtered, [normalized]);
             });
+            delete failedPlaintextByClientMessageIdRef.current[context.clientMessageId];
 
             if (options.ownerPubkey) {
                 const sentIndex = storage
@@ -314,7 +317,6 @@ export function useDirectMessagesController(options: UseDirectMessagesController
                     createdAtSec: normalizeToEpochSeconds(normalized.createdAt),
                     deliveryState: normalized.deliveryState,
                     targetRelays: [],
-                    plaintext: normalized.plaintext,
                 };
                 storage.setSentIndex(options.ownerPubkey, [nextIndex, ...sentIndex]);
             }
@@ -338,6 +340,7 @@ export function useDirectMessagesController(options: UseDirectMessagesController
             );
 
             if (options.ownerPubkey) {
+                failedPlaintextByClientMessageIdRef.current[context.clientMessageId] = input.plaintext;
                 const sentIndex = storage
                     .getSentIndex(options.ownerPubkey)
                     .filter((item) => item.clientMessageId !== context.clientMessageId);
@@ -348,7 +351,6 @@ export function useDirectMessagesController(options: UseDirectMessagesController
                         createdAtSec: normalizeToEpochSeconds(now()),
                         deliveryState: 'failed',
                         targetRelays: [],
-                        plaintext: input.plaintext,
                     },
                     ...sentIndex,
                 ]);
@@ -378,10 +380,17 @@ export function useDirectMessagesController(options: UseDirectMessagesController
             try {
                 const sentIndex = storage.getSentIndex(options.ownerPubkey!);
                 const failedItems = sentIndex
-                    .filter((item) => item.deliveryState === 'failed' && typeof item.plaintext === 'string' && item.plaintext.trim().length > 0)
+                    .flatMap((item) => {
+                        const plaintext = failedPlaintextByClientMessageIdRef.current[item.clientMessageId];
+                        if (item.deliveryState !== 'failed' || typeof plaintext !== 'string' || plaintext.trim().length === 0) {
+                            return [];
+                        }
+
+                        return [{ item, plaintext }];
+                    })
                     .slice(0, MAX_FAILED_RETRIES_PER_TICK);
 
-                for (const item of failedItems) {
+                for (const { item, plaintext } of failedItems) {
                     if (cancelled) {
                         break;
                     }
@@ -395,7 +404,7 @@ export function useDirectMessagesController(options: UseDirectMessagesController
                         await retryMutateAsyncRef.current({
                             ownerPubkey: options.ownerPubkey!,
                             peerPubkey: item.conversationId,
-                            plaintext: item.plaintext!,
+                            plaintext,
                             clientMessageId: item.clientMessageId,
                         });
                     } catch {
@@ -418,6 +427,7 @@ export function useDirectMessagesController(options: UseDirectMessagesController
             cancelled = true;
             window.clearInterval(timer);
             retryingFailedClientMessageIdsRef.current.clear();
+            failedPlaintextByClientMessageIdRef.current = {};
         };
     }, [failedRetryIntervalMs, isEnabled, now, options.dmService.sendDm, options.ownerPubkey, storage]);
 
