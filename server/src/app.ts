@@ -7,6 +7,8 @@ import { contentRoutes } from './modules/content/content.routes';
 import type { ContentService } from './modules/content/content.service';
 import { graphRoutes } from './modules/graph/graph.routes';
 import type { GraphService } from './modules/graph/graph.service';
+import { groupsRoutes } from './modules/groups/groups.routes';
+import type { GroupsService } from './modules/groups/groups.service';
 import { identityRoutes } from './modules/identity/identity.routes';
 import type { IdentityService } from './modules/identity/identity.service';
 import { dmRoutes } from './modules/dm/dm.routes';
@@ -35,6 +37,7 @@ import { createAppServices } from './services/app-services';
 export interface BuildAppOptions {
   identityService?: IdentityService;
   graphService?: GraphService;
+  groupsService?: GroupsService;
   contentService?: ContentService;
   socialService?: SocialService;
   notificationsService?: NotificationsService;
@@ -90,6 +93,10 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
   app.register(graphRoutes, {
     prefix: '/v1',
     service: options.graphService ?? defaultServices.graphService,
+  });
+  app.register(groupsRoutes, {
+    prefix: '/v1',
+    service: options.groupsService ?? defaultServices.groupsService,
   });
   app.register(contentRoutes, {
     prefix: '/v1',

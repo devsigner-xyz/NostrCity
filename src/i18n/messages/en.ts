@@ -792,6 +792,8 @@ export const enMessages = {
     'groups.sync.aria': 'Sync public relays',
     'groups.join.action': 'Join group',
     'groups.join.aria': 'Join {{name}}',
+    'groups.joined.action': 'Joined',
+    'groups.joined.aria': 'Joined {{name}}',
     'groups.leave.action': 'Leave group',
     'groups.leave.aria': 'Leave {{name}}',
     'groups.timeline.title': 'Recent messages',

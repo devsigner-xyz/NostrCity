@@ -790,6 +790,8 @@ export const esMessages = {
     'groups.sync.aria': 'Sincronizar relays públicos',
     'groups.join.action': 'Unirse al grupo',
     'groups.join.aria': 'Unirse a {{name}}',
+    'groups.joined.action': 'Unido',
+    'groups.joined.aria': 'Unido a {{name}}',
     'groups.leave.action': 'Salir del grupo',
     'groups.leave.aria': 'Salir de {{name}}',
     'groups.timeline.title': 'Mensajes recientes',

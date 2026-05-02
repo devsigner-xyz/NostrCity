@@ -68,6 +68,7 @@ export function GroupDetail({
     const actionDescription = disabledReason;
     const textareaId = `group-message-${group.id}`;
     const textareaDescriptionId = `${textareaId}-description`;
+    const isJoined = Boolean(group.isSaved || group.isRemembered);
 
     const handlePublish = (): void => {
         if (!canWrite) {
@@ -115,6 +116,17 @@ export function GroupDetail({
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant={isJoined ? 'secondary' : 'default'}
+                                size="sm"
+                                disabled={isJoined || !canWrite}
+                                title={!isJoined ? disabledReason ?? undefined : undefined}
+                                aria-label={isJoined ? t('groups.joined.aria', { name: group.name }) : t('groups.join.aria', { name: group.name })}
+                                onClick={handleJoin}
+                            >
+                                {isJoined ? t('groups.joined.action') : t('groups.join.action')}
+                            </Button>
                             <Badge variant="secondary" className="w-fit">
                                 {group.memberCount === 1
                                     ? t('groups.members.one')
@@ -140,9 +152,6 @@ export function GroupDetail({
                                     </DropdownMenuGroup>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuGroup>
-                                        <DropdownMenuItem disabled={!canWrite} onSelect={handleJoin} aria-label={t('groups.join.aria', { name: group.name })}>
-                                            {t('groups.join.action')}
-                                        </DropdownMenuItem>
                                         <DropdownMenuItem disabled={!canWrite} onSelect={handleLeave} aria-label={t('groups.leave.aria', { name: group.name })}>
                                             {t('groups.leave.action')}
                                         </DropdownMenuItem>

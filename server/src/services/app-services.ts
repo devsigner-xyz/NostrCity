@@ -3,6 +3,7 @@ import { SimplePool } from 'nostr-tools';
 import { createContentService, type ContentService } from '../modules/content/content.service';
 import { createDmService, type DmService } from '../modules/dm/dm.service';
 import { createGraphService, type GraphService } from '../modules/graph/graph.service';
+import { createGroupsService, type GroupsService } from '../modules/groups/groups.service';
 import { createIdentityService, type IdentityService } from '../modules/identity/identity.service';
 import {
   createNotificationsService,
@@ -24,6 +25,7 @@ export interface AppServices {
   relayQueryExecutor: RelayQueryExecutor;
   identityService: IdentityService;
   graphService: GraphService;
+  groupsService: GroupsService;
   contentService: ContentService;
   socialService: SocialService;
   notificationsService: NotificationsService;
@@ -47,6 +49,7 @@ export const createAppServices = (options: CreateAppServicesOptions = {}): AppSe
     relayQueryExecutor,
     identityService: createIdentityService({ pool, bootstrapRelays }),
     graphService: createGraphService({ pool, bootstrapRelays, relayQueryExecutor }),
+    groupsService: createGroupsService({ pool }),
     contentService: createContentService({ pool, bootstrapRelays, relayQueryExecutor }),
     socialService: createSocialService({ pool, bootstrapRelays }),
     notificationsService: createNotificationsService({ pool, bootstrapRelays, relayQueryExecutor }),

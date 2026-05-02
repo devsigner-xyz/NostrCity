@@ -25,6 +25,8 @@ Cuando hay relays configurados, Nostr City muestra la información que cada rela
 - Número de miembros cuando el relay publica una lista `kind:39002` accesible.
 - Mensajes recientes `kind:9` etiquetados con `h` para ese grupo.
 
+Para acelerar el descubrimiento, la app puede pedir la metadata pública `kind:39000` a través del BFF de Nostr City. Esa consulta no incluye tu clave pública, tus grupos recordados, tus relays configurados como lista personal ni códigos de invitación; solo envía el relay que quieres explorar.
+
 Nostr City solo trata como metadata de grupo confiable la metadata NIP-29 `kind:39000` firmada por la clave `self` que el relay anuncia en su información NIP-11. Si un relay real tiene NIP-11 ausente o roto, la app puede mostrar metadata `kind:39000` con firma válida como **no verificada**, pero no confía en listas de administradores, miembros o roles (`kind:39001`, `kind:39002`, `kind:39003`) sin `self` verificable. Algunos grupos pueden ser privados, restringidos, ocultos o cerrados. En esos casos, la app puede mostrar menos datos o no poder publicar aunque tengas una identidad válida.
 
 También puedes explorar grupos desde el detalle de un relay de grupos en `/relays`. Esa vista lista los grupos anunciados por ese relay y, al abrir uno, enlaza con `/groups?relay=...&group=...`. Si el grupo está entre los grupos cargados, queda seleccionado directamente.

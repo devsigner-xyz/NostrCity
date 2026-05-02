@@ -45,12 +45,59 @@ function createClient(events: NostrEvent[]): NostrClient & { fetchEvents: Return
 }
 
 describe('fetchRelayGroupsForRelay', () => {
+    test('fetches group summaries through the BFF without user identity context', async () => {
+        const fetchFn = vi.fn(async (_input: RequestInfo | URL) => new Response(JSON.stringify({
+            relay: 'wss://groups.example',
+            verifiedRelaySelf: true,
+            groups: [
+                {
+                    relay: 'wss://groups.example',
+                    id: 'maps',
+                    name: 'Map makers',
+                    description: 'Cities and transit.',
+                    private: false,
+                    restricted: false,
+                    hidden: false,
+                    closed: false,
+                    metadataVerified: true,
+                },
+            ],
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        }));
+        const fetchRelayInfo = vi.fn(async () => ({ self: SELF_PUBKEY }));
+        const client = createClient([]);
+
+        await expect(fetchRelayGroupsForRelay({
+            relayUrl: 'wss://groups.example',
+            fetch: fetchFn,
+            fetchRelayInfo,
+            createClient: () => client,
+        })).resolves.toEqual([
+            {
+                relay: 'wss://groups.example',
+                id: 'maps',
+                name: 'Map makers',
+                description: 'Cities and transit.',
+            },
+        ]);
+
+        const requestedUrl = String(fetchFn.mock.calls[0]?.[0]);
+        expect(requestedUrl).toBe('/v1/groups/relay-groups?relay=wss%3A%2F%2Fgroups.example');
+        expect(requestedUrl).not.toContain('ownerPubkey');
+        expect(requestedUrl).not.toContain('code=');
+        expect(fetchRelayInfo).not.toHaveBeenCalled();
+        expect(client.connect).not.toHaveBeenCalled();
+    });
+
     test('fetches kind 39000 from one relay using NIP-11 self as author', async () => {
         const client = createClient([signedMetadataEvent({ id: 'maps', name: 'Map makers', about: 'Cities and transit.' })]);
         const fetchRelayInfo = vi.fn(async () => ({ self: SELF_PUBKEY }));
 
         await expect(fetchRelayGroupsForRelay({
             relayUrl: 'wss://groups.example',
+            fetch: vi.fn(async () => { throw new Error('bff down'); }),
             fetchRelayInfo,
             createClient: () => client,
         })).resolves.toEqual([
@@ -77,6 +124,7 @@ describe('fetchRelayGroupsForRelay', () => {
 
         await expect(fetchRelayGroupsForRelay({
             relayUrl: 'wss://groups.example',
+            fetch: vi.fn(async () => { throw new Error('bff down'); }),
             fetchRelayInfo: async () => ({ self: SELF_PUBKEY }),
             createClient: () => client,
         })).resolves.toEqual([
@@ -96,6 +144,7 @@ describe('fetchRelayGroupsForRelay', () => {
 
         await expect(fetchRelayGroupsForRelay({
             relayUrl: 'wss://groups.example',
+            fetch: vi.fn(async () => { throw new Error('bff down'); }),
             fetchRelayInfo: async () => ({ self: 'not-a-hex-key' }),
             createClient: () => client,
         })).resolves.toEqual([

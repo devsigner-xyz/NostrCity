@@ -349,6 +349,27 @@ describe('GroupsPage', () => {
         expect(detail?.textContent || '').not.toContain('About group');
     });
 
+    test('renders join state as the primary group detail action without duplicating join in the menu', async () => {
+        const onJoinGroup = vi.fn();
+        const joined = await renderElement(page({ onJoinGroup }));
+        mounted.push(joined);
+
+        expect(joined.container.querySelector('button[aria-label="Unido a City Gardeners"]')?.textContent).toBe('Unido');
+        await openGroupActions(joined.container);
+        expect(document.body.querySelector('[aria-label="Unirse a City Gardeners"]')).toBeNull();
+
+        const other = await renderElement(page({ selectedGroupId: "wss://relay.example'artists", onJoinGroup }));
+        mounted.push(other);
+
+        const joinButton = other.container.querySelector('button[aria-label="Unirse a Street Artists"]');
+        expect(joinButton?.textContent).toBe('Unirse al grupo');
+        await act(async () => {
+            joinButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onJoinGroup).toHaveBeenCalledWith("wss://relay.example'artists");
+    });
+
     test('renders relay-first controls, group status labels, and invite parsing feedback', async () => {
         const onSelectRelay = vi.fn();
         const onAddCustomGroupRelay = vi.fn();
@@ -416,9 +437,10 @@ describe('GroupsPage', () => {
         expect(readonly.container.textContent || '').toContain('Inicia sesión con una cuenta que pueda firmar para publicar en grupos.');
         expect(readonly.container.querySelector('textarea')?.disabled).toBe(true);
         expect(readonly.container.querySelector('button[aria-label="Publicar mensaje en City Gardeners"]')?.hasAttribute('disabled')).toBe(true);
+        expect(readonly.container.querySelector('button[aria-label="Unido a City Gardeners"]')?.hasAttribute('disabled')).toBe(true);
         await openGroupActions(readonly.container);
         expect(document.body.querySelector('[aria-label="Guardar City Gardeners"]')?.getAttribute('aria-disabled')).toBe('true');
-        expect(document.body.querySelector('[aria-label="Unirse a City Gardeners"]')?.getAttribute('aria-disabled')).toBe('true');
+        expect(document.body.querySelector('[aria-label="Unirse a City Gardeners"]')).toBeNull();
         expect(document.body.querySelector('[aria-label="Salir de City Gardeners"]')?.getAttribute('aria-disabled')).toBe('true');
 
         const locked = await renderElement(page({ session: session({ method: 'local', locked: true }) }));
@@ -516,29 +538,29 @@ describe('GroupsPage', () => {
     test('calls join and leave handlers only when the session can write', async () => {
         const onJoinGroup = vi.fn();
         const onLeaveGroup = vi.fn();
-        const writable = await renderElement(page({ onJoinGroup, onLeaveGroup }));
+        const writable = await renderElement(page({ selectedGroupId: "wss://relay.example'artists", onJoinGroup, onLeaveGroup }));
         mounted.push(writable);
 
-        await openGroupActions(writable.container);
-        await clickElement(document.body.querySelector('[aria-label="Unirse a City Gardeners"]'));
-        await openGroupActions(writable.container);
-        await clickElement(document.body.querySelector('[aria-label="Salir de City Gardeners"]'));
+        await clickElement(writable.container.querySelector('[aria-label="Unirse a Street Artists"]'));
+        await openGroupActions(writable.container, 'Street Artists');
+        await clickElement(document.body.querySelector('[aria-label="Salir de Street Artists"]'));
 
-        expect(onJoinGroup).toHaveBeenCalledWith("wss://relay.example'gardeners");
-        expect(onLeaveGroup).toHaveBeenCalledWith("wss://relay.example'gardeners");
+        expect(onJoinGroup).toHaveBeenCalledWith("wss://relay.example'artists");
+        expect(onLeaveGroup).toHaveBeenCalledWith("wss://relay.example'artists");
 
         const blockedJoin = vi.fn();
         const blockedLeave = vi.fn();
         const blocked = await renderElement(page({
+            selectedGroupId: "wss://relay.example'artists",
             session: session({ method: 'npub', readonly: true, capabilities: { canSign: false, canEncrypt: false, encryptionSchemes: [] } }),
             onJoinGroup: blockedJoin,
             onLeaveGroup: blockedLeave,
         }));
         mounted.push(blocked);
 
-        await openGroupActions(blocked.container);
-        await clickElement(document.body.querySelector('[aria-label="Unirse a City Gardeners"]'));
-        await clickElement(document.body.querySelector('[aria-label="Salir de City Gardeners"]'));
+        await clickElement(blocked.container.querySelector('[aria-label="Unirse a Street Artists"]'));
+        await openGroupActions(blocked.container, 'Street Artists');
+        await clickElement(document.body.querySelector('[aria-label="Salir de Street Artists"]'));
 
         expect(blockedJoin).not.toHaveBeenCalled();
         expect(blockedLeave).not.toHaveBeenCalled();

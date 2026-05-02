@@ -23,6 +23,7 @@ export type RelayGroupsState =
 
 interface FetchRelayGroupsForRelayInput {
     relayUrl: string;
+    fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
     fetchRelayInfo?: (relayUrl: string) => Promise<GroupRelayInfo>;
     createClient?: (relayUrls: string[]) => NostrClient;
     verifyEvent?: (event: NostrEvent) => boolean;
@@ -82,7 +83,48 @@ function dedupeGroups(groups: RelayGroupSummary[]): RelayGroupSummary[] {
     return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));
 }
 
-export async function fetchRelayGroupsForRelay(input: FetchRelayGroupsForRelayInput): Promise<RelayGroupSummary[]> {
+async function fetchRelayGroupsFromBff(input: FetchRelayGroupsForRelayInput): Promise<RelayGroupSummary[]> {
+    const fetchFn = input.fetch ?? globalThis.fetch;
+    if (typeof fetchFn !== 'function') {
+        throw new Error('BFF fetch is unavailable');
+    }
+
+    const response = await fetchFn(`/v1/groups/relay-groups?relay=${encodeURIComponent(input.relayUrl)}`);
+    if (!response.ok) {
+        throw new Error('BFF group discovery failed');
+    }
+
+    const payload = await response.json() as { groups?: unknown };
+    if (!Array.isArray(payload.groups)) {
+        throw new Error('BFF group discovery response is invalid');
+    }
+
+    return dedupeGroups(payload.groups.flatMap((group) => {
+        if (!group || typeof group !== 'object') {
+            return [];
+        }
+
+        const value = group as { relay?: unknown; id?: unknown; name?: unknown; description?: unknown };
+        if (typeof value.relay !== 'string' || typeof value.id !== 'string') {
+            return [];
+        }
+
+        const summary: RelayGroupSummary = {
+            relay: value.relay,
+            id: value.id,
+        };
+        if (typeof value.name === 'string' && value.name.length > 0) {
+            summary.name = value.name;
+        }
+        if (typeof value.description === 'string' && value.description.length > 0) {
+            summary.description = value.description;
+        }
+
+        return [summary];
+    }));
+}
+
+async function fetchRelayGroupsDirect(input: FetchRelayGroupsForRelayInput): Promise<RelayGroupSummary[]> {
     const relayInfo = await (input.fetchRelayInfo ?? fetchNip11RelayInfo)(input.relayUrl);
     const self = relayInfo.self;
     const client = (input.createClient ?? ((relayUrls: string[]) => createLazyNdkClient({ relays: relayUrls })))([input.relayUrl]);
@@ -102,6 +144,14 @@ export async function fetchRelayGroupsForRelay(input: FetchRelayGroupsForRelayIn
         const summary = toRelayGroupSummary(input.relayUrl, event);
         return summary ? [summary] : [];
     }));
+}
+
+export async function fetchRelayGroupsForRelay(input: FetchRelayGroupsForRelayInput): Promise<RelayGroupSummary[]> {
+    try {
+        return await fetchRelayGroupsFromBff(input);
+    } catch {
+        return fetchRelayGroupsDirect(input);
+    }
 }
 
 export function useRelayGroupsByRelayQuery(input: UseRelayGroupsByRelayQueryInput): RelayGroupsState {
