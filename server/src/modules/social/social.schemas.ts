@@ -10,6 +10,7 @@ export interface ArticlesFeedQuery {
   limit: number;
   until: number;
   hashtag?: string;
+  hashtags?: string;
 }
 
 export interface ArticleParams {
@@ -142,6 +143,11 @@ export const followingFeedQuerySchema = {
       type: 'string',
       minLength: 1,
       maxLength: 64,
+    },
+    hashtags: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 512,
     },
   },
 } as const;

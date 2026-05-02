@@ -282,7 +282,7 @@ describe('social-feed-runtime-service', () => {
 
         const page = await service.loadArticlesFeed({
             authors: [FOLLOW_A, FOLLOW_B],
-            hashtag: '#Maps',
+            hashtags: ['#Maps', 'nostr'],
             limit: 10,
         });
 
@@ -291,7 +291,7 @@ describe('social-feed-runtime-service', () => {
             expect.objectContaining({
                 authors: [FOLLOW_A, FOLLOW_B],
                 kinds: [LONG_FORM_ARTICLE_KIND],
-                '#t': ['maps'],
+                '#t': ['maps', 'nostr'],
             }),
         ]);
     });

@@ -121,30 +121,38 @@ describe('ArticlesSurface', () => {
         expect(buttons.find((button) => button.textContent === 'Cargar mas')).toBeUndefined();
     });
 
-    test('renders article category filters and calls selection actions', async () => {
-        const onSelectHashtag = vi.fn();
+    test('renders article category multi-select and calls selection actions', async () => {
+        const onSelectedHashtagsChange = vi.fn();
         const onClearHashtag = vi.fn();
         const rendered = await renderElement(surface({
             items: [articleItem('article-1')],
-            activeHashtag: 'nostr',
-            onSelectHashtag,
+            activeHashtags: ['nostr'],
+            onSelectedHashtagsChange,
             onClearHashtag,
         }));
         mounted.push(rendered);
 
         expect(rendered.container.textContent).toContain('Lecturas largas etiquetadas con #nostr');
-        expect(rendered.container.querySelector('[aria-label="Filtros de categoría de artículos"]')).not.toBeNull();
+        expect(rendered.container.textContent).toContain('Seleccionar categorías de artículos');
+        expect(rendered.container.querySelector('[aria-label="Filtros de categoría de artículos"]')).toBeNull();
 
+        const categorySelect = rendered.container.querySelector('[data-testid="articles-category-select"]') as HTMLSelectElement | null;
         const buttons = Array.from(rendered.container.querySelectorAll('button'));
-        const mapsFilter = buttons.find((button) => button.textContent === 'maps');
         const clearFilter = buttons.find((button) => button.textContent === 'Quitar filtro');
 
+        expect(categorySelect?.multiple).toBe(true);
+
+        const mapsOption = Array.from(categorySelect?.options ?? []).find((option) => option.value === 'maps');
+        if (mapsOption) {
+            mapsOption.selected = true;
+        }
+
         await act(async () => {
-            mapsFilter?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            categorySelect?.dispatchEvent(new Event('change', { bubbles: true }));
             clearFilter?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        expect(onSelectHashtag).toHaveBeenCalledWith('maps');
+        expect(onSelectedHashtagsChange).toHaveBeenCalledWith(['maps', 'nostr']);
         expect(onClearHashtag).toHaveBeenCalledTimes(1);
     });
 

@@ -99,6 +99,24 @@ const dedupeById = (events: NostrEventLike[]): NostrEventLike[] => {
   return [...map.values()];
 };
 
+const normalizeHashtags = (values: Array<string | undefined>): string[] => {
+  const hashtags = new Set<string>();
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+
+    for (const part of value.split(',')) {
+      const hashtag = part.trim().replace(/^#+/, '').toLowerCase();
+      if (hashtag.length > 0) {
+        hashtags.add(hashtag);
+      }
+    }
+  }
+
+  return [...hashtags].sort((left, right) => left.localeCompare(right));
+};
+
 const parseFollowsFromContactList = (event: NostrEventLike | undefined): string[] => {
   if (!event) {
     return [];
@@ -420,8 +438,9 @@ class GatewaySocialService implements SocialService {
   }
 
   async getArticlesFeed(query: ArticlesFeedQuery): Promise<FollowingFeedResponseDto> {
+    const hashtags = normalizeHashtags([query.hashtag, query.hashtags]);
     return this.articlesFeedGateway.query({
-      key: `social:articles:${query.ownerPubkey}:${query.limit}:${query.until}:${query.hashtag ?? ''}`,
+      key: `social:articles:${query.ownerPubkey}:${query.limit}:${query.until}:${hashtags.join(',')}`,
       params: query,
     });
   }
@@ -658,8 +677,9 @@ const createPoolFetchers = (options: {
         limit: query.limit + 1,
       };
 
-      if (query.hashtag) {
-        filter['#t'] = [query.hashtag.toLowerCase()];
+      const hashtags = normalizeHashtags([query.hashtag, query.hashtags]);
+      if (hashtags.length > 0) {
+        filter['#t'] = hashtags;
       }
 
       const events = await options.pool.querySync(relays, filter);

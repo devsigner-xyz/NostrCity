@@ -145,6 +145,8 @@ describe('WalletPage', () => {
         expect(rendered.container.textContent || '').toContain('Conectada por WebLN');
         expect(rendered.container.textContent || '').toContain('Refrescar');
         expect(rendered.container.textContent || '').toContain('Desconectar');
+        expect(rendered.container.textContent || '').not.toContain('Conectar wallet');
+        expect(rendered.container.querySelector('input[aria-label="URI NWC"]')).toBeNull();
         expect(rendered.container.textContent || '').toContain('21 sats');
         expect(rendered.container.textContent || '').toContain('Configurar zaps');
         expect(rendered.container.querySelector('input[aria-label="Cantidad por defecto de zap"]')).not.toBeNull();

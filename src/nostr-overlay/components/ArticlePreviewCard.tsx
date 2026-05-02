@@ -17,7 +17,6 @@ interface ArticlePreviewCardProps {
     authorLabel?: string;
     compact?: boolean;
     onOpenArticle?: (eventId: string) => void;
-    onSelectHashtag?: (hashtag: string) => void;
 }
 
 function formatPublishedDate(createdAt: number, publishedAt: number | undefined): string {
@@ -29,7 +28,7 @@ function formatPublishedDate(createdAt: number, publishedAt: number | undefined)
     return new Date(timestamp * 1000).toLocaleDateString();
 }
 
-export function ArticlePreviewCard({ event, authorLabel, compact = false, onOpenArticle, onSelectHashtag }: ArticlePreviewCardProps) {
+export function ArticlePreviewCard({ event, authorLabel, compact = false, onOpenArticle }: ArticlePreviewCardProps) {
     const { t } = useI18n();
     const metadata = parseArticleMetadata(event);
     const title = metadata.title ?? t('articles.untitled');
@@ -58,13 +57,7 @@ export function ArticlePreviewCard({ event, authorLabel, compact = false, onOpen
                 {metadata.topics.length > 0 ? (
                     <div className="flex flex-wrap gap-2" aria-label={t('articles.title')}>
                         {metadata.topics.map((topic) => (
-                            onSelectHashtag ? (
-                                <button key={topic} type="button" onClick={() => onSelectHashtag(topic)}>
-                                    <Badge variant="secondary">{topic}</Badge>
-                                </button>
-                            ) : (
-                                <Badge key={topic} variant="secondary">{topic}</Badge>
-                            )
+                            <Badge key={topic} variant="secondary">{topic}</Badge>
                         ))}
                     </div>
                 ) : null}

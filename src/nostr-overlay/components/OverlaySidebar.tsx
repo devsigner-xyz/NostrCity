@@ -762,7 +762,9 @@ export function OverlaySidebar({
                 <SidebarCollapsedTrigger />
                 <SidebarContent />
                 <SidebarFooter className="pt-0">
-                    <SidebarSocialContent>{children}</SidebarSocialContent>
+                    <SidebarGroup className="pt-1 pb-0">
+                        <SidebarSocialContent>{children}</SidebarSocialContent>
+                    </SidebarGroup>
                     <SidebarActionsMenu
                         isReadonlySession={Boolean(authSession?.readonly)}
                         canAccessDirectMessages={canAccessDirectMessages}

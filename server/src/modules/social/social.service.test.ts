@@ -186,7 +186,7 @@ describe('social service pagination', () => {
     );
   });
 
-  it('filters articles by hashtag when requested', async () => {
+  it('filters articles by multiple hashtags when requested', async () => {
     const pool = {
       querySync: vi.fn(async (_relays: string[], filter: Record<string, unknown>) => {
         if (Array.isArray(filter.kinds) && filter.kinds[0] === 3) {
@@ -215,13 +215,13 @@ describe('social service pagination', () => {
       ownerPubkey: OWNER,
       limit: 2,
       until: 999,
-      hashtag: 'Maps',
+      hashtags: 'Maps,nostr',
     });
 
     expect(pool.querySync).toHaveBeenLastCalledWith(
       ['wss://relay.damus.io'],
       expect.objectContaining({
-        '#t': ['maps'],
+        '#t': ['maps', 'nostr'],
       }),
     );
   });

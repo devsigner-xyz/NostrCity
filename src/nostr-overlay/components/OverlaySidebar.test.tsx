@@ -251,6 +251,7 @@ describe('OverlaySidebar', () => {
 
         expect(socialChild).not.toBeNull();
         expect(socialChild?.closest('[data-slot="sidebar-footer"]')).not.toBeNull();
+        expect(socialChild?.closest('[data-slot="sidebar-group"]')?.className).toContain('pt-1');
         expect(socialChild?.closest('[data-slot="sidebar-content"]')).toBeNull();
     });
 

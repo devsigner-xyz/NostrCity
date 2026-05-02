@@ -175,7 +175,7 @@ describe('social routes', () => {
   it('returns articles feed envelope for valid query', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: `/v1/social/feed/articles?ownerPubkey=${VALID_PUBKEY}&limit=20&until=1719000000&hashtag=nostr`,
+      url: `/v1/social/feed/articles?ownerPubkey=${VALID_PUBKEY}&limit=20&until=1719000000&hashtags=nostr,maps`,
     });
 
     expect(response.statusCode).toBe(200);

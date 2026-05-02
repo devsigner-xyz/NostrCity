@@ -3,7 +3,6 @@ import type { NostrProfile } from '../../nostr/types';
 import type { AgoraFeedLayout } from '../../nostr/ui-settings';
 import { parseArticleMetadata } from '../../nostr/articles';
 import { useI18n } from '@/i18n/useI18n';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
@@ -22,14 +21,14 @@ interface ArticlesSurfaceProps {
     isLoadingMore: boolean;
     error: string | null;
     hasMore: boolean;
-    activeHashtag?: string;
+    activeHashtags?: string[];
     agoraFeedLayout?: AgoraFeedLayout;
     isMobile?: boolean;
     onAgoraFeedLayoutChange?: (layout: AgoraFeedLayout) => void;
     onRefresh: () => Promise<void> | void;
     onLoadMore: () => Promise<void> | void;
     onOpenArticle: (eventId: string) => void;
-    onSelectHashtag?: (hashtag: string) => void;
+    onSelectedHashtagsChange?: (hashtags: string[]) => void;
     onClearHashtag?: () => void;
 }
 
@@ -57,18 +56,30 @@ export function ArticlesSurface({
     isLoadingMore,
     error,
     hasMore,
-    activeHashtag,
+    activeHashtags = [],
     agoraFeedLayout = 'list',
     isMobile = false,
     onAgoraFeedLayoutChange,
     onRefresh,
     onLoadMore,
     onOpenArticle,
-    onSelectHashtag,
+    onSelectedHashtagsChange,
     onClearHashtag,
 }: ArticlesSurfaceProps) {
     const { t } = useI18n();
     const topics = topicsFromArticles(items);
+    const selectedTopics = [...new Set(activeHashtags)].sort((left, right) => left.localeCompare(right));
+    const hasSelectedTopics = selectedTopics.length > 0;
+
+    const selectTopics = (select: HTMLSelectElement): void => {
+        if (!onSelectedHashtagsChange) {
+            return;
+        }
+
+        onSelectedHashtagsChange(Array.from(select.selectedOptions)
+            .map((option) => option.value)
+            .sort((left, right) => left.localeCompare(right)));
+    };
 
     const onScroll = (container: HTMLDivElement | null): void => {
         if (!container || isLoading || isRefreshing || isLoadingMore || !hasMore) {
@@ -89,7 +100,7 @@ export function ArticlesSurface({
             >
                 <OverlayPageHeader
                     title={t('articles.title')}
-                    description={activeHashtag ? t('articles.subtitle.hashtag', { hashtag: activeHashtag }) : t('articles.subtitle')}
+                    description={hasSelectedTopics ? t('articles.subtitle.categories', { hashtags: selectedTopics.map((topic) => `#${topic}`).join(', ') }) : t('articles.subtitle')}
                     actions={(
                         <>
                             {onAgoraFeedLayoutChange ? (
@@ -123,7 +134,7 @@ export function ArticlesSurface({
                             >
                                 {isRefreshing ? t('articles.refreshing') : t('articles.refresh')}
                             </Button>
-                            {activeHashtag && onClearHashtag ? (
+                            {hasSelectedTopics && onClearHashtag ? (
                                 <Button type="button" variant="outline" size="sm" onClick={onClearHashtag}>
                                     {t('articles.clearFilter')}
                                 </Button>
@@ -132,17 +143,22 @@ export function ArticlesSurface({
                     )}
                 />
 
-                {topics.length > 0 && onSelectHashtag ? (
-                    <div className="flex flex-wrap items-center gap-2" aria-label={t('articles.categoryFilters')}>
-                        {topics.map((topic) => {
-                            const isActive = topic === activeHashtag;
-                            return (
-                                <button key={topic} type="button" onClick={() => onSelectHashtag(topic)}>
-                                    <Badge variant={isActive ? 'default' : 'secondary'}>{topic}</Badge>
-                                </button>
-                            );
-                        })}
-                    </div>
+                {topics.length > 0 && onSelectedHashtagsChange ? (
+                    <label className="flex max-w-[320px] flex-col gap-2 text-sm font-medium text-foreground">
+                        {t('articles.categorySelectLabel')}
+                        <select
+                            multiple
+                            size={Math.min(4, Math.max(2, topics.length))}
+                            value={selectedTopics}
+                            className="min-h-20 rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                            data-testid="articles-category-select"
+                            onChange={(event) => selectTopics(event.currentTarget)}
+                        >
+                            {topics.map((topic) => (
+                                <option key={topic} value={topic}>{topic}</option>
+                            ))}
+                        </select>
+                    </label>
                 ) : null}
 
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
@@ -179,7 +195,6 @@ export function ArticlesSurface({
                                         event={item.rawEvent}
                                         authorLabel={profileLabel(item.pubkey, profilesByPubkey[item.pubkey])}
                                         onOpenArticle={onOpenArticle}
-                                        {...(onSelectHashtag ? { onSelectHashtag } : {})}
                                     />
                                 </div>
                             ))}

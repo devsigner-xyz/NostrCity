@@ -5,7 +5,7 @@ import { useArticlesFeedInfiniteQuery } from '../query/following-feed.query';
 interface UseOverlayArticlesControllerOptions {
     ownerPubkey?: string;
     follows: string[];
-    activeHashtag?: string;
+    activeHashtags?: string[];
     isArticlesRoute: boolean;
     service: SocialFeedService;
     pageSize?: number;
@@ -16,7 +16,7 @@ export function useOverlayArticlesController(options: UseOverlayArticlesControll
     const query = useArticlesFeedInfiniteQuery({
         ...(options.ownerPubkey ? { ownerPubkey: options.ownerPubkey } : {}),
         follows: options.follows,
-        ...(options.activeHashtag ? { hashtag: options.activeHashtag } : {}),
+        ...(options.activeHashtags && options.activeHashtags.length > 0 ? { hashtags: options.activeHashtags } : {}),
         service: options.service,
         enabled: canAccessArticles && options.isArticlesRoute,
         pageSize: options.pageSize ?? 10,

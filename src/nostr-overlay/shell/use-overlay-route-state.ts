@@ -21,12 +21,16 @@ function activeAgoraHashtagFromLocation(pathname: string, search: string): strin
     return normalizeHashtag(new URLSearchParams(search).get('tag'));
 }
 
-function activeArticlesHashtagFromLocation(pathname: string, search: string): string | undefined {
+function activeArticlesHashtagsFromLocation(pathname: string, search: string): string[] {
     if (pathname !== '/agora/articles') {
-        return undefined;
+        return [];
     }
 
-    return normalizeHashtag(new URLSearchParams(search).get('tag'));
+    return [...new Set(new URLSearchParams(search)
+        .getAll('tag')
+        .map((tag) => normalizeHashtag(tag))
+        .filter((tag): tag is string => Boolean(tag)))]
+        .sort((left, right) => left.localeCompare(right));
 }
 
 function hasRouteReturnState(state: ReturnType<typeof routeReturnStateFromUnknown>): boolean {
@@ -47,7 +51,7 @@ export function useOverlayRouteState() {
     const [isUiSettingsDialogOpen, setIsUiSettingsDialogOpen] = useState(false);
 
     const activeAgoraHashtag = activeAgoraHashtagFromLocation(location.pathname, location.search);
-    const activeArticlesHashtag = activeArticlesHashtagFromLocation(location.pathname, location.search);
+    const activeArticlesHashtags = activeArticlesHashtagsFromLocation(location.pathname, location.search);
     const activeAgoraNoteEventId = noteDetailEventIdFromPathname(location.pathname);
     const activeSettingsView = settingsViewFromPathname(location.pathname);
 
@@ -122,7 +126,7 @@ export function useOverlayRouteState() {
         navigate,
         location,
         activeAgoraHashtag,
-        activeArticlesHashtag,
+        activeArticlesHashtags,
         activeAgoraNoteEventId,
         activeSettingsView,
         isMapRoute,

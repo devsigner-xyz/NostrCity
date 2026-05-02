@@ -212,7 +212,7 @@ export function createSocialFeedApiService(options: CreateSocialFeedApiServiceOp
                     ownerPubkey,
                     limit: input.limit ?? 20,
                     until: input.until ?? now(),
-                    ...(input.hashtag ? { hashtag: input.hashtag } : {}),
+                    ...(input.hashtags && input.hashtags.length > 0 ? { hashtags: input.hashtags.join(',') } : {}),
                 },
             });
 

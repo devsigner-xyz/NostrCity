@@ -118,7 +118,7 @@ export function App({ mapBridge, services }: AppProps) {
         navigate,
         location,
         activeAgoraHashtag,
-        activeArticlesHashtag,
+        activeArticlesHashtags,
         activeAgoraNoteEventId,
         isMapRoute,
         isAgoraRoute,
@@ -390,7 +390,7 @@ export function App({ mapBridge, services }: AppProps) {
     const articles = useOverlayArticlesController({
         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
         follows: overlay.follows,
-        ...(activeArticlesHashtag ? { activeHashtag: activeArticlesHashtag } : {}),
+        ...(activeArticlesHashtags.length > 0 ? { activeHashtags: activeArticlesHashtags } : {}),
         isArticlesRoute: isArticlesRoute || isArticleDetailRoute,
         service: overlay.socialFeedService,
     });
@@ -735,13 +735,23 @@ export function App({ mapBridge, services }: AppProps) {
         navigate(`/agora?tag=${encodeURIComponent(normalized)}`);
     };
 
-    const selectArticleHashtag = (hashtag: string): void => {
-        const normalized = normalizeHashtag(hashtag);
-        if (!normalized) {
+    const selectArticleHashtags = (hashtags: string[]): void => {
+        const normalized = [...new Set(hashtags
+            .map((hashtag) => normalizeHashtag(hashtag))
+            .filter((hashtag): hashtag is string => Boolean(hashtag)))]
+            .sort((left, right) => left.localeCompare(right));
+
+        if (normalized.length === 0) {
+            navigate('/agora/articles');
             return;
         }
 
-        navigate(`/agora/articles?tag=${encodeURIComponent(normalized)}`);
+        const search = new URLSearchParams();
+        for (const hashtag of normalized) {
+            search.append('tag', hashtag);
+        }
+
+        navigate(`/agora/articles?${search.toString()}`);
     };
 
     const clearArticleHashtag = (): void => {
@@ -1366,13 +1376,13 @@ export function App({ mapBridge, services }: AppProps) {
                         isLoadingMore: articles.isLoadingMore,
                         error: articles.error,
                         hasMore: articles.hasMore,
-                        ...(activeArticlesHashtag ? { activeHashtag: activeArticlesHashtag } : {}),
+                        activeHashtags: activeArticlesHashtags,
                         agoraFeedLayout: uiSettings.agoraFeedLayout,
                         onAgoraFeedLayoutChange: setAgoraFeedLayout,
                         onRefresh: articles.refresh,
                         onLoadMore: articles.loadMore,
                         onOpenArticle: (eventId) => navigate(`/agora/articles/${eventId}`),
-                        onSelectHashtag: selectArticleHashtag,
+                        onSelectedHashtagsChange: selectArticleHashtags,
                         onClearHashtag: clearArticleHashtag,
                     }}
                     articleDetail={{

@@ -209,6 +209,11 @@ function normalizeHashtag(hashtag: string): string {
     return hashtag.trim().replace(/^#+/, '').toLowerCase();
 }
 
+function normalizeHashtags(hashtags: string[] | undefined): string[] {
+    return [...new Set((hashtags ?? []).map(normalizeHashtag).filter((hashtag) => hashtag.length > 0))]
+        .sort((left, right) => left.localeCompare(right));
+}
+
 function getTagValues(event: NostrEvent, key: string): string[] {
     const values: string[] = [];
     for (const tag of event.tags) {
@@ -624,7 +629,7 @@ export function createRuntimeSocialFeedService(
                     hasMore: false,
                 };
             }
-            const hashtag = input.hashtag ? normalizeHashtag(input.hashtag) : undefined;
+            const hashtags = normalizeHashtags(input.hashtags);
 
             return withRelayFallback(async (transport) => {
                 const limit = clampLimit(input.limit, DEFAULT_FEED_LIMIT);
@@ -641,8 +646,8 @@ export function createRuntimeSocialFeedService(
                     if (typeof input.until === 'number') {
                         filter.until = input.until;
                     }
-                    if (hashtag) {
-                        filter['#t'] = [hashtag];
+                    if (hashtags.length > 0) {
+                        filter['#t'] = hashtags;
                     }
 
                     const events = await fetchBackfillWithTimeout(transport, [filter], backfillTimeoutMs);

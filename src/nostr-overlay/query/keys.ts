@@ -41,6 +41,10 @@ function normalizeHashtag(value: string | undefined): string | undefined {
     return normalized.length > 0 ? normalized : undefined;
 }
 
+function normalizeHashtags(values: string[] | undefined): string[] {
+    return normalizeValues((values ?? []).map((value) => normalizeHashtag(value) ?? ''));
+}
+
 export const nostrOverlayQueryKeys = {
     root: () => [ROOT_SCOPE] as const,
     social: () => [ROOT_SCOPE, SOCIAL_SCOPE] as const,
@@ -62,7 +66,7 @@ export const nostrOverlayQueryKeys = {
         {
             ownerPubkey: input.ownerPubkey,
             follows: normalizeValues(input.follows),
-            hashtag: normalizeHashtag(input.hashtag),
+            hashtags: normalizeHashtags(input.hashtags),
             pageSize: input.pageSize ?? 20,
         },
     ] as const,

@@ -45,7 +45,7 @@ export interface LoadFollowingFeedInput {
 
 export interface LoadArticlesFeedInput {
     authors: string[];
-    hashtag?: string;
+    hashtags?: string[];
     limit?: number;
     until?: number;
 }

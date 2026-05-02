@@ -103,26 +103,28 @@ export function WalletPage({
                             </CardContent>
                         </Card>
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('wallet.connect.title')}</CardTitle>
-                                <CardDescription>{t('wallet.connect.description')}</CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex flex-wrap gap-2">
-                                <Input
-                                    type="text"
-                                    aria-label={t('wallet.connect.nwcUri')}
-                                    placeholder="nostr+walletconnect://..."
-                                    value={nwcUriInput}
-                                    onChange={(event) => onNwcUriInputChange(event.target.value)}
-                                />
-                                <p className="w-full text-sm text-muted-foreground">
-                                    {t('wallet.connect.warning')}
-                                </p>
-                                <Button type="button" onClick={onConnectNwc}>{t('wallet.connect.nwc')}</Button>
-                                <Button type="button" variant="outline" onClick={onConnectWebLn}>{t('wallet.connect.webln')}</Button>
-                            </CardContent>
-                        </Card>
+                        {!isConnected ? (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>{t('wallet.connect.title')}</CardTitle>
+                                    <CardDescription>{t('wallet.connect.description')}</CardDescription>
+                                </CardHeader>
+                                <CardContent className="flex flex-wrap gap-2">
+                                    <Input
+                                        type="text"
+                                        aria-label={t('wallet.connect.nwcUri')}
+                                        placeholder="nostr+walletconnect://..."
+                                        value={nwcUriInput}
+                                        onChange={(event) => onNwcUriInputChange(event.target.value)}
+                                    />
+                                    <p className="w-full text-sm text-muted-foreground">
+                                        {t('wallet.connect.warning')}
+                                    </p>
+                                    <Button type="button" onClick={onConnectNwc}>{t('wallet.connect.nwc')}</Button>
+                                    <Button type="button" variant="outline" onClick={onConnectWebLn}>{t('wallet.connect.webln')}</Button>
+                                </CardContent>
+                            </Card>
+                        ) : null}
 
                         {isConnected && zapSettings ? <WalletZapSettingsSection {...zapSettings} /> : null}
 

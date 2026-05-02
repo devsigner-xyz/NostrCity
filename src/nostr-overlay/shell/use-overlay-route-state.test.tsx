@@ -64,7 +64,7 @@ function RouteStateProbe(): ReactElement {
             <span data-testid="search">{routeState.location.search}</span>
             <span data-testid="active-settings-view">{routeState.activeSettingsView ?? 'none'}</span>
             <span data-testid="active-agora-hashtag">{routeState.activeAgoraHashtag ?? 'none'}</span>
-            <span data-testid="active-articles-hashtag">{routeState.activeArticlesHashtag ?? 'none'}</span>
+            <span data-testid="active-articles-hashtags">{routeState.activeArticlesHashtags.join(',') || 'none'}</span>
             <span data-testid="active-agora-note-event-id">{activeAgoraNoteEventId ?? 'none'}</span>
             <span data-testid="is-map-route">{String(routeState.isMapRoute)}</span>
             <span data-testid="is-agora-route">{String(routeState.isAgoraRoute)}</span>
@@ -131,12 +131,12 @@ describe('useOverlayRouteState', () => {
     });
 
     test('detects article list and detail routes without activating Agora hashtag filters', () => {
-        const list = renderRoute('/agora/articles?tag=nostr');
+        const list = renderRoute('/agora/articles?tag=nostr&tag=maps');
 
         expect(text(list.container, 'is-articles-route')).toBe('true');
         expect(text(list.container, 'is-article-detail-route')).toBe('false');
         expect(text(list.container, 'active-agora-hashtag')).toBe('none');
-        expect(text(list.container, 'active-articles-hashtag')).toBe('nostr');
+        expect(text(list.container, 'active-articles-hashtags')).toBe('maps,nostr');
 
         act(() => {
             list.root.unmount();
@@ -149,7 +149,7 @@ describe('useOverlayRouteState', () => {
         expect(text(detail.container, 'is-articles-route')).toBe('false');
         expect(text(detail.container, 'is-article-detail-route')).toBe('true');
         expect(text(detail.container, 'active-agora-hashtag')).toBe('none');
-        expect(text(detail.container, 'active-articles-hashtag')).toBe('none');
+        expect(text(detail.container, 'active-articles-hashtags')).toBe('none');
     });
 
     test('detects note detail routes as Agora routes with an active note event id', () => {

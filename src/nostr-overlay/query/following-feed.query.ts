@@ -29,7 +29,7 @@ interface UseFollowingFeedInfiniteQueryOptions {
 interface UseArticlesFeedInfiniteQueryOptions {
     ownerPubkey?: string;
     follows: string[];
-    hashtag?: string;
+    hashtags?: string[];
     service: SocialFeedService;
     enabled: boolean;
     pageSize?: number;
@@ -120,21 +120,24 @@ export function useFollowingFeedInfiniteQuery(options: UseFollowingFeedInfiniteQ
 
 export function useArticlesFeedInfiniteQuery(options: UseArticlesFeedInfiniteQueryOptions) {
     const follows = normalizeEventIds(options.follows);
-    const hashtag = normalizeHashtag(options.hashtag);
+    const hashtags = [...new Set((options.hashtags ?? [])
+        .map((hashtag) => normalizeHashtag(hashtag))
+        .filter((hashtag): hashtag is string => Boolean(hashtag)))]
+        .sort((left, right) => left.localeCompare(right));
     const pageSize = Math.max(1, options.pageSize ?? DEFAULT_FEED_PAGE_SIZE);
 
     return useInfiniteQuery<SocialFeedPage, Error>(createSocialQueryOptions({
         queryKey: nostrOverlayQueryKeys.articlesFeed({
             ...(options.ownerPubkey ? { ownerPubkey: options.ownerPubkey } : {}),
             follows,
-            ...(hashtag ? { hashtag } : {}),
+            ...(hashtags.length > 0 ? { hashtags } : {}),
             pageSize,
         }),
         queryFn: ({ pageParam }: { pageParam: unknown }) => {
             const until = typeof pageParam === 'number' ? pageParam : undefined;
             return options.service.loadArticlesFeed({
                 authors: follows,
-                ...(hashtag ? { hashtag } : {}),
+                ...(hashtags.length > 0 ? { hashtags } : {}),
                 limit: pageSize,
                 ...(until !== undefined ? { until } : {}),
             });
