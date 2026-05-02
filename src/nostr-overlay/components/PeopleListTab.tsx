@@ -52,8 +52,10 @@ interface PeopleListTabProps {
     searchAriaLabel?: string;
     verificationByPubkey?: Record<string, Nip05ValidationResult | undefined>;
     followedPubkeys?: string[];
+    mutedPubkeys?: string[];
     followHiddenPubkeys?: string[];
     onFollowPerson?: (pubkey: string) => void | Promise<void>;
+    onToggleMutePerson?: (pubkey: string) => void | Promise<void>;
     followActionPlacement?: 'inline' | 'context';
     followCopyScope?: 'peopleList' | 'userSearch';
     identifierDisplay?: 'short' | 'full';
@@ -121,8 +123,10 @@ export function PeopleListTab({
     searchAriaLabel,
     verificationByPubkey = {},
     followedPubkeys = [],
+    mutedPubkeys = [],
     followHiddenPubkeys = [],
     onFollowPerson,
+    onToggleMutePerson,
     followActionPlacement = 'inline',
     followCopyScope = 'peopleList',
     identifierDisplay = 'short',
@@ -137,6 +141,7 @@ export function PeopleListTab({
     const [loadingMore, setLoadingMore] = useState(false);
     const [pendingFollowByPubkey, setPendingFollowByPubkey] = useState<Record<string, boolean>>({});
     const followedSet = useMemo(() => new Set(followedPubkeys), [followedPubkeys]);
+    const mutedSet = useMemo(() => new Set(mutedPubkeys), [mutedPubkeys]);
     const followHiddenSet = useMemo(() => new Set(followHiddenPubkeys), [followHiddenPubkeys]);
 
     useEffect(() => {
@@ -258,6 +263,7 @@ export function PeopleListTab({
         const canSendMessage = typeof onSendMessage === 'function';
         const canViewDetails = typeof onViewDetails === 'function';
         const canFollow = typeof onFollowPerson === 'function' && !followHiddenSet.has(pubkey);
+        const canToggleMute = typeof onToggleMutePerson === 'function';
         const hasActions = true;
         const display = personName(pubkey, profile);
         const canZapProfile = profileHasZapEndpoint(profile);
@@ -282,6 +288,8 @@ export function PeopleListTab({
             ...(canCopy ? { onCopyNpub: () => onCopyNpub?.(pubkeyToNpub(pubkey)) } : {}),
             ...(canSendMessage ? { onSendMessage: () => onSendMessage?.(pubkey) } : {}),
             ...(canViewDetails ? { onViewDetails: () => onViewDetails?.(pubkey) } : {}),
+            ...(canToggleMute ? { onToggleMute: () => onToggleMutePerson?.(pubkey) } : {}),
+            ...(canToggleMute ? { isMuted: mutedSet.has(pubkey) } : {}),
         };
         const showInlineFollowAction = canFollow && followActionPlacement === 'inline';
         const showContextUnfollowAction = canFollow && followActionPlacement === 'context' && isFollowed;

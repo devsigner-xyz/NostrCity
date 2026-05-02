@@ -4,8 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useI18n } from '@/i18n/useI18n';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { NostrGroupSummary } from './GroupsPage';
+import { formatGroupDisplayId } from './group-display';
 
 interface GroupListProps {
     groups: NostrGroupSummary[];
@@ -25,6 +26,10 @@ export function GroupList({ groups, selectedGroupId, onSelectGroup, emptyTitle, 
     const [activeTab, setActiveTab] = useState(selectedTab);
     const joinedPanelId = 'groups-joined-panel';
     const othersPanelId = 'groups-others-panel';
+
+    useEffect(() => {
+        setActiveTab(selectedTab);
+    }, [selectedTab]);
 
     const renderGroups = (items: NostrGroupSummary[]) => (
         <nav aria-label={t('groups.list.aria')} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
@@ -55,16 +60,11 @@ export function GroupList({ groups, selectedGroupId, onSelectGroup, emptyTitle, 
                     >
                         <span className="flex min-w-0 flex-1 flex-col gap-1">
                             <span className="truncate font-medium">{group.name}</span>
-                            <span className="truncate text-xs text-muted-foreground">{group.id}</span>
+                            <span className="truncate text-xs text-muted-foreground">{formatGroupDisplayId(group.id)}</span>
                             <span className="flex flex-wrap gap-1">
                                 {group.isSaved ? <Badge variant="secondary">{t('groups.status.saved')}</Badge> : null}
                             </span>
                         </span>
-                        <Badge variant="secondary">
-                            {group.memberCount === 1
-                                ? t('groups.members.one')
-                                : t('groups.members.many', { count: group.memberCount })}
-                        </Badge>
                     </Button>
                 );
             })}

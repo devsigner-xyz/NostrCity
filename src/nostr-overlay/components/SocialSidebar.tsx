@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { UserRoundIcon, UsersIcon } from 'lucide-react';
+import { UserRoundIcon, UsersIcon, VolumeXIcon } from 'lucide-react';
 import { encodeHexToNpub } from '../../nostr/npub';
 import type { Nip05ValidationResult } from '../../nostr/nip05';
 import type { NostrProfile } from '../../nostr/types';
@@ -8,11 +8,13 @@ import { PeopleListTab } from './PeopleListTab';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 
-type SocialTab = 'following' | 'followers';
+type SocialTab = 'following' | 'followers' | 'silenced';
 
 interface SocialSidebarProps {
     follows?: string[];
     profiles?: Record<string, NostrProfile>;
+    muted?: string[];
+    mutedProfiles?: Record<string, NostrProfile>;
     followers?: string[];
     followerProfiles?: Record<string, NostrProfile>;
     followersLoading?: boolean;
@@ -21,6 +23,7 @@ interface SocialSidebarProps {
     onLocateFollowing?: (pubkey: string) => void;
     onMessagePerson?: (pubkey: string) => void | Promise<void>;
     onFollowPerson?: (pubkey: string) => void | Promise<void>;
+    onToggleMutePerson?: (pubkey: string) => void | Promise<void>;
     onViewPersonDetails?: (pubkey: string) => void;
     zapAmounts?: number[];
     onZapPerson?: (pubkey: string, amount: number) => void | Promise<void>;
@@ -32,6 +35,8 @@ interface SocialSidebarProps {
 export function SocialSidebar({
     follows = [],
     profiles = {},
+    muted = [],
+    mutedProfiles = {},
     followers = [],
     followerProfiles = {},
     followersLoading = false,
@@ -40,6 +45,7 @@ export function SocialSidebar({
     onLocateFollowing,
     onMessagePerson,
     onFollowPerson,
+    onToggleMutePerson,
     onViewPersonDetails,
     zapAmounts = [21, 128, 256],
     onZapPerson,
@@ -52,8 +58,10 @@ export function SocialSidebar({
     const [activeDialog, setActiveDialog] = useState<SocialTab | null>(null);
     const [followingSearch, setFollowingSearch] = useState('');
     const [followersSearch, setFollowersSearch] = useState('');
+    const [silencedSearch, setSilencedSearch] = useState('');
 
     const followingPeople = useMemo(() => [...new Set(follows)], [follows]);
+    const mutedPeople = useMemo(() => [...new Set(muted)], [muted]);
     const followerPeople = useMemo(() => [...new Set(followers)], [followers]);
 
     const matchesSearch = (pubkey: string, profile: NostrProfile | undefined, query: string): boolean => {
@@ -89,8 +97,24 @@ export function SocialSidebar({
 
         return followerPeople.filter((pubkey) => matchesSearch(pubkey, followerProfiles[pubkey], query));
     }, [followerPeople, followerProfiles, followersSearch]);
-    const dialogTitle = activeDialog === 'followers' ? t('social.followersList') : t('social.followingList');
-    const dialogDescription = activeDialog === 'followers' ? t('social.followersDialogDescription') : t('social.followingDialogDescription');
+    const filteredMutedPeople = useMemo(() => {
+        const query = silencedSearch.trim().toLowerCase();
+        if (!query) {
+            return mutedPeople;
+        }
+
+        return mutedPeople.filter((pubkey) => matchesSearch(pubkey, mutedProfiles[pubkey] ?? profiles[pubkey], query));
+    }, [mutedPeople, mutedProfiles, profiles, silencedSearch]);
+    const dialogTitle = activeDialog === 'followers'
+        ? t('social.followersList')
+        : activeDialog === 'silenced'
+            ? t('social.silencedList')
+            : t('social.followingList');
+    const dialogDescription = activeDialog === 'followers'
+        ? t('social.followersDialogDescription')
+        : activeDialog === 'silenced'
+            ? t('social.silencedDialogDescription')
+            : t('social.followingDialogDescription');
 
     const closeMobileSidebar = (): void => {
         if (isMobile) {
@@ -146,6 +170,23 @@ export function SocialSidebar({
                     </SidebarMenuButton>
                     <SidebarMenuBadge>{followerPeople.length}</SidebarMenuBadge>
                 </SidebarMenuItem>
+
+                {mutedPeople.length > 0 ? (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton asChild>
+                            <button
+                                type="button"
+                                aria-label={t('social.openSilencedList')}
+                                title={t('social.silencedList')}
+                                onClick={() => setActiveDialog('silenced')}
+                            >
+                                <VolumeXIcon />
+                                <span>{t('social.silencedList')}</span>
+                            </button>
+                        </SidebarMenuButton>
+                        <SidebarMenuBadge>{mutedPeople.length}</SidebarMenuBadge>
+                    </SidebarMenuItem>
+                ) : null}
             </SidebarMenu>
 
             <Dialog open={activeDialog !== null} onOpenChange={(open) => setActiveDialog(open ? activeDialog : null)}>
@@ -178,6 +219,31 @@ export function SocialSidebar({
                                 {...(followerPeople.length > 0 ? { searchAriaLabel: t('social.searchFollowers') } : {})}
                                 verificationByPubkey={verificationByPubkey}
                             />
+                        ) : activeDialog === 'silenced' ? (
+                            <PeopleListTab
+                                people={filteredMutedPeople}
+                                profiles={{ ...profiles, ...mutedProfiles }}
+                                emptyText={silencedSearch ? t('social.emptySilencedSearch') : t('social.emptySilenced')}
+                                loading={false}
+                                {...(selectedFollowingPubkey !== undefined ? { selectedPubkey: selectedFollowingPubkey } : {})}
+                                {...(onSelectFollowing ? { onSelectPerson: selectPerson } : {})}
+                                {...(onLocateFollowing ? { onLocatePerson: locatePerson } : {})}
+                                {...(onCopyOwnerNpub ? { onCopyNpub: onCopyOwnerNpub } : {})}
+                                {...(onMessagePerson ? { onSendMessage: onMessagePerson } : {})}
+                                {...(onViewPersonDetails ? { onViewDetails: onViewPersonDetails } : {})}
+                                zapAmounts={zapAmounts}
+                                {...(onZapPerson ? { onZapPerson } : {})}
+                                {...(onConfigureZapAmounts ? { onConfigureZapAmounts } : {})}
+                                {...(mutedPeople.length > 0 ? { searchQuery: silencedSearch } : {})}
+                                {...(mutedPeople.length > 0 ? { onSearchQueryChange: setSilencedSearch } : {})}
+                                {...(mutedPeople.length > 0 ? { searchAriaLabel: t('social.searchSilenced') } : {})}
+                                followedPubkeys={followingPeople}
+                                mutedPubkeys={mutedPeople}
+                                {...(onFollowPerson ? { onFollowPerson } : {})}
+                                {...(onToggleMutePerson ? { onToggleMutePerson } : {})}
+                                followActionPlacement="context"
+                                verificationByPubkey={verificationByPubkey}
+                            />
                         ) : (
                             <PeopleListTab
                                 people={filteredFollowingPeople}
@@ -197,7 +263,9 @@ export function SocialSidebar({
                                 {...(followingPeople.length > 0 ? { onSearchQueryChange: setFollowingSearch } : {})}
                                 {...(followingPeople.length > 0 ? { searchAriaLabel: t('social.searchFollowing') } : {})}
                                 followedPubkeys={followingPeople}
+                                mutedPubkeys={mutedPeople}
                                 {...(onFollowPerson ? { onFollowPerson } : {})}
+                                {...(onToggleMutePerson ? { onToggleMutePerson } : {})}
                                 followActionPlacement="context"
                                 verificationByPubkey={verificationByPubkey}
                             />

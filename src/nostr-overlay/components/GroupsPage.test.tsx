@@ -1,9 +1,12 @@
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { nip19 } from 'nostr-tools';
 import type { AuthSessionState, LoginMethod } from '../../nostr/auth/session';
 import type { NostrEvent } from '../../nostr/types';
 import { GroupsPage, type NostrGroupSummary } from './GroupsPage';
+
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 interface RenderResult {
     container: HTMLDivElement;
@@ -26,6 +29,8 @@ const mounted: RenderResult[] = [];
 
 beforeAll(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    URL.createObjectURL = vi.fn(() => 'blob:group-preview');
+    URL.revokeObjectURL = vi.fn();
 });
 
 afterEach(async () => {
@@ -65,6 +70,7 @@ const groups: NostrGroupSummary[] = [
         description: 'Community notes about public gardens.',
         memberCount: 12,
         isSaved: true,
+        membershipStatus: 'confirmed',
         metadataVerified: true,
     },
     {
@@ -74,6 +80,7 @@ const groups: NostrGroupSummary[] = [
         description: 'Planning streets and plazas.',
         memberCount: 7,
         isRemembered: true,
+        membershipStatus: 'pending',
         metadataVerified: false,
     },
     {
@@ -82,6 +89,7 @@ const groups: NostrGroupSummary[] = [
         relayUrl: 'wss://relay.example',
         description: 'Murals and public art notes.',
         memberCount: 3,
+        membershipStatus: 'none',
         metadataVerified: true,
     },
 ];
@@ -98,6 +106,8 @@ function page(overrides: Partial<React.ComponentProps<typeof GroupsPage>> = {}) 
             selectedGroupId="wss://relay.example'gardeners"
             isLoading={false}
             error={null}
+            isGroupDetailLoading={false}
+            groupDetailError={null}
             session={session()}
             messageDraft=""
             onSelectGroup={vi.fn()}
@@ -112,6 +122,7 @@ function page(overrides: Partial<React.ComponentProps<typeof GroupsPage>> = {}) 
             onAddCustomGroupRelay={vi.fn()}
             onOpenInvite={vi.fn()}
             onRetry={vi.fn()}
+            onRetryGroupDetail={vi.fn()}
             hasGroupRelaysConfigured
             onAddSuggestedGroupRelays={vi.fn()}
             onManageGroupRelays={vi.fn()}
@@ -216,10 +227,15 @@ describe('GroupsPage', () => {
         const groupList = rendered.container.querySelector('nav[aria-label="Lista de grupos"]');
         expect(groupList).not.toBeNull();
         expect(groupList?.className).toContain('overflow-y-auto');
+        expect(groupList?.textContent || '').toContain("relay.example'gardeners");
+        expect(groupList?.textContent || '').not.toContain("wss://relay.example'gardeners");
         const groupListCard = groupList?.closest('[data-slot="card"]');
         expect(groupListCard?.className).toContain('border');
         expect(groupListCard?.className).toContain('ring-0');
-        expect(rendered.container.querySelector('article[aria-label="Detalle del grupo City Gardeners"]')).not.toBeNull();
+        const detail = rendered.container.querySelector('article[aria-label="Detalle del grupo City Gardeners"]');
+        expect(detail).not.toBeNull();
+        expect(detail?.textContent || '').toContain("relay.example'gardeners");
+        expect(detail?.textContent || '').not.toContain("wss://relay.example'gardeners");
         const groupDetailCard = rendered.container.querySelector('article[aria-label="Detalle del grupo City Gardeners"] [data-slot="card"]');
         expect(groupDetailCard?.className).toContain('border');
         expect(groupDetailCard?.className).toContain('ring-0');
@@ -375,6 +391,40 @@ describe('GroupsPage', () => {
         expect(onJoinGroup).toHaveBeenCalledWith("wss://relay.example'artists");
     });
 
+    test('renders selected detail loading and error states instead of the empty timeline', async () => {
+        const loading = await renderElement(page({ isGroupDetailLoading: true, timeline: [] }));
+        mounted.push(loading);
+
+        expect(loading.container.querySelector('[data-testid="groups-timeline"]')?.textContent || '').toContain('Cargando mensajes del grupo');
+        expect(loading.container.textContent || '').not.toContain('Aún no hay mensajes en el grupo.');
+
+        const onRetryGroupDetail = vi.fn();
+        const error = await renderElement(page({ groupDetailError: 'Relay timeout', onRetryGroupDetail, timeline: [] }));
+        mounted.push(error);
+
+        expect(error.container.querySelector('[data-testid="groups-timeline"]')?.textContent || '').toContain('No pudimos cargar los mensajes');
+        expect(error.container.textContent || '').toContain('Relay timeout');
+        expect(error.container.textContent || '').not.toContain('Aún no hay mensajes en el grupo.');
+
+        const retry = Array.from(error.container.querySelectorAll('button')).find((button) => button.textContent === 'Reintentar mensajes');
+        await act(async () => {
+            retry?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onRetryGroupDetail).toHaveBeenCalledTimes(1);
+    });
+
+    test('shows pending membership without rendering the composer', async () => {
+        const rendered = await renderElement(page({ selectedGroupId: "wss://relay.example'builders" }));
+        mounted.push(rendered);
+
+        expect(rendered.container.textContent || '').toContain('Unión pendiente de confirmación');
+        expect(rendered.container.textContent || '').toContain('Firmaste la solicitud, pero el relay todavía no te confirma como miembro.');
+        expect(rendered.container.querySelector('textarea[aria-label="Mensaje para Builders Guild"]')).toBeNull();
+        expect(rendered.container.querySelector('button[aria-label="Publicar mensaje en Builders Guild"]')).toBeNull();
+        expect(rendered.container.querySelector('button[aria-label="Unirse a Builders Guild"]')).toBeNull();
+    });
+
     test('renders relay-first controls, group status labels, and invite parsing feedback', async () => {
         const onSelectRelay = vi.fn();
         const onAddCustomGroupRelay = vi.fn();
@@ -489,6 +539,43 @@ describe('GroupsPage', () => {
         expect(blockedPublish).not.toHaveBeenCalled();
     });
 
+    test('uploads a selected image before publishing a group message', async () => {
+        const onUploadImage = vi.fn(async (_file: File) => ({
+            url: 'https://cdn.example/group.png',
+            tags: [['imeta', 'url https://cdn.example/group.png', 'm image/png']],
+        }));
+        const onPublishMessage = vi.fn();
+        const rendered = await renderElement(page({
+            messageDraft: 'Look at this',
+            onPublishMessage,
+            onUploadImage,
+        } as Partial<React.ComponentProps<typeof GroupsPage>> & { onUploadImage: typeof onUploadImage }));
+        mounted.push(rendered);
+
+        const input = rendered.container.querySelector('input[type="file"]') as HTMLInputElement | null;
+        expect(input?.getAttribute('accept')).toBe('image/jpeg,image/png,image/webp,image/avif');
+
+        const image = new File([PNG_BYTES], 'garden.png', { type: 'image/png' });
+        await act(async () => {
+            Object.defineProperty(input, 'files', {
+                configurable: true,
+                value: [image],
+            });
+            input?.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        expect(rendered.container.querySelector('img[src="blob:group-preview"]')).not.toBeNull();
+
+        await act(async () => {
+            rendered.container.querySelector('button[aria-label="Publicar mensaje en City Gardeners"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onUploadImage).toHaveBeenCalledWith(image);
+        expect(onPublishMessage).toHaveBeenCalledWith("wss://relay.example'gardeners", 'Look at this\nhttps://cdn.example/group.png', {
+            tags: [['imeta', 'url https://cdn.example/group.png', 'm image/png']],
+        });
+    });
+
     test('changes draft text without showing the public saved-groups warning', async () => {
         const onMessageDraftChange = vi.fn();
         const onSaveGroup = vi.fn();
@@ -591,10 +678,46 @@ describe('GroupsPage', () => {
         expect(timeline?.textContent || '').not.toContain('wss://relay.example');
         expect(timeline?.querySelector('.nostr-chat-messages')).not.toBeNull();
         expect(timeline?.querySelectorAll('.nostr-chat-message').length).toBe(3);
+        expect(timeline?.querySelectorAll('.nostr-chat-message.is-incoming').length).toBe(3);
         const text = timeline?.textContent || '';
 
         expect(text.indexOf('First tie note')).toBeLessThan(text.indexOf('Second tie note'));
         expect(text.indexOf('Second tie note')).toBeLessThan(text.indexOf('Older garden note'));
+        expect(text).not.toContain('Evento');
+    });
+
+    test('renders group timeline Nostr entities like rich note content', async () => {
+        const pubkey = 'b'.repeat(64);
+        const eventId = 'c'.repeat(64);
+        const npub = nip19.npubEncode(pubkey);
+        const nevent = nip19.neventEncode({ id: eventId, relays: ['wss://relay.example'] });
+        const onSelectProfile = vi.fn();
+        const rendered = await renderElement(page({
+            timeline: [{ id: 'd'.repeat(64), pubkey, kind: 9, created_at: 120, tags: [], content: `Hola nostr:${npub} nostr:${nevent}` }],
+            profilesByPubkey: { [pubkey]: { pubkey, displayName: 'Alice' } },
+            eventReferencesById: { [eventId]: { id: eventId, pubkey, kind: 1, created_at: 100, tags: [], content: 'Referenced note content' } },
+            onSelectProfile,
+        }));
+        mounted.push(rendered);
+
+        const mention = rendered.container.querySelector('button[aria-label="Abrir perfil de Alice"]') as HTMLButtonElement | null;
+        expect(mention?.textContent).toBe('@Alice');
+
+        await clickElement(mention);
+        expect(onSelectProfile).toHaveBeenCalledWith(pubkey);
+        expect(rendered.container.textContent || '').toContain('Referenced note content');
+    });
+
+    test('does not show member counts in the group list', async () => {
+        const rendered = await renderElement(page());
+        mounted.push(rendered);
+
+        const groupButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            (button.textContent || '').includes('City Gardeners')
+        );
+
+        expect(groupButton?.textContent || '').not.toContain('12 miembros');
+        expect(rendered.container.textContent || '').toContain('12 miembros');
     });
 
     test('centers the shadcn empty state in the conversation area when there are no messages', async () => {

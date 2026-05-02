@@ -239,6 +239,22 @@ describe('groups runtime service', () => {
         expect(result.timeline.map((item) => item.id)).toEqual(['c', 'a', 'b']);
     });
 
+    test('loads chat messages and text notes tagged to the group timeline', async () => {
+        const transport = createTransport({
+            self: SELF_PUBKEY,
+            timelineEvents: [
+                event({ id: 'chat', kind: GROUP_MESSAGE_KIND, created_at: 20, content: 'chat message' }),
+                event({ id: 'note', kind: 1, created_at: 30, content: 'group note' }),
+                event({ id: 'wrong', kind: 1, created_at: 40, tags: [['h', 'parks']], content: 'wrong group' }),
+            ],
+        });
+        const service = createGroupsRuntimeService({ transport, verifyEvent: () => true });
+
+        const result = await service.loadGroup({ relay: 'wss://relay.example', id: 'maps' });
+
+        expect(result.timeline.map((item) => item.id)).toEqual(['note', 'chat']);
+    });
+
     test('ignores unsigned or cross-group timeline messages before display', async () => {
         const verifyEvent = vi.fn((candidate: NostrEvent) => candidate.id !== 'forged');
         const transport = createTransport({
@@ -276,7 +292,8 @@ describe('groups runtime service', () => {
 
         const result = await service.publishMessage({
             group: { relay: 'wss://relay.example', id: 'maps' },
-            content: 'hello',
+            content: 'hello\nhttps://cdn.example/group.png',
+            tags: [['imeta', 'url https://cdn.example/group.png', 'm image/png']],
             recentTimeline: [
                 event({ id: '33333333cccc', kind: GROUP_MESSAGE_KIND, created_at: 3, pubkey: OTHER_PUBKEY }),
                 event({ id: '11111111aaaa', kind: GROUP_MESSAGE_KIND, created_at: 1, pubkey: OTHER_PUBKEY }),
@@ -289,8 +306,14 @@ describe('groups runtime service', () => {
         expect(publishEvent).toHaveBeenCalledWith({
             kind: GROUP_MESSAGE_KIND,
             created_at: 123,
-            content: 'hello',
-            tags: [['h', 'maps'], ['previous', '55555555'], ['previous', '33333333'], ['previous', '22222222']],
+            content: 'hello\nhttps://cdn.example/group.png',
+            tags: [
+                ['h', 'maps'],
+                ['imeta', 'url https://cdn.example/group.png', 'm image/png'],
+                ['previous', '55555555'],
+                ['previous', '33333333'],
+                ['previous', '22222222'],
+            ],
         });
         expect(publishToGroupRelay).toHaveBeenCalledWith(expect.objectContaining({ id: 'signed' }), ['wss://relay.example']);
         expect(result.publish.ackedRelays).toEqual(['wss://relay.example']);

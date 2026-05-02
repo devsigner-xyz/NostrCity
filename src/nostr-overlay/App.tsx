@@ -348,6 +348,7 @@ export function App({ mapBridge, services }: AppProps) {
         isNotificationsRoute,
         service: overlay.socialNotificationsService,
     });
+    const canUsePrivateMuteList = Boolean(overlay.canWrite && overlay.authSession?.capabilities.encryptionSchemes.includes('nip44'));
     const handleFollowPerson = useCallback(async (pubkey: string): Promise<void> => {
         if (!pubkey || !overlay.canWrite) {
             return;
@@ -360,6 +361,18 @@ export function App({ mapBridge, services }: AppProps) {
             toast.error(message, { duration: 2200 });
         }
     }, [overlay.canWrite, overlay.followPerson, uiSettings.language]);
+    const handleToggleMutedPerson = useCallback(async (pubkey: string): Promise<void> => {
+        if (!pubkey || !canUsePrivateMuteList) {
+            return;
+        }
+
+        try {
+            await overlay.toggleMutedPerson(pubkey);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : translate(uiSettings.language, 'app.toast.muteUpdateFailed');
+            toast.error(message, { duration: 2200 });
+        }
+    }, [canUsePrivateMuteList, overlay.toggleMutedPerson, uiSettings.language]);
     const socialFeed = useOverlaySocialFeedController({
         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
         follows: overlay.follows,
@@ -381,6 +394,44 @@ export function App({ mapBridge, services }: AppProps) {
     });
     const followingFeed = socialFeed.followingFeed;
     const followPerson = socialFeed.followPerson;
+    const mutedPubkeySet = useMemo(() => new Set(overlay.mutedPubkeys), [overlay.mutedPubkeys]);
+    const visibleFollowingFeedItems = useMemo(
+        () => followingFeed.items.filter((item) => !mutedPubkeySet.has(item.pubkey)),
+        [followingFeed.items, mutedPubkeySet],
+    );
+    const visiblePendingFollowingFeedItems = useMemo(
+        () => followingFeed.pendingItems.filter((item) => !mutedPubkeySet.has(item.pubkey)),
+        [followingFeed.pendingItems, mutedPubkeySet],
+    );
+    const currentFollowingFeedItemIds = useMemo(
+        () => new Set(visibleFollowingFeedItems.map((item) => item.id)),
+        [visibleFollowingFeedItems],
+    );
+    const visibleFollowingFeedPendingCount = useMemo(
+        () => visiblePendingFollowingFeedItems.filter((item) => !currentFollowingFeedItemIds.has(item.id)).length,
+        [currentFollowingFeedItemIds, visiblePendingFollowingFeedItems],
+    );
+    const visibleFollowingFeedHasPendingNewItems = visibleFollowingFeedPendingCount > 0;
+    const visibleFollowingFeedHasUnread = useMemo(
+        () => visibleFollowingFeedItems.some((item) => item.createdAt > followingFeed.lastReadAt),
+        [followingFeed.lastReadAt, visibleFollowingFeedItems],
+    );
+    const visibleNotificationItems = useMemo(
+        () => socialState.items.filter((item) => !mutedPubkeySet.has(item.actorPubkey)),
+        [socialState.items, mutedPubkeySet],
+    );
+    const visiblePendingNotificationItems = useMemo(
+        () => socialState.pendingSnapshot.filter((item) => !mutedPubkeySet.has(item.actorPubkey)),
+        [socialState.pendingSnapshot, mutedPubkeySet],
+    );
+    const hasVisibleUnreadNotifications = useMemo(
+        () => visiblePendingNotificationItems.length > 0 || visibleNotificationItems.some((item) => item.createdAt > socialState.lastReadAt),
+        [socialState.lastReadAt, visibleNotificationItems, visiblePendingNotificationItems],
+    );
+    const visibleNotificationsHasUnread = useMemo(
+        () => socialState.hasUnread && hasVisibleUnreadNotifications,
+        [hasVisibleUnreadNotifications, socialState.hasUnread],
+    );
     const activeProfilePostEventIds = useMemo(
         () => selectPostEventIds(activeProfileData.posts),
         [activeProfileData.posts]
@@ -463,7 +514,7 @@ export function App({ mapBridge, services }: AppProps) {
         maxConcurrentProbes: 3,
     });
     const resolvedOverlayTheme = useOverlayTheme(uiSettings.theme as UiTheme);
-    const followingFeedHasUnread = socialFeed.followingFeedHasUnread;
+    const followingFeedHasUnread = socialFeed.followingFeedHasUnread && (visibleFollowingFeedHasUnread || visibleFollowingFeedHasPendingNewItems);
     const canSendChatMessages = canAccessDirectMessages;
     const activeProfileVerification = overlay.activeProfilePubkey
         ? verificationByPubkey[overlay.activeProfilePubkey]
@@ -1132,7 +1183,7 @@ export function App({ mapBridge, services }: AppProps) {
                     canAccessSocialNotifications={canAccessSocialNotifications}
                     canAccessFollowingFeed={canAccessFollowingFeed}
                     chatHasUnread={chatState.hasUnreadGlobal}
-                    notificationsHasUnread={socialState.hasUnread}
+                    notificationsHasUnread={visibleNotificationsHasUnread}
                     followingFeedHasUnread={followingFeedHasUnread}
                     onOpenMap={() => navigate('/')}
                     onOpenCityStats={() => navigate('/city-stats')}
@@ -1166,6 +1217,8 @@ export function App({ mapBridge, services }: AppProps) {
                     onMobileAppBarBack={handleMobileAppBarBack}
                     follows={overlay.follows}
                     profiles={overlay.profiles}
+                    mutedPubkeys={overlay.mutedPubkeys}
+                    mutedProfiles={overlay.mutedProfiles}
                     followers={overlay.followers}
                     followerProfiles={overlay.followerProfiles}
                     followersLoading={overlay.followersLoading}
@@ -1174,6 +1227,7 @@ export function App({ mapBridge, services }: AppProps) {
                     onLocateFollowing={locateFollowingOnMap}
                     {...(canAccessDirectMessages ? { onMessagePerson: openDmFromContextMenu } : {})}
                     {...(overlay.canWrite ? { onFollowPerson: followPerson } : {})}
+                    {...(canUsePrivateMuteList ? { onToggleMutePerson: handleToggleMutedPerson } : {})}
                     onViewPersonDetails={(pubkey) => {
                         if (!isMapRoute) {
                             navigate('/');
@@ -1207,6 +1261,7 @@ export function App({ mapBridge, services }: AppProps) {
                         followerProfiles={overlay.followerProfiles}
                         {...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {})}
                         {...(overlay.ownerProfile ? { ownerProfile: overlay.ownerProfile } : {})}
+                        mutedPubkeys={overlay.mutedPubkeys}
                         canWrite={overlay.canWrite}
                         canAccessDirectMessages={canAccessDirectMessages}
                         zapAmounts={zapSettings.amounts}
@@ -1218,6 +1273,7 @@ export function App({ mapBridge, services }: AppProps) {
                         onCopyNpub={copyOwnerIdentifier}
                         onOpenDirectMessage={openDmFromContextMenu}
                         onOpenProfile={overlay.openActiveProfile}
+                        {...(canUsePrivateMuteList ? { onToggleMutePerson: handleToggleMutedPerson } : {})}
                         onRequestZapPayment={requestZapPayment}
                         onConfigureZapAmounts={() => openSettingsPage('zaps')}
                     />
@@ -1236,9 +1292,9 @@ export function App({ mapBridge, services }: AppProps) {
                         agoraFeedLayout: uiSettings.agoraFeedLayout,
                         onAgoraFeedLayoutChange: setAgoraFeedLayout,
                         followingFeed: {
-                            items: followingFeed.items,
-                            pendingNewCount: followingFeed.pendingNewCount,
-                            hasPendingNewItems: followingFeed.hasPendingNewItems,
+                            items: visibleFollowingFeedItems,
+                            pendingNewCount: visibleFollowingFeedPendingCount,
+                            hasPendingNewItems: visibleFollowingFeedHasPendingNewItems,
                             hasFollows: followingFeed.hasFollows,
                             ...(followingFeed.activeHashtag ? { activeHashtag: followingFeed.activeHashtag } : {}),
                             isLoadingFeed: followingFeed.isLoadingFeed,
@@ -1316,9 +1372,9 @@ export function App({ mapBridge, services }: AppProps) {
                     }}
                     notifications={{
                         canAccessSocialNotifications,
-                        hasUnread: socialState.hasUnread,
-                        pendingSnapshot: socialState.pendingSnapshot,
-                        items: socialState.items,
+                        hasUnread: visibleNotificationsHasUnread,
+                        pendingSnapshot: visiblePendingNotificationItems,
+                        items: visibleNotificationItems,
                         hasMore: socialState.hasMore,
                         isLoadingMore: socialState.isLoadingMore,
                         profilesByPubkey: overlay.profiles,
@@ -1340,6 +1396,13 @@ export function App({ mapBridge, services }: AppProps) {
                         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
                         canDirectMessages: overlay.canDirectMessages,
                         onOpenConversation: (conversationId) => openChatConversation(conversationId),
+                        onUploadImage: async (file) => uploadComposeImage({ file }),
+                        profilesByPubkey: richContentProfilesByPubkey,
+                        eventReferencesById,
+                        onSelectProfile: openMentionedProfile,
+                        onResolveProfiles: resolveMentionProfiles,
+                        onSelectEventReference: openReferencedEventFromFeed,
+                        onResolveEventReferences: resolveEventReferences,
                         sendMessage: async (conversationId, plaintext) => {
                             await chatState.sendMessage(conversationId, plaintext);
                         },
@@ -1351,6 +1414,8 @@ export function App({ mapBridge, services }: AppProps) {
                         selectedGroupId: groupsController.selectedGroupId,
                         isLoading: groupsController.isLoading,
                         error: groupsController.error,
+                        isGroupDetailLoading: groupsController.isGroupDetailLoading,
+                        groupDetailError: groupsController.groupDetailError,
                         session: overlay.authSession ?? null,
                         messageDraft: groupsController.messageDraft,
                         timeline: groupsController.selectedTimeline,
@@ -1358,6 +1423,7 @@ export function App({ mapBridge, services }: AppProps) {
                         onSelectGroup: groupsController.selectGroup,
                         onMessageDraftChange: groupsController.setMessageDraft,
                         onPublishMessage: groupsController.publishMessage,
+                        onUploadImage: async (file) => uploadComposeImage({ file }),
                         onSaveGroup: groupsController.saveGroup,
                         onSyncPublicGroups: groupsController.syncPublicGroups,
                         onJoinGroup: groupsController.requestJoin,
@@ -1365,9 +1431,16 @@ export function App({ mapBridge, services }: AppProps) {
                         onAddCustomGroupRelay: groupsController.addCustomGroupRelay,
                         onOpenInvite: openGroupInvite,
                         onRetry: groupsController.retry,
+                        onRetryGroupDetail: groupsController.retryGroupDetail,
                         hasGroupRelaysConfigured: groupsController.hasGroupRelaysConfigured,
                         onAddSuggestedGroupRelays: groupsController.addSuggestedGroupRelays,
                         onManageGroupRelays: groupsController.manageGroupRelays,
+                        profilesByPubkey: richContentProfilesByPubkey,
+                        eventReferencesById,
+                        onSelectProfile: openMentionedProfile,
+                        onResolveProfiles: resolveMentionProfiles,
+                        onSelectEventReference: openReferencedEventFromFeed,
+                        onResolveEventReferences: resolveEventReferences,
                     }}
                     relays={{
                         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
@@ -1465,6 +1538,7 @@ export function App({ mapBridge, services }: AppProps) {
                     verificationByPubkey={verificationByPubkey}
                     eventReferencesById={eventReferencesById}
                     ownerFollows={overlay.follows}
+                    mutedPubkeys={overlay.mutedPubkeys}
                     canWrite={overlay.canWrite}
                     canAccessDirectMessages={canAccessDirectMessages}
                     reactionByEventId={followingFeed.reactionByEventId}
@@ -1482,6 +1556,7 @@ export function App({ mapBridge, services }: AppProps) {
                     onAddRelaySuggestion={addRelaySuggestionToSettings}
                     onAddAllRelaySuggestions={addAllRelaySuggestionsToSettings}
                     onFollowProfile={followPerson}
+                    {...(canUsePrivateMuteList ? { onToggleMuteProfile: handleToggleMutedPerson } : {})}
                     onSendMessage={openDmFromContextMenu}
                     onToggleReaction={followingFeed.toggleReaction}
                     onToggleRepost={handleToggleRepost}

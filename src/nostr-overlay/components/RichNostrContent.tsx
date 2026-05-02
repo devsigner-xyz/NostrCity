@@ -289,6 +289,7 @@ function renderInlineTokens(
         onSelectHashtag: ((hashtag: string) => void) | undefined;
         onSelectProfile: ((pubkey: string) => void) | undefined;
         profilesByPubkey: Record<string, NostrProfile> | undefined;
+        mediaAttachmentUrls: Set<string>;
     }
 ): ReactNode[] {
     return tokens.map((token, index) => {
@@ -297,7 +298,16 @@ function renderInlineTokens(
         }
 
         if (token.kind === 'url') {
-            return null;
+            const url = sanitizeUrlToken(token.value);
+            if (input.mediaAttachmentUrls.has(url)) {
+                return null;
+            }
+
+            return (
+                <a key={`url-${index}`} className="nostr-rich-link" href={url} target="_blank" rel="noreferrer">
+                    {url}
+                </a>
+            );
         }
 
         if (token.kind === 'event-reference') {
@@ -663,8 +673,9 @@ export function RichNostrContent({
             onSelectHashtag,
             onSelectProfile,
             profilesByPubkey,
+            mediaAttachmentUrls: new Set(mediaAttachments.map((attachment) => attachment.url)),
         }),
-        [tokenizedContent, t, onSelectHashtag, onSelectProfile, profilesByPubkey]
+        [mediaAttachments, tokenizedContent, t, onSelectHashtag, onSelectProfile, profilesByPubkey]
     );
     const { visibleEventIds, hiddenCount: hiddenEventReferencesCount } = useMemo(
         () => buildVisibleEventReferenceEntries(tokenizedContent, 2),

@@ -4,7 +4,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { useI18n } from '@/i18n/useI18n';
 import type { AuthSessionState } from '../../nostr/auth/session';
 import { isWriteEnabled } from '../../nostr/auth/session';
-import type { NostrEvent } from '../../nostr/types';
+import type { NostrEvent, NostrProfile } from '../../nostr/types';
+import type { UploadedImageAttachment } from '../media/upload-note-image-attachment';
 import { OverlayPageHeader } from './OverlayPageHeader';
 import { OverlaySurface } from './OverlaySurface';
 import { GroupDetail } from './GroupDetail';
@@ -21,8 +22,11 @@ export interface NostrGroupSummary {
     memberCount: number;
     isSaved?: boolean;
     isRemembered?: boolean;
+    membershipStatus?: GroupMembershipStatus;
     metadataVerified?: boolean;
 }
+
+export type GroupMembershipStatus = 'none' | 'pending' | 'confirmed';
 
 export interface GroupsPageProps {
     groups: NostrGroupSummary[];
@@ -31,13 +35,16 @@ export interface GroupsPageProps {
     selectedGroupId: string | null;
     isLoading: boolean;
     error: string | null;
+    isGroupDetailLoading: boolean;
+    groupDetailError: string | null;
     session: AuthSessionState | null;
     messageDraft: string;
     timeline: NostrEvent[];
     onSelectRelay?: (relayUrl: string | null) => void;
     onSelectGroup: (groupId: string) => void;
     onMessageDraftChange: (message: string) => void;
-    onPublishMessage: (groupId: string, message: string) => void;
+    onPublishMessage: (groupId: string, message: string, options?: { tags?: string[][] }) => void;
+    onUploadImage?: (file: File) => Promise<UploadedImageAttachment | undefined> | UploadedImageAttachment | undefined;
     onSaveGroup: (groupId: string) => void;
     onSyncPublicGroups: () => void;
     onJoinGroup: (groupId: string) => void;
@@ -45,9 +52,19 @@ export interface GroupsPageProps {
     onAddCustomGroupRelay?: (relayUrl: string) => void;
     onOpenInvite?: (invite: ParsedGroupInviteLink) => void;
     onRetry: () => Promise<void> | void;
+    onRetryGroupDetail: () => Promise<void> | void;
     hasGroupRelaysConfigured: boolean;
     onAddSuggestedGroupRelays: () => void;
     onManageGroupRelays: () => void;
+    profilesByPubkey?: Record<string, NostrProfile>;
+    eventReferencesById?: Record<string, NostrEvent>;
+    onSelectProfile?: (pubkey: string) => void;
+    onResolveProfiles?: (pubkeys: string[]) => Promise<void> | void;
+    onSelectEventReference?: (eventId: string) => void;
+    onResolveEventReferences?: (
+        eventIds: string[],
+        options?: { relayHintsByEventId?: Record<string, string[]> }
+    ) => Promise<Record<string, NostrEvent> | void> | Record<string, NostrEvent> | void;
 }
 
 function selectedGroup(groups: NostrGroupSummary[], selectedGroupId: string | null): NostrGroupSummary | null {
@@ -85,6 +102,8 @@ export function GroupsPage({
     selectedGroupId,
     isLoading,
     error,
+    isGroupDetailLoading,
+    groupDetailError,
     session,
     messageDraft,
     timeline,
@@ -92,6 +111,7 @@ export function GroupsPage({
     onSelectGroup,
     onMessageDraftChange,
     onPublishMessage,
+    onUploadImage,
     onSaveGroup,
     onSyncPublicGroups,
     onJoinGroup,
@@ -99,9 +119,16 @@ export function GroupsPage({
     onAddCustomGroupRelay = () => {},
     onOpenInvite = () => {},
     onRetry,
+    onRetryGroupDetail,
     hasGroupRelaysConfigured,
     onAddSuggestedGroupRelays,
     onManageGroupRelays,
+    profilesByPubkey,
+    eventReferencesById,
+    onSelectProfile,
+    onResolveProfiles,
+    onSelectEventReference,
+    onResolveEventReferences,
 }: GroupsPageProps) {
     const { t } = useI18n();
     const relayGroups = selectedRelayUrl ? groups.filter((item) => item.relayUrl === selectedRelayUrl) : groups;
@@ -223,11 +250,21 @@ export function GroupsPage({
                                 disabledReason={disabledReason}
                                 messageDraft={messageDraft}
                                 timeline={timeline}
+                                isGroupDetailLoading={isGroupDetailLoading}
+                                groupDetailError={groupDetailError}
                                 onMessageDraftChange={onMessageDraftChange}
                                 onPublishMessage={onPublishMessage}
+                                {...(onUploadImage ? { onUploadImage } : {})}
                                 onSaveGroup={onSaveGroup}
                                 onJoinGroup={onJoinGroup}
                                 onLeaveGroup={onLeaveGroup}
+                                onRetryGroupDetail={onRetryGroupDetail}
+                                {...(profilesByPubkey !== undefined ? { profilesByPubkey } : {})}
+                                {...(eventReferencesById !== undefined ? { eventReferencesById } : {})}
+                                {...(onSelectProfile ? { onSelectProfile } : {})}
+                                {...(onResolveProfiles ? { onResolveProfiles } : {})}
+                                {...(onSelectEventReference ? { onSelectEventReference } : {})}
+                                {...(onResolveEventReferences ? { onResolveEventReferences } : {})}
                             />
                         </div>
                     </div>

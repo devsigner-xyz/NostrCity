@@ -1257,8 +1257,10 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
     return {
         isOpen,
         items,
+        pendingItems: pendingLatestFeedPage?.items ?? [],
         hasFollows,
         hasUnread,
+        lastReadAt,
         pendingNewCount,
         hasPendingNewItems,
         isLoadingFeed: feedQuery.isPending || feedQuery.isFetchingNextPage,

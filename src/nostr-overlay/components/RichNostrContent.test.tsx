@@ -61,6 +61,15 @@ describe('RichNostrContent', () => {
         expect(rendered.container.textContent).toContain('**bold**');
     });
 
+    test('renders non-media urls as links without duplicating media urls inline', async () => {
+        const rendered = await renderElement(<RichNostrContent content={'web https://example.com docs https://example.com/photo.jpg'} />);
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('a[href="https://example.com"]')?.textContent).toBe('https://example.com');
+        expect(rendered.container.querySelector('a[href="https://example.com/photo.jpg"]')).toBeNull();
+        expect(rendered.container.querySelector('img[src="https://example.com/photo.jpg"]')).not.toBeNull();
+    });
+
     test('renders english fallbacks and actions when ui language is en', async () => {
         window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
 

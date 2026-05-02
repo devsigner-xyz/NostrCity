@@ -32,8 +32,10 @@ function createFeedState(input: Partial<ReturnType<typeof useFollowingFeedContro
     return {
         isOpen: false,
         items: [],
+        pendingItems: [],
         hasFollows: true,
         hasUnread: false,
+        lastReadAt: 0,
         pendingNewCount: 0,
         hasPendingNewItems: false,
         isLoadingFeed: false,

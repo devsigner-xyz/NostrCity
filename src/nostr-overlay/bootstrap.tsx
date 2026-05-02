@@ -104,6 +104,7 @@ export function createBootstrapOverlayServices(): OverlayServices {
         publishTextNote: (content, tags) => requireWriteGateway().publishTextNote(content, tags),
         publishProfileMetadata: (content) => requireWriteGateway().publishProfileMetadata(content),
         publishContactList: (follows) => requireWriteGateway().publishContactList(follows),
+        publishMuteList: (mutedPubkeys) => requireWriteGateway().publishMuteList(mutedPubkeys),
         encryptDm: (pubkey, plaintext) => requireWriteGateway().encryptDm(pubkey, plaintext),
         decryptDm: (pubkey, ciphertext, scheme) => requireWriteGateway().decryptDm(pubkey, ciphertext, scheme),
     };

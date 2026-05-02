@@ -1,7 +1,7 @@
 import { ChatConversationList } from './ChatConversationList';
 import { ChatConversationDetail } from './ChatConversationDetail';
 import type { Nip05ValidationResult } from '../../nostr/nip05';
-import type { NostrProfile } from '../../nostr/types';
+import type { NostrEvent, NostrProfile } from '../../nostr/types';
 import { OverlayPageHeader } from './OverlayPageHeader';
 import { OverlayUnreadIndicator } from './OverlayUnreadIndicator';
 import { useI18n } from '@/i18n/useI18n';
@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { OverlaySurface } from './OverlaySurface';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import type { UploadedImageAttachment } from '../media/upload-note-image-attachment';
 
 export interface ChatConversationSummary {
     id: string;
@@ -40,9 +41,19 @@ interface ChatsPageProps {
     activeConversationId: string | null;
     onOpenConversation: (conversationId: string) => void;
     onSendMessage: (plaintext: string) => Promise<void> | void;
+    onUploadImage?: (file: File) => Promise<UploadedImageAttachment | undefined> | UploadedImageAttachment | undefined;
     composerAutoFocusKey?: string;
     canSend?: boolean;
     disabledReason?: string;
+    profilesByPubkey?: Record<string, NostrProfile>;
+    eventReferencesById?: Record<string, NostrEvent>;
+    onSelectProfile?: (pubkey: string) => void;
+    onResolveProfiles?: (pubkeys: string[]) => Promise<void> | void;
+    onSelectEventReference?: (eventId: string) => void;
+    onResolveEventReferences?: (
+        eventIds: string[],
+        options?: { relayHintsByEventId?: Record<string, string[]> }
+    ) => Promise<Record<string, NostrEvent> | void> | Record<string, NostrEvent> | void;
 }
 
 export function ChatsPage({
@@ -53,9 +64,16 @@ export function ChatsPage({
     activeConversationId,
     onOpenConversation,
     onSendMessage,
+    onUploadImage,
     composerAutoFocusKey,
     canSend = true,
     disabledReason,
+    profilesByPubkey,
+    eventReferencesById,
+    onSelectProfile,
+    onResolveProfiles,
+    onSelectEventReference,
+    onResolveEventReferences,
 }: ChatsPageProps) {
     const { t } = useI18n();
     const isMobile = useIsMobile();
@@ -113,10 +131,17 @@ export function ChatsPage({
                                             {...(activeConversation ? { conversation: activeConversation } : {})}
                                             messages={messages}
                                             onSendMessage={onSendMessage}
+                                            {...(onUploadImage ? { onUploadImage } : {})}
                                             {...(composerAutoFocusKey ? { composerAutoFocusKey } : {})}
                                             canSend={canSend}
                                             {...(disabledReason ? { disabledReason } : {})}
                                             showHeader={!isMobile}
+                                            {...(profilesByPubkey !== undefined ? { profilesByPubkey } : {})}
+                                            {...(eventReferencesById !== undefined ? { eventReferencesById } : {})}
+                                            {...(onSelectProfile ? { onSelectProfile } : {})}
+                                            {...(onResolveProfiles ? { onResolveProfiles } : {})}
+                                            {...(onSelectEventReference ? { onSelectEventReference } : {})}
+                                            {...(onResolveEventReferences ? { onResolveEventReferences } : {})}
                                         />
                                     </CardContent>
                                 </Card>

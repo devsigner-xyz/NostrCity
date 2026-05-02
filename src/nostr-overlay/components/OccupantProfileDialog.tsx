@@ -65,7 +65,9 @@ interface OccupantProfileDialogProps {
     onSelectProfile?: (pubkey: string) => void;
     onCopyNpub?: (value: string) => void | Promise<void>;
     ownerFollows?: string[];
+    mutedPubkeys?: string[];
     onFollowProfile?: (pubkey: string) => void | Promise<void>;
+    onToggleMuteProfile?: (pubkey: string) => void | Promise<void>;
     onSendMessage?: (pubkey: string) => void | Promise<void>;
     canWrite?: boolean;
     reactionByEventId?: Record<string, boolean>;
@@ -155,6 +157,28 @@ function buildFollowActionState(
     };
 }
 
+function buildMuteActionState(
+    targetPubkey: string,
+    displayName: string,
+    mutedSet: Set<string>,
+    pendingMuteByPubkey: Record<string, boolean>,
+    t: I18nContextValue['t'],
+) {
+    const isMutePending = Object.prototype.hasOwnProperty.call(pendingMuteByPubkey, targetPubkey);
+    const isMuted = mutedSet.has(targetPubkey);
+
+    return {
+        isMuted,
+        isDisabled: isMutePending,
+        label: isMuted ? t('profile.unmute') : t('profile.mute'),
+        ariaLabel: isMutePending
+            ? t('profile.muteStatusUpdating', { displayName })
+            : isMuted
+                ? t('profile.unmutePerson', { displayName })
+                : t('profile.mutePerson', { displayName }),
+    };
+}
+
 const NETWORK_PAGE_SIZE = 20;
 const NETWORK_LOAD_DELAY_MS = 120;
 type OccupantProfileTab = 'info' | 'feed' | 'followers' | 'following';
@@ -223,7 +247,9 @@ export function OccupantProfileDialog({
     onSelectProfile,
     onCopyNpub,
     ownerFollows = [],
+    mutedPubkeys = [],
     onFollowProfile,
+    onToggleMuteProfile,
     onSendMessage,
     canWrite = false,
     reactionByEventId = {},
@@ -264,8 +290,10 @@ export function OccupantProfileDialog({
     const [followsLoadingMore, setFollowsLoadingMore] = useState(false);
     const [followersLoadingMore, setFollowersLoadingMore] = useState(false);
     const [pendingFollowByPubkey, setPendingFollowByPubkey] = useState<Record<string, boolean>>({});
+    const [pendingMuteByPubkey, setPendingMuteByPubkey] = useState<Record<string, boolean>>({});
     const [activeTab, setActiveTab] = useState<OccupantProfileTab>('info');
     const ownerFollowSet = useMemo(() => new Set(ownerFollows), [ownerFollows]);
+    const mutedSet = useMemo(() => new Set(mutedPubkeys), [mutedPubkeys]);
     const displayName = resolveName(pubkey, profile);
     const relaySuggestionRows = useMemo(
         () => buildRelaySuggestionRows(relaySuggestionsByType),
@@ -274,9 +302,11 @@ export function OccupantProfileDialog({
     const canAddRelaySuggestions = typeof onAddRelaySuggestion === 'function';
     const canAddAllRelaySuggestions = typeof onAddAllRelaySuggestions === 'function' && relaySuggestionRows.length > 1;
     const canFollowActiveProfile = typeof onFollowProfile === 'function' && ownerPubkey !== pubkey;
+    const canMuteActiveProfile = typeof onToggleMuteProfile === 'function' && ownerPubkey !== pubkey;
     const canSendMessageToActiveProfile = typeof onSendMessage === 'function' && ownerPubkey !== pubkey;
     const showDonationBanner = donationPubkey === pubkey;
     const activeProfileFollowState = buildFollowActionState(pubkey, displayName, ownerFollowSet, pendingFollowByPubkey, t);
+    const activeProfileMuteState = buildMuteActionState(pubkey, displayName, mutedSet, pendingMuteByPubkey, t);
 
     const npubValue = useMemo(() => {
         try {
@@ -449,6 +479,31 @@ export function OccupantProfileDialog({
         });
     };
 
+    const toggleMuteProfile = (targetPubkey: string): void => {
+        if (typeof onToggleMuteProfile !== 'function') {
+            return;
+        }
+
+        setPendingMuteByPubkey((current) => ({
+            ...current,
+            [targetPubkey]: true,
+        }));
+
+        void Promise.resolve(onToggleMuteProfile(targetPubkey))
+            .catch((): void => undefined)
+            .finally((): void => {
+                setPendingMuteByPubkey((current) => {
+                    if (!current[targetPubkey]) {
+                        return current;
+                    }
+
+                    const next = { ...current };
+                    delete next[targetPubkey];
+                    return next;
+                });
+            });
+    };
+
     const openPersonActionsMenu = (event: ReactMouseEvent<HTMLButtonElement>): void => {
         event.preventDefault();
         event.stopPropagation();
@@ -530,11 +585,15 @@ export function OccupantProfileDialog({
         const canSendMessage = typeof onSendMessage === 'function' && ownerPubkey !== personPubkey;
         const canViewDetails = typeof onSelectProfile === 'function';
         const followState = buildFollowActionState(personPubkey, personDisplay, ownerFollowSet, pendingFollowByPubkey, t);
+        const canToggleMute = typeof onToggleMuteProfile === 'function' && ownerPubkey !== personPubkey;
+        const muteState = buildMuteActionState(personPubkey, personDisplay, mutedSet, pendingMuteByPubkey, t);
 
         const contextMenuActionProps = {
             ...(canCopy ? { onCopyNpub: () => onCopyNpub?.(pubkeyToNpub(personPubkey)) } : {}),
             ...(canSendMessage ? { onSendMessage: () => onSendMessage?.(personPubkey) } : {}),
             ...(canViewDetails ? { onViewDetails: () => onSelectProfile?.(personPubkey) } : {}),
+            ...(canToggleMute ? { onToggleMute: () => onToggleMuteProfile?.(personPubkey) } : {}),
+            ...(canToggleMute ? { isMuted: muteState.isMuted } : {}),
             testIdPrefix: `profile-network-${personPubkey}`,
         };
 
@@ -731,7 +790,7 @@ export function OccupantProfileDialog({
                                             </div>
                                         </div>
 
-                                        {(canSendMessageToActiveProfile || canFollowActiveProfile) ? (
+                                        {(canSendMessageToActiveProfile || canFollowActiveProfile || canMuteActiveProfile) ? (
                                             <div className="flex shrink-0 items-center gap-2">
                                                 {canSendMessageToActiveProfile ? (
                                                     <Button
@@ -759,6 +818,20 @@ export function OccupantProfileDialog({
                                                         onClick={() => followProfile(pubkey)}
                                                     >
                                                         {activeProfileFollowState.label}
+                                                    </Button>
+                                                ) : null}
+
+                                                {canMuteActiveProfile ? (
+                                                    <Button
+                                                        type="button"
+                                                        size="xs"
+                                                        variant={activeProfileMuteState.isMuted ? 'secondary' : 'outline'}
+                                                        className="shrink-0"
+                                                        disabled={activeProfileMuteState.isDisabled}
+                                                        aria-label={activeProfileMuteState.ariaLabel}
+                                                        onClick={() => toggleMuteProfile(pubkey)}
+                                                    >
+                                                        {activeProfileMuteState.label}
                                                     </Button>
                                                 ) : null}
                                             </div>

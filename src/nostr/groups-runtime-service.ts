@@ -6,9 +6,9 @@ import {
     canonicalizeGroupAddress,
     GROUP_ADMINS_KIND,
     GROUP_MEMBERS_KIND,
-    GROUP_MESSAGE_KIND,
     GROUP_METADATA_KIND,
     GROUP_ROLES_KIND,
+    GROUP_TIMELINE_KINDS,
     parseGroupAdminsEvent,
     parseGroupMembersEvent,
     parseGroupMetadataEvent,
@@ -78,7 +78,7 @@ function emptyPublishResult(): PublishResult {
 function sortTimeline(events: NostrEvent[]): NostrEvent[] {
     const byId = new Map<string, NostrEvent>();
     for (const event of events) {
-        if (event.kind === GROUP_MESSAGE_KIND) {
+        if ((GROUP_TIMELINE_KINDS as readonly number[]).includes(event.kind)) {
             byId.set(event.id, event);
         }
     }
@@ -152,8 +152,8 @@ function isSignatureValidEvent(event: NostrEvent, verifyEvent: (event: NostrEven
     }
 }
 
-function isValidGroupMessageEvent(event: NostrEvent, groupId: string, verifyEvent: (event: NostrEvent) => boolean): boolean {
-    if (event.kind !== GROUP_MESSAGE_KIND || firstTagValue(event.tags, 'h') !== groupId) {
+function isValidGroupTimelineEvent(event: NostrEvent, groupId: string, verifyEvent: (event: NostrEvent) => boolean): boolean {
+    if (!(GROUP_TIMELINE_KINDS as readonly number[]).includes(event.kind) || firstTagValue(event.tags, 'h') !== groupId) {
         return false;
     }
 
@@ -173,14 +173,14 @@ export function createGroupsRuntimeService(options: CreateGroupsRuntimeServiceOp
             { kinds: relayAuthoredKinds, '#d': [group.id], limit: 20 },
         ]);
         const rawTimeline = await fetchSafely(options.transport, group.relay, [
-            { kinds: [GROUP_MESSAGE_KIND], '#h': [group.id], limit: 50 },
+            { kinds: [...GROUP_TIMELINE_KINDS], '#h': [group.id], limit: 50 },
         ]);
 
         const self = relayInfo.self;
         const metadataVerified = typeof self === 'string' && isHexKey(self);
         const groupMetadataEvents = metadataEvents.filter((event) => firstTagValue(event.tags, 'd') === group.id);
         const verifyEvent = options.verifyEvent ?? ((event: NostrEvent) => verifyNostrEvent(event as Parameters<typeof verifyNostrEvent>[0]));
-        const timeline = sortTimeline(rawTimeline.filter((event) => isValidGroupMessageEvent(event, group.id, verifyEvent)));
+        const timeline = sortTimeline(rawTimeline.filter((event) => isValidGroupTimelineEvent(event, group.id, verifyEvent)));
         const trustedEvents = metadataVerified ? groupMetadataEvents.filter((event) => isValidRelayAuthoredEvent(event, self, verifyEvent)) : [];
         const trustedDecisionEvents = metadataVerified ? trustedEvents : [];
         const displayEvents = metadataVerified
@@ -221,6 +221,7 @@ export function createGroupsRuntimeService(options: CreateGroupsRuntimeServiceOp
         async publishMessage(input: {
             group: GroupAddressInput | string;
             content: string;
+            tags?: string[][];
             recentTimeline?: NostrEvent[];
         }): Promise<GroupPublishResponse> {
             if (!options.ownPubkey) {
@@ -233,6 +234,9 @@ export function createGroupsRuntimeService(options: CreateGroupsRuntimeServiceOp
                 content: input.content,
                 ownPubkey: options.ownPubkey,
             };
+            if (input.tags) {
+                eventInput.tags = input.tags;
+            }
             if (input.recentTimeline) {
                 eventInput.recentTimeline = input.recentTimeline;
             }

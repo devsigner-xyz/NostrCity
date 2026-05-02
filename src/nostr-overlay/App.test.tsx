@@ -3766,7 +3766,7 @@ describe('Nostr overlay App', () => {
             metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
             metadataVerified: true,
             admins: undefined,
-            members: { id: 'maps', pubkeys: ['a'.repeat(64), 'b'.repeat(64)] },
+            members: { id: 'maps', pubkeys: [ownerPubkey, 'a'.repeat(64), 'b'.repeat(64)] },
             roles: undefined,
             timeline: [],
         }));
@@ -3798,7 +3798,7 @@ describe('Nostr overlay App', () => {
         expect(getLocationText(rendered.container)).toBe('/groups');
         expect(loadGroups).toHaveBeenCalledWith({ ownerPubkey });
         expect(loadGroup).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'maps' } });
-        expect(rendered.container.textContent || '').toContain('2 miembros');
+        expect(rendered.container.textContent || '').toContain('3 miembros');
         expect(rendered.container.querySelector('button[aria-label="Publicar mensaje en Map Makers"]')).not.toBeNull();
     });
 
@@ -3826,7 +3826,7 @@ describe('Nostr overlay App', () => {
                                 metadata: { id: input.id, name: names[input.id] ?? input.id, about: input.id === 'parks' ? 'Plan park districts.' : 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
                                 metadataVerified: true,
                                 admins: undefined,
-                                members: undefined,
+                                members: { id: input.id, pubkeys: [ownerPubkey] },
                                 roles: undefined,
                                 timeline: [],
                             };
@@ -3864,7 +3864,7 @@ describe('Nostr overlay App', () => {
                             metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
                             metadataVerified: true,
                             admins: undefined,
-                            members: undefined,
+                            members: { id: 'maps', pubkeys: [ownerPubkey] },
                             roles: undefined,
                             timeline: [],
                         })),
@@ -3915,7 +3915,7 @@ describe('Nostr overlay App', () => {
                             metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
                             metadataVerified: true,
                             admins: undefined,
-                            members: undefined,
+                            members: { id: 'maps', pubkeys: [ownerPubkey] },
                             roles: undefined,
                             timeline: [],
                         })),
@@ -4052,10 +4052,27 @@ describe('Nostr overlay App', () => {
         });
     });
 
-    test('groups route accumulates sequential discovered group saves before reload', async () => {
+    test('groups route saves the selected discovered group without preloading unrelated details', async () => {
         const ownerPubkey = persistDmCapableSession();
         persistGroupRelaySettings(ownerPubkey);
         const savePublicGroups = vi.fn(async () => undefined);
+        const loadGroup = vi.fn(async ({ group }) => {
+            const input = group as { relay: string; id: string };
+            const names: Record<string, string> = {
+                artists: 'Artist Guild',
+                maps: 'Map Makers',
+                parks: 'Park Planners',
+            };
+            return {
+                group: { relay: input.relay, id: input.id, key: `${input.relay}'${input.id}`, external: `relay.example'${input.id}` },
+                metadata: { id: input.id, name: names[input.id] ?? input.id, about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
+                metadataVerified: true,
+                admins: undefined,
+                members: undefined,
+                roles: undefined,
+                timeline: [],
+            };
+        });
         const { bridge } = createMapBridgeStub();
         const rendered = await renderApp(
             <App
@@ -4069,23 +4086,7 @@ describe('Nostr overlay App', () => {
                                 { relay: 'wss://relay.example', id: 'artists' },
                             ],
                         } as never)),
-                        loadGroup: vi.fn(async ({ group }) => {
-                            const input = group as { relay: string; id: string };
-                            const names: Record<string, string> = {
-                                artists: 'Artist Guild',
-                                maps: 'Map Makers',
-                                parks: 'Park Planners',
-                            };
-                            return {
-                                group: { relay: input.relay, id: input.id, key: `${input.relay}'${input.id}`, external: `relay.example'${input.id}` },
-                                metadata: { id: input.id, name: names[input.id] ?? input.id, about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
-                                metadataVerified: true,
-                                admins: undefined,
-                                members: undefined,
-                                roles: undefined,
-                                timeline: [],
-                            };
-                        }),
+                        loadGroup,
                         publishMessage: vi.fn(),
                         requestJoin: vi.fn(),
                         requestLeave: vi.fn(),
@@ -4105,30 +4106,11 @@ describe('Nostr overlay App', () => {
         await openGroupActions(rendered.container, 'Park Planners');
         await clickMenuItemByLabel('Guardar Park Planners');
 
-        const othersTab = rendered.container.querySelector('button#groups-others-tab') as HTMLButtonElement;
-        await act(async () => {
-            othersTab.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
-            othersTab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-        await waitFor(() => Array.from(rendered.container.querySelectorAll('button')).some((button) => (button.textContent || '').includes('Artist Guild')));
-        const artistsButton = Array.from(rendered.container.querySelectorAll('button')).find((button) => (button.textContent || '').includes('Artist Guild')) as HTMLButtonElement;
-        await act(async () => {
-            artistsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-        await openGroupActions(rendered.container, 'Artist Guild');
-        await clickMenuItemByLabel('Guardar Artist Guild');
-
-        expect(savePublicGroups).toHaveBeenNthCalledWith(1, {
+        expect(loadGroup).not.toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'artists' } });
+        expect(savePublicGroups).toHaveBeenCalledWith({
             groups: [
                 { relay: 'wss://relay.example', id: 'maps' },
                 { relay: 'wss://relay.example', id: 'parks' },
-            ],
-        });
-        expect(savePublicGroups).toHaveBeenNthCalledWith(2, {
-            groups: [
-                { relay: 'wss://relay.example', id: 'maps' },
-                { relay: 'wss://relay.example', id: 'parks' },
-                { relay: 'wss://relay.example', id: 'artists' },
             ],
         });
     });
@@ -4166,7 +4148,10 @@ describe('Nostr overlay App', () => {
         mounted.push(rendered);
 
         await waitFor(() => (rendered.container.textContent || '').includes('Map Makers'));
-        await clickMenuItemByLabel('Unirse a Map Makers');
+        const joinButton = rendered.container.querySelector('button[aria-label="Unirse a Map Makers"]') as HTMLButtonElement;
+        await act(async () => {
+            joinButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
         await openGroupActions(rendered.container, 'Map Makers');
         await clickMenuItemByLabel('Salir de Map Makers');
 
@@ -4207,8 +4192,10 @@ describe('Nostr overlay App', () => {
         mounted.push(rendered);
 
         await waitFor(() => (rendered.container.textContent || '').includes('Park Planners'));
-        await openGroupActions(rendered.container, 'Park Planners');
-        await clickMenuItemByLabel('Unirse a Park Planners');
+        const joinButton = rendered.container.querySelector('button[aria-label="Unirse a Park Planners"]') as HTMLButtonElement;
+        await act(async () => {
+            joinButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
 
         expect(requestJoin).toHaveBeenCalledWith({ group: { relay: 'wss://relay.example', id: 'parks' }, code: 'invite-code' });
         expect(savePublicGroups).not.toHaveBeenCalled();
@@ -4245,7 +4232,7 @@ describe('Nostr overlay App', () => {
                             metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
                             metadataVerified: true,
                             admins: undefined,
-                            members: undefined,
+                            members: { id: 'maps', pubkeys: [ownerPubkey] },
                             roles: undefined,
                             timeline: [],
                         })),
@@ -4285,7 +4272,7 @@ describe('Nostr overlay App', () => {
                             metadata: { id: 'maps', name: 'Map Makers', about: 'Coordinate city maps together.', private: false, restricted: false, hidden: false, closed: false },
                             metadataVerified: true,
                             admins: undefined,
-                            members: undefined,
+                            members: { id: 'maps', pubkeys: [ownerPubkey] },
                             roles: undefined,
                             timeline: [olderA, newerB, newerA],
                         })),
@@ -7635,6 +7622,536 @@ describe('Nostr overlay App', () => {
         await waitFor(() => getActiveProfileDialog() !== null);
 
         expect(document.body.textContent || '').not.toContain('Configurar cantidades');
+    });
+
+    test('shows silenciar or desilenciar in the map context menu based on mute state', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const followedPubkey = 'a'.repeat(64);
+
+        const { bridge, triggerOccupiedBuildingContextMenu } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => {
+                            if (kind === 10000) {
+                                return null;
+                            }
+                            return null;
+                        },
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: followedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        expect(document.body.textContent || '').not.toContain('Desilenciar');
+
+        await act(async () => {
+            rendered.root.unmount();
+        });
+        rendered.container.remove();
+        window.localStorage.clear();
+
+        const mutedRendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => {
+                            if (kind === 10000) {
+                                return {
+                                    id: 'mute-kind-10000',
+                                    pubkey: ownerPubkey,
+                                    kind: 10000,
+                                    created_at: 111,
+                                    tags: [],
+                                    content: JSON.stringify([['p', followedPubkey]]),
+                                };
+                            }
+                            return null;
+                        },
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                }}
+            />
+        );
+        mounted.push(mutedRendered);
+
+        await loginWithNip07(mutedRendered.container);
+        await waitFor(() => (mutedRendered.container.textContent || '').includes('Owner'));
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: followedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Desilenciar'));
+    });
+
+    test('renders Silenciados in the social sidebar only when there are muted users', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const followedPubkey = 'a'.repeat(64);
+        const mutedPubkey = 'b'.repeat(64);
+        const { bridge } = createMapBridgeStub();
+
+        const withoutMuted = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async () => null,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                }}
+            />
+        );
+        mounted.push(withoutMuted);
+
+        await loginWithNip07(withoutMuted.container);
+        await waitFor(() => (withoutMuted.container.textContent || '').includes('Owner'));
+        expect(withoutMuted.container.querySelector('button[aria-label="Abrir lista de silenciados"]')).toBeNull();
+
+        await act(async () => {
+            withoutMuted.root.unmount();
+        });
+        withoutMuted.container.remove();
+        window.localStorage.clear();
+
+        const withMuted = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => {
+                            if (kind === 10000) {
+                                return {
+                                    id: 'mute-kind-10000-sidebar',
+                                    pubkey: ownerPubkey,
+                                    kind: 10000,
+                                    created_at: 111,
+                                    tags: [],
+                                    content: JSON.stringify([['p', mutedPubkey]]),
+                                };
+                            }
+                            return null;
+                        },
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                        [mutedPubkey]: { pubkey: mutedPubkey, displayName: 'Bob' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                }}
+            />
+        );
+        mounted.push(withMuted);
+
+        await loginWithNip07(withMuted.container);
+        await waitFor(() => (withMuted.container.textContent || '').includes('Owner'));
+        expect(withMuted.container.querySelector('button[aria-label="Abrir lista de silenciados"]')).not.toBeNull();
+    });
+
+    test('filters silenced authors from the following feed UI', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const visiblePubkey = 'a'.repeat(64);
+        const mutedPubkey = 'b'.repeat(64);
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [
+                createFeedNote('visible-note', visiblePubkey, 101, 'nota visible'),
+                createFeedNote('muted-note', mutedPubkey, 100, 'nota silenciada'),
+            ],
+            hasMore: false,
+        });
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => {
+                            if (kind === 10000) {
+                                return {
+                                    id: 'mute-kind-10000-feed',
+                                    pubkey: ownerPubkey,
+                                    kind: 10000,
+                                    created_at: 111,
+                                    tags: [],
+                                    content: JSON.stringify([['p', mutedPubkey]]),
+                                };
+                            }
+                            return null;
+                        },
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [visiblePubkey, mutedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [visiblePubkey]: { pubkey: visiblePubkey, displayName: 'Alice' },
+                        [mutedPubkey]: { pubkey: mutedPubkey, displayName: 'Bob' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialFeedService: socialFeed.service,
+                }}
+            />,
+            { initialEntries: ['/'] }
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
+        await act(async () => {
+            feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (rendered.container.textContent || '').includes('nota visible'));
+        expect(rendered.container.textContent || '').not.toContain('nota silenciada');
+    });
+
+    test('filters silenced actors from notifications UI', async () => {
+        const ownerPubkey = persistDmCapableSession();
+        const visibleActorPubkey = 'a'.repeat(64);
+        const mutedActorPubkey = 'b'.repeat(64);
+        const notifications = createSocialNotificationsServiceMock();
+        (notifications.service.loadInitialSocial as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [
+                {
+                    id: 'mention-visible',
+                    pubkey: visibleActorPubkey,
+                    kind: 1,
+                    created_at: 101,
+                    tags: [['p', ownerPubkey], ['e', '1'.repeat(64)]],
+                    content: 'visible mention',
+                },
+                {
+                    id: 'mention-muted',
+                    pubkey: mutedActorPubkey,
+                    kind: 1,
+                    created_at: 100,
+                    tags: [['p', ownerPubkey], ['e', '2'.repeat(64)]],
+                    content: 'muted mention',
+                },
+            ],
+            hasMore: false,
+            nextSince: null,
+        });
+        const { bridge } = createMapBridgeStub();
+
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    socialNotificationsService: notifications.service,
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [visibleActorPubkey]: { pubkey: visibleActorPubkey, displayName: 'Alice' },
+                        [mutedActorPubkey]: { pubkey: mutedActorPubkey, displayName: 'Bob' },
+                    }),
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => {
+                            if (kind === 10000) {
+                                return {
+                                    id: 'mute-kind-10000-notifications',
+                                    pubkey: ownerPubkey,
+                                    kind: 10000,
+                                    created_at: 111,
+                                    tags: [],
+                                    content: JSON.stringify([['p', mutedActorPubkey]]),
+                                };
+                            }
+                            return null;
+                        },
+                        fetchEvents: async () => [],
+                    }),
+                })}
+            />,
+            { initialEntries: ['/notifications'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Alice'));
+        expect(rendered.container.textContent || '').not.toContain('Bob');
+        expect(rendered.container.textContent || '').not.toContain('muted mention');
+    });
+
+    test('silencing a followed user publishes mute list only and keeps the follow state', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const publishContactList = vi.fn(async () => ({
+            id: '1'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 3,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [['p', followedPubkey]],
+            content: '',
+            sig: '2'.repeat(128),
+        }));
+        const publishMuteList = vi.fn(async () => ({
+            id: '3'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 10000,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [],
+            content: JSON.stringify([['p', followedPubkey]]),
+            sig: '4'.repeat(128),
+        }));
+
+        vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
+            publishEvent: vi.fn(async (event: any) => ({
+                ...event,
+                id: '5'.repeat(64),
+                pubkey: ownerPubkey,
+                sig: '6'.repeat(128),
+            })),
+            publishContactList,
+            publishMuteList,
+            encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
+            decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
+        } as any);
+
+        const { bridge, triggerOccupiedBuildingContextMenu } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async () => null,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: followedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        const muteItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
+            (node.textContent || '').trim() === 'Silenciar'
+        ) as HTMLElement;
+
+        await act(async () => {
+            muteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(publishMuteList).toHaveBeenCalledTimes(1);
+        expect(publishMuteList).toHaveBeenCalledWith([followedPubkey], []);
+        expect(publishContactList).not.toHaveBeenCalled();
+
+        const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
+        expect(followingItem.closest('[data-slot="sidebar-menu-item"]')?.textContent || '').toContain('1');
+
+        await act(async () => {
+            followingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Alice'));
+    });
+
+    test('falls back to cached mute list when live fetch times out during silencing', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const publishMuteList = vi.fn(async () => ({
+            id: '3'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 10000,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [],
+            content: JSON.stringify([['p', followedPubkey]]),
+            sig: '4'.repeat(128),
+        }));
+
+        vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
+            publishEvent: vi.fn(async (event: any) => ({
+                ...event,
+                id: '5'.repeat(64),
+                pubkey: ownerPubkey,
+                sig: '6'.repeat(128),
+            })),
+            publishContactList: vi.fn(),
+            publishMuteList,
+            encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
+            decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
+        } as any);
+
+        let muteFetchCount = 0;
+        const { bridge, triggerOccupiedBuildingContextMenu } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => {
+                            if (kind === 10000) {
+                                muteFetchCount += 1;
+                                if (muteFetchCount === 1) {
+                                    return null;
+                                }
+                                throw new Error('NDK fetchEvents timed out after 5000ms');
+                            }
+                            return null;
+                        },
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: followedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        const muteItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
+            (node.textContent || '').trim() === 'Silenciar'
+        ) as HTMLElement;
+
+        await act(async () => {
+            muteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => publishMuteList.mock.calls.length === 1);
+        expect(publishMuteList).toHaveBeenCalledWith([followedPubkey], []);
     });
 
     test('redirects zap actions to wallet when no wallet is connected', async () => {

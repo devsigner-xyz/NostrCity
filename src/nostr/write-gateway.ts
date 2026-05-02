@@ -6,6 +6,7 @@ import {
     type UnsignedNostrEvent,
 } from './auth/providers/types';
 import type { NostrEvent } from './types';
+import { buildEncryptedMuteListContent } from './mute-list';
 
 interface WriteGatewayOptions {
     getSession: () => AuthSessionState | undefined;
@@ -86,6 +87,22 @@ export function createWriteGateway(options: WriteGatewayOptions) {
                 content: '',
                 created_at: now(),
                 tags,
+            });
+        },
+
+        async publishMuteList(mutedPubkeys: string[], preservedTags: string[][] = []): Promise<NostrEvent> {
+            const { session, provider } = requireEncryption(options, 'nip44');
+            const content = await buildEncryptedMuteListContent({
+                tags: [...preservedTags, ...dedupePubkeys(mutedPubkeys).map((pubkey) => ['p', pubkey])],
+                provider,
+                ownerPubkey: session.pubkey,
+            });
+
+            return this.publishEvent({
+                kind: 10000,
+                content,
+                created_at: now(),
+                tags: [],
             });
         },
 

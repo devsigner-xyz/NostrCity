@@ -72,6 +72,8 @@ function createDefaultProps(overrides: Partial<ComponentProps<typeof OverlaySide
         profiles: {
             [ALICE_PUBKEY]: { pubkey: ALICE_PUBKEY, displayName: 'Alice' },
         },
+        mutedPubkeys: [],
+        mutedProfiles: {},
         followers: [BOB_PUBKEY],
         followerProfiles: {
             [BOB_PUBKEY]: { pubkey: BOB_PUBKEY, displayName: 'Bob' },
@@ -82,6 +84,7 @@ function createDefaultProps(overrides: Partial<ComponentProps<typeof OverlaySide
         onLocateFollowing: vi.fn(),
         onMessagePerson: vi.fn(),
         onFollowPerson: vi.fn(),
+        onToggleMutePerson: vi.fn(),
         onViewPersonDetails: vi.fn(),
         zapAmounts: [21, 128],
         onZapPerson: vi.fn(),

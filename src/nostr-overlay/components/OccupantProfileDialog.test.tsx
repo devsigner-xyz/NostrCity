@@ -880,6 +880,45 @@ describe('OccupantProfileDialog', () => {
         expect(ownProfile.container.querySelector('button[aria-label="Enviar mensaje a Alice"]')).toBeNull();
     });
 
+    test('shows mute action in header for the active profile and switches to desilenciar when muted', async () => {
+        const onToggleMuteProfile = vi.fn(() => new Promise<void>(() => {}));
+        const rendered = await renderElement(
+            <OccupantProfileDialog
+                {...buildProps({
+                    ownerPubkey: 'f'.repeat(64),
+                    onToggleMuteProfile,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        const muteAliceButton = document.body.querySelector('button[aria-label="Silenciar a Alice"]') as HTMLButtonElement;
+        expect(muteAliceButton).toBeDefined();
+        expect((muteAliceButton.textContent || '').trim()).toBe('Silenciar');
+
+        await act(async () => {
+            muteAliceButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onToggleMuteProfile).toHaveBeenCalledTimes(1);
+        expect(onToggleMuteProfile).toHaveBeenCalledWith('a'.repeat(64));
+
+        const rerendered = await renderElement(
+            <OccupantProfileDialog
+                {...buildProps({
+                    ownerPubkey: 'f'.repeat(64),
+                    mutedPubkeys: ['a'.repeat(64)],
+                    onToggleMuteProfile,
+                })}
+            />
+        );
+        mounted.push(rerendered);
+
+        const unmuteAliceButton = rerendered.container.querySelector('button[aria-label="Desilenciar a Alice"]') as HTMLButtonElement;
+        expect(unmuteAliceButton).toBeDefined();
+        expect((unmuteAliceButton.textContent || '').trim()).toBe('Desilenciar');
+    });
+
     test('shows action menu in network tabs and executes copy, message, and details actions', async () => {
         const onSelectProfile = vi.fn();
         const onCopyNpub = vi.fn();
@@ -944,6 +983,69 @@ describe('OccupantProfileDialog', () => {
             detailsMenuItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
         expect(onSelectProfile).toHaveBeenCalledWith('d'.repeat(64));
+    });
+
+    test('shows silenciar or desilenciar in network action menus based on mute state', async () => {
+        const onToggleMuteProfile = vi.fn();
+        const rendered = await renderElement(
+            <OccupantProfileDialog
+                {...buildProps({
+                    ownerPubkey: 'f'.repeat(64),
+                    onToggleMuteProfile,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        await selectTab('Seguidores');
+        await waitForCondition(() => (document.body.textContent || '').includes('Dave'));
+
+        const actionsButton = document.body.querySelector('button[aria-label="Abrir acciones para Dave"]') as HTMLButtonElement;
+        await act(async () => {
+            actionsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitForCondition(() => (document.body.textContent || '').includes('Silenciar'));
+        const muteItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((item) =>
+            (item.textContent || '').trim() === 'Silenciar'
+        ) as HTMLElement;
+        expect(muteItem).toBeDefined();
+
+        await act(async () => {
+            muteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onToggleMuteProfile).toHaveBeenCalledWith('d'.repeat(64));
+
+        await act(async () => {
+            rendered.root.unmount();
+        });
+        rendered.container.remove();
+
+        const mutedRendered = await renderElement(
+            <OccupantProfileDialog
+                {...buildProps({
+                    ownerPubkey: 'f'.repeat(64),
+                    mutedPubkeys: ['d'.repeat(64)],
+                    onToggleMuteProfile,
+                })}
+            />
+        );
+        mounted.push(mutedRendered);
+
+        await selectTab('Seguidores');
+        await waitForCondition(() => (document.body.textContent || '').includes('Dave'));
+
+        const mutedActionButtons = Array.from(document.body.querySelectorAll('button[aria-label="Abrir acciones para Dave"]'));
+        const mutedActionsButton = mutedActionButtons[mutedActionButtons.length - 1] as HTMLButtonElement;
+        await act(async () => {
+            mutedActionsButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitForCondition(() => (document.body.textContent || '').includes('Desilenciar'));
+        expect(Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).some((item) =>
+            (item.textContent || '').trim() === 'Desilenciar'
+        )).toBe(true);
     });
 
     test('keeps banner in the active scroll area and pins identity with tabs', async () => {

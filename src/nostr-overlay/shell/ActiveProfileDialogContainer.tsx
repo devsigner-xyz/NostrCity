@@ -18,6 +18,7 @@ interface ActiveProfileDialogContainerProps {
     verificationByPubkey: Record<string, Nip05ValidationResult | undefined>;
     eventReferencesById: Record<string, NostrEvent>;
     ownerFollows: string[];
+    mutedPubkeys?: string[];
     canWrite: boolean;
     canAccessDirectMessages: boolean;
     reactionByEventId: Record<string, boolean>;
@@ -35,6 +36,7 @@ interface ActiveProfileDialogContainerProps {
     onAddRelaySuggestion: (relayUrl: string, relayTypes: RelayType[]) => void | Promise<void>;
     onAddAllRelaySuggestions: (rows: Array<{ relayUrl: string; relayTypes: RelayType[] }>) => void | Promise<void>;
     onFollowProfile: (pubkey: string) => void | Promise<void>;
+    onToggleMuteProfile?: (pubkey: string) => void | Promise<void>;
     onSendMessage: (pubkey: string) => void | Promise<void>;
     onToggleReaction: (input: { eventId: string; targetPubkey?: string; emoji?: string }) => Promise<boolean>;
     onToggleRepost: (input: { eventId: string; targetPubkey?: string; repostContent?: string }) => Promise<boolean>;
@@ -62,6 +64,7 @@ export function ActiveProfileDialogContainer({
     verificationByPubkey,
     eventReferencesById,
     ownerFollows,
+    mutedPubkeys = [],
     canWrite,
     canAccessDirectMessages,
     reactionByEventId,
@@ -79,6 +82,7 @@ export function ActiveProfileDialogContainer({
     onAddRelaySuggestion,
     onAddAllRelaySuggestions,
     onFollowProfile,
+    onToggleMuteProfile,
     onSendMessage,
     onToggleReaction,
     onToggleRepost,
@@ -124,10 +128,12 @@ export function ActiveProfileDialogContainer({
             onSelectProfile={onSelectProfile}
             onCopyNpub={onCopyNpub}
             ownerFollows={ownerFollows}
+            mutedPubkeys={mutedPubkeys}
             relaySuggestionsByType={activeProfileData.relaySuggestionsByType as RelaySettingsByType}
             onAddRelaySuggestion={onAddRelaySuggestion}
             onAddAllRelaySuggestions={onAddAllRelaySuggestions}
             {...(canWrite ? { onFollowProfile } : {})}
+            {...(canWrite && onToggleMuteProfile ? { onToggleMuteProfile } : {})}
             {...(canAccessDirectMessages ? { onSendMessage } : {})}
             canWrite={canWrite}
             reactionByEventId={reactionByEventId}

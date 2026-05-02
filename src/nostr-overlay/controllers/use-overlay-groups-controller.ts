@@ -14,6 +14,7 @@ export interface OverlayGroupsService {
     publishMessage(input: {
         group: GroupAddressInput | string;
         content: string;
+        tags?: string[][];
         recentTimeline?: NostrEvent[];
     }): Promise<GroupPublishResponse | void>;
     requestJoin(input: { group: GroupAddressInput | string; code?: string }): Promise<GroupPublishResponse | void>;
@@ -61,7 +62,6 @@ interface OverlayGroupsControllerSnapshot {
     groups: NostrGroupSummary[];
     savedAddresses: GroupAddressValue[];
     addressesById: Record<string, GroupAddressInput | string>;
-    timelineById: Record<string, NostrEvent[]>;
     selectedRelayUrl: string | null;
     selectedGroupId: string | null;
 }
@@ -70,7 +70,6 @@ const EMPTY_GROUPS_SNAPSHOT: OverlayGroupsControllerSnapshot = {
     groups: [],
     savedAddresses: [],
     addressesById: {},
-    timelineById: {},
     selectedRelayUrl: null,
     selectedGroupId: null,
 };
@@ -85,7 +84,30 @@ function sortTimeline(events: NostrEvent[]): NostrEvent[] {
     });
 }
 
-function summaryFromSnapshot(snapshot: GroupsRuntimeSnapshot, flags: { isSaved: boolean; isRemembered: boolean }): NostrGroupSummary {
+function membershipStatus(input: { ownerPubkey?: string; snapshot?: GroupsRuntimeSnapshot; isRemembered: boolean }): NonNullable<NostrGroupSummary['membershipStatus']> {
+    if (input.ownerPubkey && input.snapshot?.members?.pubkeys.includes(input.ownerPubkey)) {
+        return 'confirmed';
+    }
+
+    return input.isRemembered ? 'pending' : 'none';
+}
+
+function summaryFromAddress(address: GroupAddressValue, flags: { isSaved: boolean; isRemembered: boolean }): NostrGroupSummary {
+    const group = canonicalizeGroupAddress(address);
+
+    return {
+        id: group.key,
+        name: group.id,
+        relayUrl: group.relay,
+        description: group.external,
+        memberCount: 0,
+        isSaved: flags.isSaved,
+        isRemembered: flags.isRemembered,
+        membershipStatus: flags.isRemembered ? 'pending' : 'none',
+    };
+}
+
+function summaryFromSnapshot(snapshot: GroupsRuntimeSnapshot, flags: { isSaved: boolean; isRemembered: boolean; ownerPubkey?: string }): NostrGroupSummary {
     const group = canonicalizeGroupAddress(snapshot.group);
 
     return {
@@ -96,6 +118,11 @@ function summaryFromSnapshot(snapshot: GroupsRuntimeSnapshot, flags: { isSaved: 
         memberCount: snapshot.members?.pubkeys.length ?? 0,
         isSaved: flags.isSaved,
         isRemembered: flags.isRemembered,
+        membershipStatus: membershipStatus({
+            ...(flags.ownerPubkey ? { ownerPubkey: flags.ownerPubkey } : {}),
+            snapshot,
+            isRemembered: flags.isRemembered,
+        }),
         metadataVerified: snapshot.metadataVerified,
     };
 }
@@ -187,15 +214,11 @@ async function loadGroupsSnapshot(input: {
     const addresses = dedupeGroupAddresses(input.selectedGroupAddress ? [...loaded.display, input.selectedGroupAddress] : loaded.display);
     const savedKeys = sourceKeys(loaded.saved);
     const rememberedKeys = sourceKeys(loaded.remembered);
-    const snapshots = await Promise.all(addresses.map(async (address) => input.service.loadGroup({ group: address })));
     const nextAddressesById: Record<string, GroupAddressInput | string> = {};
-    const nextTimelineById: Record<string, NostrEvent[]> = {};
-    const groups = snapshots.map((snapshot, index) => {
-        const address = addresses[index] ?? snapshot.group;
-        const id = canonicalizeGroupAddress(snapshot.group).key;
+    const groups = addresses.map((address) => {
+        const id = canonicalizeGroupAddress(address).key;
         nextAddressesById[id] = address;
-        nextTimelineById[id] = sortTimeline(snapshot.timeline);
-        return summaryFromSnapshot(snapshot, {
+        return summaryFromAddress(address, {
             isSaved: savedKeys.has(id),
             isRemembered: rememberedKeys.has(id),
         });
@@ -209,7 +232,6 @@ async function loadGroupsSnapshot(input: {
         groups,
         savedAddresses: loaded.saved,
         addressesById: nextAddressesById,
-        timelineById: nextTimelineById,
         selectedRelayUrl: selectedRelay,
         selectedGroupId: selectedGroupKey && groups.some((group) => group.id === selectedGroupKey)
             ? selectedGroupKey
@@ -260,11 +282,39 @@ export function useOverlayGroupsController({
         enabled: enabled && canLoadGroups,
     }));
     const snapshot = canLoadGroups ? groupsQuery.data ?? EMPTY_GROUPS_SNAPSHOT : EMPTY_GROUPS_SNAPSHOT;
-    const { groups, savedAddresses, addressesById, timelineById } = snapshot;
+    const { savedAddresses, addressesById } = snapshot;
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(snapshot.selectedGroupId);
     const [selectedRelayUrl, setSelectedRelayUrl] = useState<string | null>(selectedRouteGroupRelay ?? snapshot.selectedRelayUrl);
     const [messageDraft, setMessageDraft] = useState('');
     const canWrite = canUseGroupWrites(session);
+    const selectedGroupAddressValue = selectedGroupId ? addressesById[selectedGroupId] : undefined;
+    const selectedGroupQuery = useQuery(createSocialQueryOptions({
+        queryKey: nostrOverlayQueryKeys.overlayGroupDetail({
+            ownerPubkey: ownerPubkey ?? '',
+            groupKey: selectedGroupId ?? '',
+        }),
+        queryFn: async () => {
+            if (!service || !selectedGroupAddressValue) {
+                return null;
+            }
+
+            return service.loadGroup({ group: selectedGroupAddressValue });
+        },
+        enabled: enabled && Boolean(service && selectedGroupAddressValue),
+    }));
+    const selectedGroupDetail = selectedGroupQuery.data ?? null;
+    const selectedGroupDetailKey = selectedGroupDetail ? canonicalizeGroupAddress(selectedGroupDetail.group).key : null;
+    const groups = snapshot.groups.map((group) => {
+        if (!selectedGroupDetail || group.id !== selectedGroupDetailKey) {
+            return group;
+        }
+
+        return summaryFromSnapshot(selectedGroupDetail, {
+            isSaved: Boolean(group.isSaved),
+            isRemembered: Boolean(group.isRemembered),
+            ...(ownerPubkey ? { ownerPubkey } : {}),
+        });
+    });
 
     useEffect(() => {
         if (!enabled) {
@@ -291,9 +341,9 @@ export function useOverlayGroupsController({
         });
     }, [enabled, groups, selectedRouteGroupKey, selectedRouteGroupRelay, snapshot.selectedGroupId, snapshot.selectedRelayUrl]);
 
-    const selectedTimeline = selectedGroupId ? timelineById[selectedGroupId] ?? [] : [];
+    const selectedTimeline = sortTimeline(selectedGroupDetail?.timeline ?? []);
 
-    const publishMessage = useCallback(async (groupIdValue: string, content: string): Promise<void> => {
+    const publishMessage = useCallback(async (groupIdValue: string, content: string, options?: { tags?: string[][] }): Promise<void> => {
         const address = addressesById[groupIdValue];
         if (!service || !address || !canWrite) {
             return;
@@ -302,10 +352,11 @@ export function useOverlayGroupsController({
         await service.publishMessage({
             group: address,
             content,
-            recentTimeline: timelineById[groupIdValue] ?? [],
+            ...(options?.tags ? { tags: options.tags } : {}),
+            recentTimeline: selectedTimeline,
         });
         setMessageDraft('');
-    }, [addressesById, canWrite, service, timelineById]);
+    }, [addressesById, canWrite, selectedTimeline, service]);
 
     const saveGroup = useCallback(async (groupIdValue: string): Promise<void> => {
         const address = addressesById[groupIdValue];
@@ -344,11 +395,20 @@ export function useOverlayGroupsController({
         const canonicalAddress = canonicalizeGroupAddress(address);
         const routeInviteCode = selectedGroupAddress && canonicalizeGroupAddress(selectedGroupAddress).key === canonicalAddress.key ? selectedInviteCode : undefined;
         const joinCode = code ?? routeInviteCode;
-        await service.requestJoin(joinCode ? { group: address, code: joinCode } : { group: address });
+        const response = await service.requestJoin(joinCode ? { group: address, code: joinCode } : { group: address });
+        const acknowledged = response === undefined || response.publish.ackedRelays.includes(canonicalAddress.relay);
+        if (!acknowledged) {
+            return;
+        }
+
         onRememberGroup?.({ relay: canonicalAddress.relay, id: canonicalAddress.id });
         queryClient.setQueryData<OverlayGroupsControllerSnapshot>(queryKey, (current) => current ? {
             ...current,
-            groups: current.groups.map((group) => group.id === canonicalAddress.key ? { ...group, isRemembered: true } : group),
+            groups: current.groups.map((group) => group.id === canonicalAddress.key ? {
+                ...group,
+                isRemembered: true,
+                membershipStatus: group.membershipStatus === 'confirmed' ? 'confirmed' : 'pending',
+            } : group),
         } : current);
     }, [addressesById, canWrite, onRememberGroup, queryClient, queryKey, selectedGroupAddress, selectedInviteCode, service]);
 
@@ -366,6 +426,9 @@ export function useOverlayGroupsController({
     const retry = useCallback(async (): Promise<void> => {
         await groupsQuery.refetch();
     }, [groupsQuery]);
+    const retryGroupDetail = useCallback(async (): Promise<void> => {
+        await selectedGroupQuery.refetch();
+    }, [selectedGroupQuery]);
 
     return {
         groups,
@@ -376,7 +439,10 @@ export function useOverlayGroupsController({
         isLoading: enabled && canLoadGroups && groupsQuery.isPending && groups.length === 0,
         error: groups.length === 0 && groupsQuery.error ? errorFallbackMessage : null,
         messageDraft,
+        selectedGroupDetail,
         selectedTimeline,
+        isGroupDetailLoading: selectedGroupQuery.isPending && Boolean(selectedGroupAddressValue),
+        groupDetailError: selectedGroupQuery.error ? errorFallbackMessage : null,
         setMessageDraft,
         selectGroup: setSelectedGroupId,
         selectRelay: setSelectedRelayUrl,
@@ -386,6 +452,7 @@ export function useOverlayGroupsController({
         requestJoin,
         requestLeave,
         retry,
+        retryGroupDetail,
         hasGroupRelaysConfigured,
         addCustomGroupRelay: onAddCustomGroupRelay,
         addSuggestedGroupRelays: onAddSuggestedGroupRelays,

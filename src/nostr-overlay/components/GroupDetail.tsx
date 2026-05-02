@@ -5,12 +5,23 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { FieldDescription } from '@/components/ui/field';
+import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { useI18n } from '@/i18n/useI18n';
 import { MoreHorizontalIcon } from 'lucide-react';
-import { useState } from 'react';
-import type { NostrEvent } from '../../nostr/types';
+import { useRef, useState } from 'react';
+import type { NostrEvent, NostrProfile } from '../../nostr/types';
+import { useSelectedImageFile } from '../hooks/useSelectedImageFile';
+import type { ImageFileRejectionReason } from '../media/image-file-policy';
+import type { UploadedImageAttachment } from '../media/upload-note-image-attachment';
+import {
+    ComposerImageAttachmentButton,
+    ComposerImageAttachmentPreview,
+    imageFileRejectionMessageKey,
+} from './ComposerImageAttachment';
 import type { NostrGroupSummary } from './GroupsPage';
+import { RichNostrContent } from './RichNostrContent';
+import { formatGroupDisplayId } from './group-display';
 
 interface GroupDetailProps {
     group: NostrGroupSummary | null;
@@ -18,11 +29,24 @@ interface GroupDetailProps {
     disabledReason: string | null;
     messageDraft: string;
     timeline: NostrEvent[];
+    isGroupDetailLoading: boolean;
+    groupDetailError: string | null;
     onMessageDraftChange: (message: string) => void;
-    onPublishMessage: (groupId: string, message: string) => void;
+    onPublishMessage: (groupId: string, message: string, options?: { tags?: string[][] }) => void;
+    onUploadImage?: (file: File) => Promise<UploadedImageAttachment | undefined> | UploadedImageAttachment | undefined;
     onSaveGroup: (groupId: string) => void;
     onJoinGroup: (groupId: string) => void;
     onLeaveGroup: (groupId: string) => void;
+    onRetryGroupDetail: () => Promise<void> | void;
+    profilesByPubkey?: Record<string, NostrProfile>;
+    eventReferencesById?: Record<string, NostrEvent>;
+    onSelectProfile?: (pubkey: string) => void;
+    onResolveProfiles?: (pubkeys: string[]) => Promise<void> | void;
+    onSelectEventReference?: (eventId: string) => void;
+    onResolveEventReferences?: (
+        eventIds: string[],
+        options?: { relayHintsByEventId?: Record<string, string[]> }
+    ) => Promise<Record<string, NostrEvent> | void> | Record<string, NostrEvent> | void;
 }
 
 function sortedTimeline(timeline: NostrEvent[]): NostrEvent[] {
@@ -46,20 +70,42 @@ function shortPubkey(pubkey: string): string {
     return pubkey.slice(0, 8);
 }
 
+function appendImageUrl(content: string, url: string | undefined): string {
+    if (!url) {
+        return content;
+    }
+
+    return content.trim().length > 0 ? `${content.trim()}\n${url}` : url;
+}
+
 export function GroupDetail({
     group,
     canWrite,
     disabledReason,
     messageDraft,
     timeline,
+    isGroupDetailLoading,
+    groupDetailError,
     onMessageDraftChange,
     onPublishMessage,
+    onUploadImage,
     onSaveGroup,
     onJoinGroup,
     onLeaveGroup,
+    onRetryGroupDetail,
+    profilesByPubkey,
+    eventReferencesById,
+    onSelectProfile,
+    onResolveProfiles,
+    onSelectEventReference,
+    onResolveEventReferences,
 }: GroupDetailProps) {
     const { t, locale } = useI18n();
     const [detailsOpen, setDetailsOpen] = useState(false);
+    const { selectedImage: image, setSelectedImageFile, clearSelectedImage } = useSelectedImageFile();
+    const [imageStatus, setImageStatus] = useState('');
+    const [imageError, setImageError] = useState('');
+    const imageInputRef = useRef<HTMLInputElement | null>(null);
 
     if (!group) {
         return (
@@ -79,14 +125,44 @@ export function GroupDetail({
     const actionDescription = disabledReason;
     const textareaId = `group-message-${group.id}`;
     const textareaDescriptionId = `${textareaId}-description`;
-    const isJoined = Boolean(group.isSaved || group.isRemembered);
+    const membershipStatus = group.membershipStatus ?? (group.isRemembered ? 'pending' : 'none');
+    const groupDisplayId = formatGroupDisplayId(group.id);
 
-    const handlePublish = (): void => {
+    const handlePublish = async (): Promise<void> => {
         if (!canWrite) {
             return;
         }
 
-        onPublishMessage(group.id, messageDraft);
+        const uploadedImage = image && onUploadImage ? await onUploadImage(image.file) : undefined;
+        if (image && !uploadedImage) {
+            return;
+        }
+
+        if (uploadedImage) {
+            onPublishMessage(group.id, appendImageUrl(messageDraft, uploadedImage.url), { tags: uploadedImage.tags });
+        } else {
+            onPublishMessage(group.id, messageDraft);
+        }
+        clearSelectedImage();
+        setImageStatus('');
+        setImageError('');
+    };
+
+    const selectImage = (file: File): void => {
+        setSelectedImageFile(file);
+        setImageError('');
+        setImageStatus(t('feed.imageSelected'));
+    };
+
+    const removeImage = (): void => {
+        clearSelectedImage();
+        setImageError('');
+        setImageStatus(t('feed.imageRemoved'));
+    };
+
+    const rejectImage = (reason: ImageFileRejectionReason): void => {
+        setImageStatus('');
+        setImageError(t(imageFileRejectionMessageKey(reason)));
     };
 
     const handleSave = (): void => {
@@ -114,6 +190,14 @@ export function GroupDetail({
     };
 
     const timelineItems = sortedTimeline(timeline);
+    const richContentProps = {
+        ...(profilesByPubkey !== undefined ? { profilesByPubkey } : {}),
+        ...(eventReferencesById !== undefined ? { eventReferencesById } : {}),
+        ...(onSelectProfile ? { onSelectProfile } : {}),
+        ...(onResolveProfiles ? { onResolveProfiles } : {}),
+        ...(onSelectEventReference ? { onSelectEventReference } : {}),
+        ...(onResolveEventReferences ? { onResolveEventReferences } : {}),
+    };
 
     return (
         <article className="h-full min-h-0" aria-label={t('groups.detail.aria', { name: group.name })}>
@@ -122,6 +206,7 @@ export function GroupDetail({
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 flex-col gap-1">
                             <CardTitle>{group.name}</CardTitle>
+                            <p className="break-all text-xs text-muted-foreground">{groupDisplayId}</p>
                             <div className="flex flex-wrap gap-1 pt-1">
                                 {group.isSaved ? <Badge variant="secondary">{t('groups.status.saved')}</Badge> : null}
                             </div>
@@ -166,37 +251,57 @@ export function GroupDetail({
                 </CardHeader>
                 <CardContent className="min-h-0 flex-1 py-3">
                     <section data-testid="groups-timeline" aria-label={t('groups.timeline.title')} className="flex h-full min-h-0 flex-col gap-3">
-                        {timelineItems.length === 0 ? (
+                        {isGroupDetailLoading ? (
+                            <Empty className="min-h-[14rem] justify-center border border-dashed" role="status" aria-label={t('groups.timeline.loadingTitle')}>
+                                <EmptyHeader>
+                                    <Spinner role="presentation" aria-hidden="true" />
+                                    <EmptyTitle>{t('groups.timeline.loadingTitle')}</EmptyTitle>
+                                    <EmptyDescription>{t('groups.timeline.loadingDescription')}</EmptyDescription>
+                                </EmptyHeader>
+                            </Empty>
+                        ) : groupDetailError ? (
+                            <Empty className="min-h-[14rem] justify-center border border-dashed" role="alert">
+                                <EmptyHeader>
+                                    <EmptyTitle>{t('groups.timeline.errorTitle')}</EmptyTitle>
+                                    <EmptyDescription>{groupDetailError}</EmptyDescription>
+                                </EmptyHeader>
+                                <Button type="button" variant="outline" onClick={() => { void onRetryGroupDetail(); }}>
+                                    {t('groups.timeline.retry')}
+                                </Button>
+                            </Empty>
+                        ) : timelineItems.length === 0 ? (
                             <Empty className="min-h-[14rem] justify-center border border-dashed">
                                 <EmptyHeader>
                                     <EmptyTitle>{t('groups.timeline.empty')}</EmptyTitle>
                                 </EmptyHeader>
                             </Empty>
                         ) : (
-                            <ol className="nostr-chat-messages pr-1">
+                            <ul className="nostr-chat-messages pr-1">
                                 {timelineItems.map((event) => (
-                                    <li key={event.id} className="nostr-chat-message">
+                                    <li key={event.id} className="nostr-chat-message is-incoming">
                                         <div className="nostr-chat-message-header">
                                             <strong className="nostr-chat-message-author" title={event.pubkey}>{shortPubkey(event.pubkey)}</strong>
                                             <span className="nostr-chat-message-timestamp">{formatMessageTimestamp(event.created_at, locale)}</span>
                                         </div>
-                                        <p className="nostr-chat-message-body">{event.content}</p>
-                                        <p className="nostr-chat-message-status">
-                                            {t('groups.timeline.meta', { id: event.id.slice(0, 8) })}
-                                        </p>
+                                        <RichNostrContent
+                                            content={event.content}
+                                            tags={event.tags}
+                                            {...richContentProps}
+                                            textClassName="nostr-chat-message-body whitespace-pre-wrap break-words"
+                                        />
                                     </li>
                                 ))}
-                            </ol>
+                            </ul>
                         )}
                     </section>
                 </CardContent>
                 <CardFooter className="flex flex-col items-stretch gap-2">
-                    {isJoined ? (
+                    {membershipStatus === 'confirmed' ? (
                         <form
                             className="nostr-group-composer"
                             onSubmit={(event) => {
                                 event.preventDefault();
-                                handlePublish();
+                                void handlePublish();
                             }}
                         >
                             <Textarea
@@ -209,15 +314,55 @@ export function GroupDetail({
                                 onChange={(event) => onMessageDraftChange(event.currentTarget.value)}
                                 placeholder={t('groups.composer.placeholder')}
                             />
+                            {onUploadImage ? (
+                                <>
+                                    <ComposerImageAttachmentPreview
+                                        value={image}
+                                        onChange={(value) => {
+                                            if (!value) {
+                                                removeImage();
+                                            }
+                                        }}
+                                        onEdit={() => imageInputRef.current?.click()}
+                                        compact
+                                        disabled={!canWrite}
+                                    />
+                                    <div className="sr-only" role="status" aria-live="polite">
+                                        {imageStatus}
+                                    </div>
+                                    {imageError ? (
+                                        <p className="text-xs text-destructive" role="alert">
+                                            {imageError}
+                                        </p>
+                                    ) : null}
+                                </>
+                            ) : null}
+                            <div className="flex items-center justify-between gap-2">
+                                {onUploadImage ? (
+                                    <ComposerImageAttachmentButton
+                                        inputRef={imageInputRef}
+                                        disabled={!canWrite}
+                                        onSelect={selectImage}
+                                        onReject={rejectImage}
+                                    />
+                                ) : <span />}
                             <Button
                                 type="submit"
-                                disabled={!canWrite}
+                                disabled={!canWrite || (messageDraft.trim().length === 0 && !image)}
                                 title={disabledReason ?? undefined}
                                 aria-label={t('groups.publish.aria', { name: group.name })}
                             >
                                 {t('groups.publish.action')}
                             </Button>
+                            </div>
                         </form>
+                    ) : membershipStatus === 'pending' ? (
+                        <div className="flex flex-col gap-1">
+                            <Button type="button" className="w-full" variant="secondary" disabled>
+                                {t('groups.join.pending.action')}
+                            </Button>
+                            <FieldDescription className="text-center">{t('groups.join.pending.description')}</FieldDescription>
+                        </div>
                     ) : (
                         <Button
                             type="button"

@@ -128,6 +128,20 @@ describe('groups', () => {
         ]);
     });
 
+    test('preserves additional message tags after group routing tags', () => {
+        const built = buildGroupMessageEvent({
+            group: "relay.example'maps",
+            content: 'hello group\nhttps://cdn.example/group.png',
+            ownPubkey: 'own',
+            tags: [['imeta', 'url https://cdn.example/group.png', 'm image/png']],
+        });
+
+        expect(built.tags).toEqual([
+            ['h', 'maps'],
+            ['imeta', 'url https://cdn.example/group.png', 'm image/png'],
+        ]);
+    });
+
     test('builds join, leave, and public saved groups events', () => {
         const group = { relay: 'wss://relay.example/', id: 'maps' };
 

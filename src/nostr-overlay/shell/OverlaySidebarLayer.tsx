@@ -53,6 +53,8 @@ interface OverlaySidebarLayerProps {
     onMobileAppBarBack: () => void;
     follows: string[];
     profiles: Record<string, NostrProfile>;
+    mutedPubkeys: string[];
+    mutedProfiles: Record<string, NostrProfile>;
     followers: string[];
     followerProfiles: Record<string, NostrProfile>;
     followersLoading: boolean;
@@ -61,6 +63,7 @@ interface OverlaySidebarLayerProps {
     onLocateFollowing?: (pubkey: string) => void;
     onMessagePerson?: (pubkey: string) => void | Promise<void>;
     onFollowPerson?: (pubkey: string) => void | Promise<void>;
+    onToggleMutePerson?: (pubkey: string) => void | Promise<void>;
     onViewPersonDetails?: (pubkey: string) => void;
     zapAmounts: number[];
     onZapPerson?: (pubkey: string, amount: number) => void | Promise<void>;
@@ -111,6 +114,8 @@ export function OverlaySidebarLayer({
     onMobileAppBarBack,
     follows,
     profiles,
+    mutedPubkeys,
+    mutedProfiles,
     followers,
     followerProfiles,
     followersLoading,
@@ -119,6 +124,7 @@ export function OverlaySidebarLayer({
     onLocateFollowing,
     onMessagePerson,
     onFollowPerson,
+    onToggleMutePerson,
     onViewPersonDetails: onViewPersonDetailsFromSocialSidebar,
     zapAmounts,
     onZapPerson,
@@ -174,6 +180,8 @@ export function OverlaySidebarLayer({
             <SocialSidebar
                 follows={follows}
                 profiles={profiles}
+                muted={mutedPubkeys}
+                mutedProfiles={mutedProfiles}
                 followers={followers}
                 followerProfiles={followerProfiles}
                 followersLoading={followersLoading}
@@ -182,6 +190,7 @@ export function OverlaySidebarLayer({
                 {...(onLocateFollowing ? { onLocateFollowing } : {})}
                 {...(onMessagePerson ? { onMessagePerson } : {})}
                 {...(onFollowPerson ? { onFollowPerson } : {})}
+                {...(onToggleMutePerson ? { onToggleMutePerson } : {})}
                 {...(onViewPersonDetailsFromSocialSidebar ? { onViewPersonDetails: onViewPersonDetailsFromSocialSidebar } : {})}
                 zapAmounts={zapAmounts}
                 {...(onZapPerson ? { onZapPerson } : {})}

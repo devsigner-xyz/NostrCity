@@ -11,6 +11,7 @@ import { buildOccupancyState } from '../../nostr/domain/occupancy';
 import { fetchFollowersBestEffort } from '../../nostr/followers';
 import { fetchFollowsByNpub, fetchFollowsByPubkey } from '../../nostr/follows';
 import { fetchLatestPostsByPubkey } from '../../nostr/posts';
+import { extractMuteListTags, parseMutedPubkeysFromTags } from '../../nostr/mute-list';
 import { loadProfileRelaySuggestions } from '../../nostr/profile-relay-discovery';
 import { fetchProfileStats } from '../../nostr/profile-stats';
 import { cacheProfile, fetchProfiles } from '../../nostr/profiles';
@@ -67,6 +68,10 @@ interface OverlayData {
     follows: string[];
     featuredPubkeys: string[];
     profiles: Record<string, NostrProfile>;
+    muteListTags: string[][];
+    muteListLoaded: boolean;
+    mutedPubkeys: string[];
+    mutedProfiles: Record<string, NostrProfile>;
     followers: string[];
     followerProfiles: Record<string, NostrProfile>;
     followersLoading: boolean;
@@ -198,6 +203,10 @@ function createInitialData(): OverlayData {
         follows: [],
         featuredPubkeys: FEATURED_OCCUPANT_PUBKEYS,
         profiles: {},
+        muteListTags: [],
+        muteListLoaded: false,
+        mutedPubkeys: [],
+        mutedProfiles: {},
         followers: [],
         followerProfiles: {},
         followersLoading: false,
@@ -871,8 +880,12 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
                 });
 
             const follows = dedupe(graph.follows);
+            const activeProvider = sessionController.authService.getActiveProvider();
             const featuredPubkeys = FEATURED_OCCUPANT_PUBKEYS;
             const assignmentPubkeys = dedupe([...follows, ...featuredPubkeys]);
+            let knownMuteListTags: string[][] = [];
+            let muteListLoaded = false;
+            let knownMutedPubkeys: string[] = [];
             let suggestedRelays: string[] = [];
             let suggestedRelaysByType: RelaySettingsByType = {
                 nip65Both: [],
@@ -883,7 +896,7 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
                 groups: [],
             };
             try {
-                const [relayListEvent, dmInboxRelayListEvent] = await Promise.all([
+                const [relayListEvent, dmInboxRelayListEvent, muteListEvent] = await Promise.all([
                     withTimeout(
                         graphClient.fetchLatestReplaceableEvent(graph.ownerPubkey, 10002),
                         RELAY_METADATA_TIMEOUT_MS,
@@ -893,6 +906,11 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
                         graphClient.fetchLatestReplaceableEvent(graph.ownerPubkey, 10050),
                         RELAY_METADATA_TIMEOUT_MS,
                         'Relay timeout while fetching DM relay list (kind 10050)',
+                    ),
+                    withTimeout(
+                        graphClient.fetchLatestReplaceableEvent(graph.ownerPubkey, 10000),
+                        RELAY_METADATA_TIMEOUT_MS,
+                        'Relay timeout while fetching mute list (kind 10000)',
                     ),
                 ]);
                 const nip65ByType = relaySuggestionsByTypeFromKind10002Event(relayListEvent);
@@ -904,6 +922,210 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
                     groups: [],
                 };
                 suggestedRelays = relayListFromKind10002Event(relayListEvent);
+                knownMuteListTags = await extractMuteListTags({
+                    event: muteListEvent,
+                    ...(activeProvider ? { provider: activeProvider } : {}),
+                    ownerPubkey: graph.ownerPubkey,
+                });
+                knownMutedPubkeys = parseMutedPubkeysFromTags(knownMuteListTags);
+                muteListLoaded = true;
+
+                if (requestIdRef.current !== requestId) {
+                    return;
+                }
+
+                setState((current) => ({
+                    ...current,
+                    status: 'loading_profiles',
+                    error: undefined,
+                }));
+                setMapLoaderStage('fetching_data');
+
+                const profilePubkeys = dedupe([...assignmentPubkeys, ...knownMutedPubkeys]);
+                const [ownerProfiles, profiles] = await Promise.all([
+                    resolveProfilesByOwner({
+                        ownerPubkey: graph.ownerPubkey,
+                        pubkeys: [graph.ownerPubkey],
+                        legacyClient: graphClient,
+                    }),
+                    resolveProfilesByOwner({
+                        ownerPubkey: graph.ownerPubkey,
+                        pubkeys: profilePubkeys,
+                        legacyClient: graphClient,
+                    }),
+                ]);
+                const ownerProfile = ownerProfiles[graph.ownerPubkey];
+                const mutedProfiles = Object.fromEntries(
+                    knownMutedPubkeys.map((pubkey) => [pubkey, profiles[pubkey]]).filter((entry): entry is [string, NostrProfile] => Boolean(entry[1]))
+                );
+
+                if (requestIdRef.current !== requestId) {
+                    return;
+                }
+
+                setState((current) => ({
+                    ...current,
+                    status: 'assigning_map',
+                    error: undefined,
+                }));
+                setMapLoaderStage('building_map');
+
+                const targetBuildings = resolveTargetBuildingsFromFollows(follows);
+                await mapBridge.regenerateMap({ targetBuildings });
+                const buildings = mapBridge.listBuildings();
+                const assignments = assignPubkeysToBuildings({
+                    pubkeys: assignmentPubkeys,
+                    priorityPubkeys: featuredPubkeys,
+                    buildingsCount: buildings.length,
+                    seed: graph.ownerPubkey,
+                });
+
+                const occupancy = buildOccupancyState({
+                    buildingsCount: buildings.length,
+                    assignments: assignments.assignments,
+                });
+
+                await applyOccupancyProgressively({
+                    byBuildingIndex: occupancy.byBuildingIndex,
+                    shouldStop: () => requestIdRef.current !== requestId,
+                    ...(occupancy.selectedBuildingIndex !== undefined
+                        ? { selectedBuildingIndex: occupancy.selectedBuildingIndex }
+                        : {}),
+                });
+
+                if (requestIdRef.current !== requestId) {
+                    return;
+                }
+
+                setMapLoaderStage(null);
+
+                setState({
+                    status: 'loading_followers',
+                    error: undefined,
+                    data: {
+                        ownerPubkey: graph.ownerPubkey,
+                        ownerProfile,
+                        ownerBuildingIndex: resolveOwnerBuildingIndex(graph.ownerPubkey, buildings.length),
+                        follows,
+                        featuredPubkeys,
+                        profiles,
+                        muteListTags: knownMuteListTags,
+                        muteListLoaded,
+                        mutedPubkeys: knownMutedPubkeys,
+                        mutedProfiles,
+                        followers: [],
+                        followerProfiles: {},
+                        followersLoading: true,
+                        assignments,
+                        buildingsCount: buildings.length,
+                        parkCount: mapBridge.getParkCount(),
+                        relayHints: graph.relayHints,
+                        suggestedRelays,
+                        suggestedRelaysByType,
+                        selectedPubkey: undefined,
+                        ...createEmptyActiveProfileState(),
+                    },
+                });
+                await (async () => {
+                    const followerSet = new Set<string>();
+                    const nextFollowerProfiles: Record<string, NostrProfile> = {};
+                    const followerBatcher = createFollowerBatcher(async (newFollowers: string[]) => {
+                        if (requestIdRef.current !== requestId || newFollowers.length === 0) {
+                            return;
+                        }
+
+                        for (const pubkey of newFollowers) {
+                            followerSet.add(pubkey);
+                        }
+
+                        const fetchedProfiles = await resolveProfilesByOwner({
+                            ownerPubkey: graph.ownerPubkey,
+                            pubkeys: newFollowers,
+                            legacyClient: graphClient,
+                        });
+                        Object.assign(nextFollowerProfiles, fetchedProfiles);
+
+                        if (requestIdRef.current !== requestId) {
+                            return;
+                        }
+
+                        setState((current) => {
+                            if (
+                                !hasLoadedOverlayData(current.status) ||
+                                current.data.ownerPubkey !== graph.ownerPubkey ||
+                                requestIdRef.current !== requestId
+                            ) {
+                                return current;
+                            }
+
+                            return {
+                                ...current,
+                                data: {
+                                    ...current.data,
+                                    followers: [...followerSet],
+                                    followerProfiles: {
+                                        ...current.data.followerProfiles,
+                                        ...fetchedProfiles,
+                                    },
+                                },
+                            };
+                        });
+                    });
+
+                    try {
+                        const scopedReadRelays = resolveScopedReadRelays({
+                            relayHints: graph.relayHints,
+                            suggestedRelaysByType,
+                        });
+                        const followersResult = await graphApiService.loadFollowers({
+                            ownerPubkey: graph.ownerPubkey,
+                            pubkey: graph.ownerPubkey,
+                            candidateAuthors: follows,
+                            scopedReadRelays,
+                        });
+
+                        if (requestIdRef.current !== requestId) {
+                            return;
+                        }
+
+                        followerBatcher.add(followersResult.followers);
+
+                        await followerBatcher.flushNow();
+                    } catch {
+                        // Keep follows + profile visible even when follower discovery fails.
+                    } finally {
+                        followerBatcher.dispose();
+                    }
+
+                    if (requestIdRef.current !== requestId) {
+                        return;
+                    }
+
+                    setState((current) => {
+                        if (
+                            !hasLoadedOverlayData(current.status) ||
+                            current.data.ownerPubkey !== graph.ownerPubkey ||
+                            requestIdRef.current !== requestId
+                        ) {
+                            return current;
+                        }
+
+                        return {
+                            ...current,
+                            status: 'success',
+                            data: {
+                                ...current.data,
+                                followers: [...followerSet],
+                                followerProfiles: {
+                                    ...current.data.followerProfiles,
+                                    ...nextFollowerProfiles,
+                                },
+                                followersLoading: false,
+                            },
+                        };
+                    });
+                })();
+                return;
             } catch {
                 suggestedRelays = [];
                 suggestedRelaysByType = {
@@ -927,6 +1149,25 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
             }));
             setMapLoaderStage('fetching_data');
 
+            try {
+                knownMuteListTags = await extractMuteListTags({
+                    event: await withTimeout(
+                        graphClient.fetchLatestReplaceableEvent(graph.ownerPubkey, 10000),
+                        RELAY_METADATA_TIMEOUT_MS,
+                        'Relay timeout while fetching mute list (kind 10000)',
+                    ),
+                    ...(activeProvider ? { provider: activeProvider } : {}),
+                    ownerPubkey: graph.ownerPubkey,
+                });
+                knownMutedPubkeys = parseMutedPubkeysFromTags(knownMuteListTags);
+                muteListLoaded = true;
+            } catch {
+                knownMuteListTags = [];
+                knownMutedPubkeys = [];
+                muteListLoaded = false;
+            }
+            const profilePubkeys = dedupe([...assignmentPubkeys, ...knownMutedPubkeys]);
+
             const [ownerProfiles, profiles] = await Promise.all([
                 resolveProfilesByOwner({
                     ownerPubkey: graph.ownerPubkey,
@@ -935,11 +1176,14 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
                 }),
                 resolveProfilesByOwner({
                     ownerPubkey: graph.ownerPubkey,
-                    pubkeys: assignmentPubkeys,
+                    pubkeys: profilePubkeys,
                     legacyClient: graphClient,
                 }),
             ]);
             const ownerProfile = ownerProfiles[graph.ownerPubkey];
+            const mutedProfiles = Object.fromEntries(
+                knownMutedPubkeys.map((pubkey) => [pubkey, profiles[pubkey]]).filter((entry): entry is [string, NostrProfile] => Boolean(entry[1]))
+            );
 
             if (requestIdRef.current !== requestId) {
                 return;
@@ -991,6 +1235,10 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
                     follows,
                     featuredPubkeys,
                     profiles,
+                    muteListTags: knownMuteListTags,
+                    muteListLoaded,
+                    mutedPubkeys: knownMutedPubkeys,
+                    mutedProfiles,
                     followers: [],
                     followerProfiles: {},
                     followersLoading: true,
@@ -1379,6 +1627,98 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
         void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.activeProfile() });
     };
 
+    const toggleMutedPerson = async (pubkey: string): Promise<void> => {
+        const normalizedPubkey = pubkey.trim().toLowerCase();
+        if (!/^[a-f0-9]{64}$/.test(normalizedPubkey)) {
+            throw new Error('La cuenta a silenciar no es valida');
+        }
+
+        const current = latestStateRef.current;
+        if (!hasLoadedOverlayData(current.status) || !current.data.ownerPubkey) {
+            throw new Error('La red social aun se esta cargando');
+        }
+
+        if (!sessionController.canWrite || !sessionController.canDirectMessages) {
+            throw new Error('Tu sesion actual no puede silenciar cuentas');
+        }
+
+        if (current.data.ownerPubkey === normalizedPubkey) {
+            return;
+        }
+
+        const overlayRelays = resolveOverlayRelays(current.data.relayHints);
+        const client = createClient(overlayRelays);
+        const provider = sessionController.authService.getActiveProvider();
+        let latestMuteTags: string[][];
+        try {
+            const latestMuteEvent = await client.fetchLatestReplaceableEvent(current.data.ownerPubkey, 10000);
+            latestMuteTags = await extractMuteListTags({
+                event: latestMuteEvent,
+                ...(provider ? { provider } : {}),
+                ownerPubkey: current.data.ownerPubkey,
+                strict: true,
+            });
+        } catch (error) {
+            if (!current.data.muteListLoaded) {
+                throw error;
+            }
+            latestMuteTags = current.data.muteListTags;
+        }
+        const latestMutedPubkeys = parseMutedPubkeysFromTags(latestMuteTags);
+        const nextMutedPubkeys = latestMutedPubkeys.includes(normalizedPubkey)
+            ? latestMutedPubkeys.filter((entry) => entry !== normalizedPubkey)
+            : dedupe([...latestMutedPubkeys, normalizedPubkey]);
+        const preservedMuteTags = latestMuteTags.filter((tag) => tag[0] !== 'p');
+        const nextMuteListTags = [...preservedMuteTags, ...nextMutedPubkeys.map((entry) => ['p', entry])];
+        const resolvedMutedProfiles: Record<string, NostrProfile> = nextMutedPubkeys.includes(normalizedPubkey)
+            ? await resolveProfilesByOwner({
+                ownerPubkey: current.data.ownerPubkey,
+                pubkeys: [normalizedPubkey],
+                legacyClient: client,
+            }).catch(() => ({}))
+            : {};
+
+        await writeGateway.publishMuteList(nextMutedPubkeys, preservedMuteTags);
+
+        setState((nextState) => {
+            if (!hasLoadedOverlayData(nextState.status)) {
+                return nextState;
+            }
+
+            const updatedMutedPubkeys = nextMutedPubkeys;
+            const updatedMutedProfiles = { ...nextState.data.mutedProfiles };
+            if (!updatedMutedPubkeys.includes(normalizedPubkey)) {
+                delete updatedMutedProfiles[normalizedPubkey];
+            } else {
+                const profile = resolvedMutedProfiles[normalizedPubkey]
+                    ?? nextState.data.profiles[normalizedPubkey]
+                    ?? nextState.data.followerProfiles[normalizedPubkey];
+                if (profile) {
+                    updatedMutedProfiles[normalizedPubkey] = profile;
+                }
+            }
+
+            return {
+                ...nextState,
+                data: {
+                    ...nextState.data,
+                    profiles: {
+                        ...nextState.data.profiles,
+                        ...resolvedMutedProfiles,
+                    },
+                    muteListTags: nextMuteListTags,
+                    muteListLoaded: true,
+                    mutedPubkeys: updatedMutedPubkeys,
+                    mutedProfiles: updatedMutedProfiles,
+                },
+            };
+        });
+
+        void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.followingFeed() });
+        void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.notifications() });
+        void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.activeProfile() });
+    };
+
     const openActiveProfile = (pubkey: string, buildingIndex?: number): void => {
         if (!mapBridge || !hasLoadedOverlayData(state.status) || !pubkey) {
             return;
@@ -1761,6 +2101,8 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
         ownerProfile: state.data.ownerProfile,
         ownerBuildingIndex: state.data.ownerBuildingIndex,
         follows: state.data.follows,
+        mutedPubkeys: state.data.mutedPubkeys,
+        mutedProfiles: state.data.mutedProfiles,
         alwaysVisiblePubkeys: state.data.featuredPubkeys,
         profiles: state.data.profiles,
         followers: state.data.followers,
@@ -1796,6 +2138,7 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
         applyOwnerProfile,
         selectFollowing,
         followPerson,
+        toggleMutedPerson,
         openActiveProfile,
         closeActiveProfileDialog,
     };

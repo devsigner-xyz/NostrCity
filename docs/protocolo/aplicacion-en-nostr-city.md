@@ -19,6 +19,19 @@ La metadata ayuda a representar perfiles con más contexto visual y semántico d
 
 El resultado depende de los relays consultados. Si tu actividad, perfil o lista de follows no está en los relays configurados, Nostr City puede mostrar una vista parcial.
 
+## Silenciar cuentas
+
+Nostr City usa la `mute list` estándar de Nostr (`kind:10000`, NIP-51) para silenciar cuentas. En la interfaz aparece como `Silenciar` o `Desilenciar`, pero no crea una lista propietaria separada.
+
+Reglas actuales de producto:
+
+- Silenciar una cuenta no deja de seguirla automáticamente.
+- Una cuenta puede seguir apareciendo en `Seguidos` y, a la vez, estar en `Silenciados`.
+- La lista `Silenciados` solo aparece en el panel social cuando existe al menos una cuenta silenciada.
+- En esta iteración, el silenciamiento filtra el feed social basado en follows y las notificaciones visibles de esa cuenta.
+
+Cuando la sesión puede firmar y cifrar con NIP-44, Nostr City intenta publicar la mute list en formato cifrado, no como tags públicas, para no exponer innecesariamente las cuentas silenciadas. Si la sesión no tiene ese soporte, la interfaz no ofrece la acción de silenciar como si fuera una operación equivalente.
+
 ## Firma y acceso
 
 Los métodos de firma condicionan qué acciones puedes realizar:
@@ -48,6 +61,7 @@ Para escribir en grupos, la sesión debe poder firmar. Publicar mensajes, guarda
 - Los relays pueden aceptar, rechazar, ocultar o limitar eventos según sus reglas.
 - Los eventos cifrados protegen contenido, pero no eliminan todos los metadatos de transporte.
 - La lista `kind:10009` de grupos guardados es pública.
+- La mute list forma parte de tu actividad Nostr. Nostr City intenta mantenerla cifrada cuando la sesión soporta NIP-44, pero la privacidad efectiva también depende del firmante y de los relays desde los que leas o republíques datos.
 - La membresía real de un grupo NIP-29 depende del relay del grupo; no se debe inferir solo por una lista guardada.
 
 ## Relacionado

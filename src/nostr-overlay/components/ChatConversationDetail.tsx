@@ -4,15 +4,35 @@ import { useI18n } from '@/i18n/useI18n';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Textarea } from '@/components/ui/textarea';
+import type { NostrEvent, NostrProfile } from '../../nostr/types';
+import { useSelectedImageFile } from '../hooks/useSelectedImageFile';
+import type { ImageFileRejectionReason } from '../media/image-file-policy';
+import type { UploadedImageAttachment } from '../media/upload-note-image-attachment';
+import {
+    ComposerImageAttachmentButton,
+    ComposerImageAttachmentPreview,
+    imageFileRejectionMessageKey,
+} from './ComposerImageAttachment';
+import { RichNostrContent } from './RichNostrContent';
 
 interface ChatConversationDetailProps {
     conversation?: ChatConversationSummary;
     messages: ChatDetailMessage[];
     onSendMessage: (plaintext: string) => Promise<void> | void;
+    onUploadImage?: (file: File) => Promise<UploadedImageAttachment | undefined> | UploadedImageAttachment | undefined;
     composerAutoFocusKey?: string;
     canSend?: boolean;
     disabledReason?: string;
     showHeader?: boolean;
+    profilesByPubkey?: Record<string, NostrProfile>;
+    eventReferencesById?: Record<string, NostrEvent>;
+    onSelectProfile?: (pubkey: string) => void;
+    onResolveProfiles?: (pubkeys: string[]) => Promise<void> | void;
+    onSelectEventReference?: (eventId: string) => void;
+    onResolveEventReferences?: (
+        eventIds: string[],
+        options?: { relayHintsByEventId?: Record<string, string[]> }
+    ) => Promise<Record<string, NostrEvent> | void> | Record<string, NostrEvent> | void;
 }
 
 function deliveryStatusLabel(state: 'pending' | 'sent' | 'failed', t: ReturnType<typeof useI18n>['t']): string {
@@ -34,18 +54,37 @@ function formatMessageTimestamp(createdAt: number, locale: 'es' | 'en'): string 
     }).format(new Date(createdAt * 1000));
 }
 
+function appendImageUrl(content: string, url: string | undefined): string {
+    if (!url) {
+        return content;
+    }
+
+    return content.trim().length > 0 ? `${content.trim()}\n${url}` : url;
+}
+
 export function ChatConversationDetail({
     conversation,
     messages,
     onSendMessage,
+    onUploadImage,
     composerAutoFocusKey,
     canSend = true,
     disabledReason,
     showHeader = true,
+    profilesByPubkey,
+    eventReferencesById,
+    onSelectProfile,
+    onResolveProfiles,
+    onSelectEventReference,
+    onResolveEventReferences,
 }: ChatConversationDetailProps) {
     const { t, locale } = useI18n();
     const [draft, setDraft] = useState('');
+    const { selectedImage: image, setSelectedImageFile, clearSelectedImage } = useSelectedImageFile();
+    const [imageStatus, setImageStatus] = useState('');
+    const [imageError, setImageError] = useState('');
     const composerRef = useRef<HTMLTextAreaElement | null>(null);
+    const imageInputRef = useRef<HTMLInputElement | null>(null);
 
     useEffect(() => {
         if (!conversation || !composerRef.current) {
@@ -67,6 +106,53 @@ export function ChatConversationDetail({
             </div>
         );
     }
+
+    const selectImage = (file: File): void => {
+        setSelectedImageFile(file);
+        setImageError('');
+        setImageStatus(t('feed.imageSelected'));
+    };
+
+    const removeImage = (): void => {
+        clearSelectedImage();
+        setImageError('');
+        setImageStatus(t('feed.imageRemoved'));
+    };
+
+    const rejectImage = (reason: ImageFileRejectionReason): void => {
+        setImageStatus('');
+        setImageError(t(imageFileRejectionMessageKey(reason)));
+    };
+
+    const sendDraft = async (): Promise<void> => {
+        if (!canSend) {
+            return;
+        }
+
+        const plaintext = draft.trim();
+        if (!plaintext && !image) {
+            return;
+        }
+
+        const uploadedImage = image && onUploadImage ? await onUploadImage(image.file) : undefined;
+        if (image && !uploadedImage) {
+            return;
+        }
+
+        void onSendMessage(appendImageUrl(plaintext, uploadedImage?.url));
+        setDraft('');
+        clearSelectedImage();
+        setImageStatus('');
+        setImageError('');
+    };
+    const richContentProps = {
+        ...(profilesByPubkey !== undefined ? { profilesByPubkey } : {}),
+        ...(eventReferencesById !== undefined ? { eventReferencesById } : {}),
+        ...(onSelectProfile ? { onSelectProfile } : {}),
+        ...(onResolveProfiles ? { onResolveProfiles } : {}),
+        ...(onSelectEventReference ? { onSelectEventReference } : {}),
+        ...(onResolveEventReferences ? { onResolveEventReferences } : {}),
+    };
 
     return (
         <div className="nostr-chat-detail">
@@ -95,9 +181,15 @@ export function ChatConversationDetail({
                             </strong>
                             <span className="nostr-chat-message-timestamp">{formatMessageTimestamp(message.createdAt, locale)}</span>
                         </div>
-                        <p className="nostr-chat-message-body">
-                            {message.isUndecryptable ? t('chats.detail.body.undecryptable') : message.plaintext}
-                        </p>
+                        {message.isUndecryptable ? (
+                            <p className="nostr-chat-message-body">{t('chats.detail.body.undecryptable')}</p>
+                        ) : (
+                            <RichNostrContent
+                                content={message.plaintext}
+                                {...richContentProps}
+                                textClassName="nostr-chat-message-body whitespace-pre-wrap break-words"
+                            />
+                        )}
                         {message.direction === 'outgoing' ? (
                             <p className={`nostr-chat-message-status is-${message.deliveryState}`}>
                                 {deliveryStatusLabel(message.deliveryState, t)}
@@ -111,17 +203,7 @@ export function ChatConversationDetail({
                 className="nostr-chat-composer"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    if (!canSend) {
-                        return;
-                    }
-
-                    const plaintext = draft.trim();
-                    if (!plaintext) {
-                        return;
-                    }
-
-                    void onSendMessage(plaintext);
-                    setDraft('');
+                    void sendDraft();
                 }}
             >
                 <Textarea
@@ -132,9 +214,42 @@ export function ChatConversationDetail({
                     placeholder={t('chats.detail.placeholder')}
                     readOnly={!canSend}
                 />
-                <Button type="submit" className="nostr-chat-send" disabled={!canSend || draft.trim().length === 0}>
-                    {t('chats.detail.send')}
-                </Button>
+                {onUploadImage ? (
+                    <>
+                        <ComposerImageAttachmentPreview
+                            value={image}
+                            onChange={(value) => {
+                                if (!value) {
+                                    removeImage();
+                                }
+                            }}
+                            onEdit={() => imageInputRef.current?.click()}
+                            compact
+                            disabled={!canSend}
+                        />
+                        <div className="sr-only" role="status" aria-live="polite">
+                            {imageStatus}
+                        </div>
+                        {imageError ? (
+                            <p className="text-xs text-destructive" role="alert">
+                                {imageError}
+                            </p>
+                        ) : null}
+                    </>
+                ) : null}
+                <div className="flex items-center justify-between gap-2">
+                    {onUploadImage ? (
+                        <ComposerImageAttachmentButton
+                            inputRef={imageInputRef}
+                            disabled={!canSend}
+                            onSelect={selectImage}
+                            onReject={rejectImage}
+                        />
+                    ) : <span />}
+                    <Button type="submit" className="nostr-chat-send" disabled={!canSend || (draft.trim().length === 0 && !image)}>
+                        {t('chats.detail.send')}
+                    </Button>
+                </div>
             </form>
             {!canSend ? <p className="nostr-chat-disabled-note">{disabledReason || t('chats.detail.disabled')}</p> : null}
         </div>

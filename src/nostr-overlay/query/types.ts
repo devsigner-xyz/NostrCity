@@ -63,6 +63,11 @@ export interface OverlayGroupsQueryInput {
     selectedGroupKey?: string;
 }
 
+export interface OverlayGroupDetailQueryInput {
+    ownerPubkey: string;
+    groupKey: string;
+}
+
 export interface ActiveProfilePostsQueryInput {
     pubkey: string;
     pageSize: number;

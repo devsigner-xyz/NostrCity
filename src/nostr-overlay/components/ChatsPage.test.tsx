@@ -4,6 +4,8 @@ import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { UI_SETTINGS_STORAGE_KEY } from '../../nostr/ui-settings';
 import { ChatsPage, type ChatConversationSummary, type ChatDetailMessage } from './ChatsPage';
 
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 interface RenderResult {
     container: HTMLDivElement;
     root: Root;
@@ -25,6 +27,8 @@ let mounted: RenderResult[] = [];
 
 beforeAll(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    URL.createObjectURL = vi.fn(() => 'blob:chat-preview');
+    URL.revokeObjectURL = vi.fn();
 });
 
 afterEach(async () => {
@@ -404,6 +408,55 @@ describe('ChatsPage', () => {
         expect(rendered.container.textContent || '').toContain('Enviando...');
         expect(rendered.container.textContent || '').toContain('Enviado');
         expect(rendered.container.textContent || '').toContain('Error de entrega');
+    });
+
+    test('uploads a selected image before sending a chat message', async () => {
+        const onUploadImage = vi.fn(async (_file: File) => ({
+            url: 'https://cdn.example/chat.png',
+            tags: [['imeta', 'url https://cdn.example/chat.png', 'm image/png']],
+        }));
+        const onSendMessage = vi.fn(async (_plaintext: string) => {});
+        const rendered = await renderElement(
+            <ChatsPage
+                hasUnreadGlobal={false}
+                conversations={[buildConversation()]}
+                messages={[]}
+                activeConversationId="peer-1"
+                onOpenConversation={() => {}}
+                onSendMessage={onSendMessage}
+                {...({ onUploadImage } as { onUploadImage: typeof onUploadImage })}
+            />
+        );
+        mounted.push(rendered);
+
+        const input = rendered.container.querySelector('input[type="file"]') as HTMLInputElement | null;
+        expect(input?.getAttribute('accept')).toBe('image/jpeg,image/png,image/webp,image/avif');
+
+        const image = new File([PNG_BYTES], 'chat.png', { type: 'image/png' });
+        await act(async () => {
+            Object.defineProperty(input, 'files', {
+                configurable: true,
+                value: [image],
+            });
+            input?.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        expect(rendered.container.querySelector('img[src="blob:chat-preview"]')).not.toBeNull();
+
+        const textarea = rendered.container.querySelector('textarea') as HTMLTextAreaElement;
+        await act(async () => {
+            const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+            valueSetter?.call(textarea, 'Look');
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        await act(async () => {
+            rendered.container.querySelector('button.nostr-chat-send')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onUploadImage).toHaveBeenCalledWith(image);
+        expect(onSendMessage).toHaveBeenCalledWith('Look\nhttps://cdn.example/chat.png');
     });
 
     test('renders english chat copy when ui language is en', async () => {

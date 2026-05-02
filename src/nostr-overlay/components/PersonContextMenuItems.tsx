@@ -6,6 +6,8 @@ interface PersonContextMenuItemsProps {
     onSendMessage?: () => void | Promise<void>;
     onViewDetails?: () => void | Promise<void>;
     onLocateOnMap?: () => void | Promise<void>;
+    isMuted?: boolean;
+    onToggleMute?: () => void | Promise<void>;
     closeMenu?: () => void;
     testIdPrefix?: string;
 }
@@ -23,6 +25,8 @@ export function PersonContextMenuItems({
     onSendMessage,
     onViewDetails,
     onLocateOnMap,
+    isMuted = false,
+    onToggleMute,
     closeMenu,
     testIdPrefix,
 }: PersonContextMenuItemsProps) {
@@ -65,6 +69,14 @@ export function PersonContextMenuItems({
                     onSelect={() => run(onViewDetails)}
                 >
                     {t('personMenu.viewDetails')}
+                </ContextMenuItem>
+            ) : null}
+            {onToggleMute ? (
+                <ContextMenuItem
+                    data-testid={prefixedTestId(testIdPrefix, 'toggle-mute')}
+                    onSelect={() => run(onToggleMute)}
+                >
+                    {isMuted ? t('personMenu.unmute') : t('personMenu.mute')}
                 </ContextMenuItem>
             ) : null}
         </>

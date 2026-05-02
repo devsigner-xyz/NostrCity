@@ -3,6 +3,8 @@ import type { NostrEvent, NostrUnsignedEvent } from './types';
 import { verifyEvent } from 'nostr-tools/pure';
 
 export const GROUP_MESSAGE_KIND = 9;
+export const TEXT_NOTE_KIND = 1;
+export const GROUP_TIMELINE_KINDS = [GROUP_MESSAGE_KIND, TEXT_NOTE_KIND] as const;
 export const GROUP_METADATA_KIND = 39000;
 export const GROUP_ADMINS_KIND = 39001;
 export const GROUP_MEMBERS_KIND = 39002;
@@ -101,6 +103,7 @@ export function buildGroupMessageEvent(input: {
     content: string;
     ownPubkey: string;
     recentTimeline?: NostrEvent[];
+    tags?: string[][];
     now?: () => number;
 }): NostrUnsignedEvent {
     const group = canonicalizeGroupAddress(input.group);
@@ -114,7 +117,7 @@ export function buildGroupMessageEvent(input: {
         kind: GROUP_MESSAGE_KIND,
         created_at: timestamp(input.now),
         content: input.content,
-        tags: [['h', group.id], ...previousTags],
+        tags: [['h', group.id], ...(input.tags ?? []), ...previousTags],
     };
 }
 

@@ -22,6 +22,7 @@ No necesitas memorizar cada NIP. Lo útil es entender qué parte de la experienc
 | NIP-11 | Información anunciada por un relay, incluida la clave `self` cuando está disponible. | Si el relay no anuncia información suficiente, algunas verificaciones quedan limitadas. |
 | NIP-65 | Relays asociados a una identidad. | Una configuración incompleta puede hacer que falten eventos o perfiles. |
 | NIP-44 | Cifrado moderno usado por flujos compatibles, como NIP-46 y mensajes privados. | El cifrado protege contenido, no todos los metadatos de transporte. |
+| NIP-51 / `kind:10000` | Lista de cuentas silenciadas de la identidad activa. La app la usa para `Silenciar` / `Desilenciar` usuarios y para ocultar contenido social visible de esas cuentas. | Silenciar no deja de seguir automáticamente. Nostr City intenta publicar esta lista en formato cifrado cuando la sesión soporta NIP-44, pero la privacidad práctica depende también del firmante y de los relays. |
 
 ## Grupos
 

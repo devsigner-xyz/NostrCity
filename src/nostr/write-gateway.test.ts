@@ -93,6 +93,53 @@ describe('createWriteGateway', () => {
         });
     });
 
+    test('publishes encrypted kind 10000 mute list', async () => {
+        const provider = buildProvider();
+        const gateway = createWriteGateway({
+            getSession: () => buildSession(),
+            getProvider: () => provider,
+            now: () => 444,
+        });
+
+        await gateway.publishMuteList(['a'.repeat(64), 'b'.repeat(64), 'a'.repeat(64)]);
+
+        expect(provider.encrypt).toHaveBeenCalledWith('f'.repeat(64), JSON.stringify([
+            ['p', 'a'.repeat(64)],
+            ['p', 'b'.repeat(64)],
+        ]), 'nip44');
+        expect(provider.signEvent).toHaveBeenCalledWith({
+            kind: 10000,
+            content: `enc:${JSON.stringify([
+                ['p', 'a'.repeat(64)],
+                ['p', 'b'.repeat(64)],
+            ])}`,
+            created_at: 444,
+            tags: [],
+        });
+    });
+
+    test('preserves non-user mute tags when publishing mute list updates', async () => {
+        const provider = buildProvider();
+        const gateway = createWriteGateway({
+            getSession: () => buildSession(),
+            getProvider: () => provider,
+            now: () => 445,
+        });
+
+        await gateway.publishMuteList(['a'.repeat(64)], [
+            ['t', 'nsfw'],
+            ['word', 'spam'],
+            ['e', '1'.repeat(64)],
+        ]);
+
+        expect(provider.encrypt).toHaveBeenCalledWith('f'.repeat(64), JSON.stringify([
+            ['t', 'nsfw'],
+            ['word', 'spam'],
+            ['e', '1'.repeat(64)],
+            ['p', 'a'.repeat(64)],
+        ]), 'nip44');
+    });
+
     test('publishes profile metadata as kind 0 replaceable event', async () => {
         const provider = buildProvider();
         const gateway = createWriteGateway({
@@ -152,6 +199,25 @@ describe('createWriteGateway', () => {
         });
 
         await expect(gateway.encryptDm('a'.repeat(64), 'secret')).rejects.toMatchObject({
+            code: AUTH_PROVIDER_ERROR.AUTH_PROVIDER_UNAVAILABLE,
+        });
+    });
+
+    test('rejects mute publication when encryption is unavailable', async () => {
+        const provider = buildProvider();
+        const gateway = createWriteGateway({
+            getSession: () =>
+                buildSession({
+                    capabilities: {
+                        canSign: true,
+                        canEncrypt: false,
+                        encryptionSchemes: [],
+                    },
+                }),
+            getProvider: () => provider,
+        });
+
+        await expect(gateway.publishMuteList(['a'.repeat(64)])).rejects.toMatchObject({
             code: AUTH_PROVIDER_ERROR.AUTH_PROVIDER_UNAVAILABLE,
         });
     });

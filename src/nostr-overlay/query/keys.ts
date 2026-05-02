@@ -8,6 +8,7 @@ import type {
     EngagementQueryInput,
     FollowingFeedQueryInput,
     Nip05BatchQueryInput,
+    OverlayGroupDetailQueryInput,
     OverlayGroupsQueryInput,
     RelayGroupsQueryInput,
     NotificationsQueryInput,
@@ -153,6 +154,16 @@ export const nostrOverlayQueryKeys = {
             configuredRelays: normalizeValues(input.configuredRelays),
             hasGroupRelaysConfigured: input.hasGroupRelaysConfigured,
             selectedGroupKey: input.selectedGroupKey ?? null,
+        },
+    ] as const,
+    overlayGroupDetail: (input: OverlayGroupDetailQueryInput) => [
+        ROOT_SCOPE,
+        SOCIAL_SCOPE,
+        'groups',
+        'detail',
+        {
+            ownerPubkey: input.ownerPubkey,
+            groupKey: input.groupKey,
         },
     ] as const,
     userSearch: (input: { term: string; ownerPubkey?: string | undefined; searchRelaySetKey?: string | undefined }) => [

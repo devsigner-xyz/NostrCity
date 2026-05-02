@@ -47,6 +47,7 @@ export interface OverlayMapInteractionLayerProps {
     followerProfiles: Record<string, NostrProfile>;
     ownerPubkey?: string;
     ownerProfile?: NostrProfile;
+    mutedPubkeys?: string[];
     canWrite: boolean;
     canAccessDirectMessages: boolean;
     zapAmounts: number[];
@@ -58,6 +59,7 @@ export interface OverlayMapInteractionLayerProps {
     onCopyNpub: (npub: string) => void | Promise<void>;
     onOpenDirectMessage: (pubkey: string) => void | Promise<void>;
     onOpenProfile: (pubkey: string, buildingIndex: number) => void;
+    onToggleMutePerson?: (pubkey: string) => void | Promise<void>;
     onRequestZapPayment: (input: ZapIntentInput) => Promise<void>;
     onConfigureZapAmounts: () => void;
 }
@@ -89,6 +91,7 @@ export function OverlayMapInteractionLayer({
     followerProfiles,
     ownerPubkey,
     ownerProfile,
+    mutedPubkeys = [],
     canWrite,
     canAccessDirectMessages,
     zapAmounts,
@@ -100,6 +103,7 @@ export function OverlayMapInteractionLayer({
     onCopyNpub,
     onOpenDirectMessage,
     onOpenProfile,
+    onToggleMutePerson,
     onRequestZapPayment,
     onConfigureZapAmounts,
 }: OverlayMapInteractionLayerProps) {
@@ -176,6 +180,7 @@ export function OverlayMapInteractionLayer({
             ?? followerProfiles[buildingContextMenu.pubkey]
             ?? (ownerPubkey === buildingContextMenu.pubkey ? ownerProfile : undefined)
         : undefined;
+    const mutedSet = new Set(mutedPubkeys);
     const zapLabel = translate(language, 'notifications.kind.zap');
     const configureZapAmountsLabel = translate(language, 'note.actions.configureZapAmounts');
 
@@ -221,6 +226,10 @@ export function OverlayMapInteractionLayer({
                                     ? { onSendMessage: () => onOpenDirectMessage(buildingContextMenu.pubkey) }
                                     : {})}
                                 onViewDetails={() => onOpenProfile(buildingContextMenu.pubkey, buildingContextMenu.buildingIndex)}
+                                isMuted={mutedSet.has(buildingContextMenu.pubkey)}
+                                {...(onToggleMutePerson && ownerPubkey !== buildingContextMenu.pubkey
+                                    ? { onToggleMute: () => onToggleMutePerson(buildingContextMenu.pubkey) }
+                                    : {})}
                                 closeMenu={closeOccupiedContextMenu}
                             />
 

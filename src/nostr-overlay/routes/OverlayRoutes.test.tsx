@@ -405,6 +405,8 @@ describe('OverlayRoutes', () => {
                 selectedGroupId: null,
                 isLoading: false,
                 error: null,
+                isGroupDetailLoading: false,
+                groupDetailError: null,
                 session: {
                     method: 'npub',
                     pubkey: 'f'.repeat(64),
@@ -427,6 +429,7 @@ describe('OverlayRoutes', () => {
                 onJoinGroup: noop,
                 onLeaveGroup: noop,
                 onRetry: noop,
+                onRetryGroupDetail: noop,
                 hasGroupRelaysConfigured: false,
                 onAddSuggestedGroupRelays: noop,
                 onManageGroupRelays: noop,

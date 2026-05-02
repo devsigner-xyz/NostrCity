@@ -125,6 +125,118 @@ describe('useOverlayGroupsController', () => {
         expect(controller?.groups.find((group) => group.name === 'parks')?.isRemembered).toBe(true);
     });
 
+    test('does not preload every group detail while loading the group list', async () => {
+        let controller: OverlayGroupsController | undefined;
+        const service: OverlayGroupsService = {
+            loadGroups: vi.fn(async () => ({
+                saved: [{ relay: 'wss://relay.example', id: 'maps' }],
+                remembered: [{ relay: 'wss://relay.example', id: 'parks' }],
+                discovered: [{ relay: 'wss://relay.example', id: 'artists' }],
+            })),
+            loadGroup: vi.fn(async ({ group }) => {
+                const address = group as { relay: string; id: string };
+                return snapshot(address.relay, address.id, address.id);
+            }),
+            publishMessage: vi.fn(),
+            requestJoin: vi.fn(),
+            requestLeave: vi.fn(),
+            savePublicGroups: vi.fn(),
+        };
+
+        function Harness() {
+            controller = useOverlayGroupsController({
+                enabled: true,
+                ownerPubkey: 'a'.repeat(64),
+                session: session(),
+                service,
+                configuredGroupRelays: ['wss://relay.example'],
+                errorFallbackMessage: 'Could not load groups',
+            });
+            return null;
+        }
+
+        await render(<Harness />);
+        await waitFor(() => controller?.groups.length === 3);
+        await waitFor(() => (service.loadGroup as ReturnType<typeof vi.fn>).mock.calls.length === 1);
+
+        expect(service.loadGroups).toHaveBeenCalledTimes(1);
+        expect(service.loadGroup).toHaveBeenCalledTimes(1);
+    });
+
+    test('marks remembered groups pending until selected detail confirms membership', async () => {
+        let controller: OverlayGroupsController | undefined;
+        const service: OverlayGroupsService = {
+            loadGroups: vi.fn(async () => ({
+                saved: [],
+                remembered: [{ relay: 'wss://relay.example', id: 'parks' }],
+                discovered: [],
+            })),
+            loadGroup: vi.fn(async () => ({
+                ...snapshot('wss://relay.example', 'parks', 'parks'),
+                members: { id: 'parks', pubkeys: ['a'.repeat(64)] },
+            })),
+            publishMessage: vi.fn(),
+            requestJoin: vi.fn(),
+            requestLeave: vi.fn(),
+            savePublicGroups: vi.fn(),
+        };
+
+        function Harness() {
+            controller = useOverlayGroupsController({
+                enabled: true,
+                ownerPubkey: 'a'.repeat(64),
+                session: session(),
+                service,
+                configuredGroupRelays: ['wss://relay.example'],
+                errorFallbackMessage: 'Could not load groups',
+            });
+            return null;
+        }
+
+        await render(<Harness />);
+        await waitFor(() => controller?.groups[0]?.membershipStatus === 'confirmed');
+
+        expect(controller?.groups[0]?.isRemembered).toBe(true);
+        expect(controller?.groups[0]?.membershipStatus).toBe('confirmed');
+    });
+
+    test('keeps remembered groups pending when relay members do not include the owner', async () => {
+        let controller: OverlayGroupsController | undefined;
+        const service: OverlayGroupsService = {
+            loadGroups: vi.fn(async () => ({
+                saved: [],
+                remembered: [{ relay: 'wss://relay.example', id: 'parks' }],
+                discovered: [],
+            })),
+            loadGroup: vi.fn(async () => ({
+                ...snapshot('wss://relay.example', 'parks', 'parks'),
+                members: { id: 'parks', pubkeys: ['b'.repeat(64)] },
+            })),
+            publishMessage: vi.fn(),
+            requestJoin: vi.fn(),
+            requestLeave: vi.fn(),
+            savePublicGroups: vi.fn(),
+        };
+
+        function Harness() {
+            controller = useOverlayGroupsController({
+                enabled: true,
+                ownerPubkey: 'a'.repeat(64),
+                session: session(),
+                service,
+                configuredGroupRelays: ['wss://relay.example'],
+                errorFallbackMessage: 'Could not load groups',
+            });
+            return null;
+        }
+
+        await render(<Harness />);
+        await waitFor(() => controller?.groups[0]?.membershipStatus === 'pending');
+
+        expect(controller?.groups[0]?.isRemembered).toBe(true);
+        expect(controller?.groups[0]?.membershipStatus).toBe('pending');
+    });
+
     test('join uses invite code, remembers locally, and does not save public groups', async () => {
         let controller: OverlayGroupsController | undefined;
         const requestJoin = vi.fn(async () => undefined);
