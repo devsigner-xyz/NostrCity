@@ -10,21 +10,38 @@ import {
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/i18n/useI18n';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { parseGroupInviteLink, type ParsedGroupInviteLink } from '../../nostr/group-invite-links';
 
 interface GroupInviteDialogProps {
     onOpenInvite: (invite: ParsedGroupInviteLink) => void;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    trigger?: ReactNode | null;
 }
 
-export function GroupInviteDialog({ onOpenInvite }: GroupInviteDialogProps) {
+export function GroupInviteDialog({ onOpenInvite, open, onOpenChange, trigger }: GroupInviteDialogProps) {
     const { t } = useI18n();
-    const [open, setOpen] = useState(false);
+    const [internalOpen, setInternalOpen] = useState(false);
     const [value, setValue] = useState('');
     const [inviteCode, setInviteCode] = useState('');
     const [error, setError] = useState<string | null>(null);
     const inputId = 'group-invite-link';
     const inviteCodeInputId = 'group-invite-code';
+    const dialogOpen = open ?? internalOpen;
+    const triggerElement = trigger === undefined ? (
+        <Button type="button" variant="outline" aria-label={t('groups.invite.openAria')}>
+            {t('groups.invite.open')}
+        </Button>
+    ) : trigger;
+
+    const setDialogOpen = (nextOpen: boolean): void => {
+        if (open === undefined) {
+            setInternalOpen(nextOpen);
+        }
+
+        onOpenChange?.(nextOpen);
+    };
 
     const openInvite = (): void => {
         const invite = parseGroupInviteLink(value, inviteCode);
@@ -35,18 +52,14 @@ export function GroupInviteDialog({ onOpenInvite }: GroupInviteDialogProps) {
 
         setError(null);
         onOpenInvite(invite);
-        setOpen(false);
+        setDialogOpen(false);
         setValue('');
         setInviteCode('');
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button type="button" variant="outline" aria-label={t('groups.invite.openAria')}>
-                    {t('groups.invite.open')}
-                </Button>
-            </DialogTrigger>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            {triggerElement ? <DialogTrigger asChild>{triggerElement}</DialogTrigger> : null}
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t('groups.invite.title')}</DialogTitle>

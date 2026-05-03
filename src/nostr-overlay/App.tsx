@@ -17,6 +17,7 @@ import { useOverlayNotificationsController } from './controllers/use-overlay-not
 import { useOverlayDmController } from './controllers/use-overlay-dm-controller';
 import { useOverlayGroupsController } from './controllers/use-overlay-groups-controller';
 import { addRememberedGroup } from '../nostr/group-remembered-storage';
+import { canonicalizeGroupAddress } from '../nostr/groups';
 import { useWalletZapController, type ZapIntentInput } from './controllers/use-wallet-zap-controller';
 import { useEasterEggDiscoveryController } from './hooks/useEasterEggDiscoveryController';
 import { useFollowingFeedEngagementQuery } from './query/following-feed.query';
@@ -42,6 +43,7 @@ import {
     type OptimisticZapEntry,
 } from './app.selectors';
 import type { SocialComposeSubmitInput } from './components/SocialComposeDialog';
+import type { NostrGroupSummary } from './components/GroupsPage';
 import { uploadImageToBlossom, type UploadedImageAttachment } from './media/blossom-image-upload';
 import { uploadImageBlobToBlossom } from './media/blossom-upload';
 import type { MapBridge } from './map-bridge';
@@ -129,7 +131,6 @@ export function App({ mapBridge, services }: AppProps) {
         isUiSettingsDialogOpen,
         openUiSettingsDialog,
         closeUiSettingsDialog,
-        openSettingsPage,
         openSettingsDestination,
         openGlobalUserSearch,
         closeGlobalUserSearch,
@@ -171,7 +172,7 @@ export function App({ mapBridge, services }: AppProps) {
     );
     const loginDisabled = overlay.status !== 'idle' && overlay.status !== 'success' && overlay.status !== 'error';
     const mapLoaderText = selectMapLoaderStageLabel(overlay.mapLoaderStage, uiSettings.language);
-    const mobileAppBarShowBack = shouldShowMobileBack(location.pathname);
+    const mobileAppBarShowBack = shouldShowMobileBack(location.pathname, location.search);
     const agoraReturnFocusEventId = location.pathname === '/agora'
         ? routeReturnStateFromUnknown(location.state).returnFocusEventId
         : undefined;
@@ -1151,6 +1152,17 @@ export function App({ mapBridge, services }: AppProps) {
 
         return new URLSearchParams(location.search).get('code')?.trim() || undefined;
     }, [location.pathname, location.search]);
+    const selectedGroupDetailId = useMemo(() => {
+        if (!selectedGroupAddress) {
+            return null;
+        }
+
+        try {
+            return canonicalizeGroupAddress(selectedGroupAddress).key;
+        } catch {
+            return null;
+        }
+    }, [selectedGroupAddress]);
     const rememberGroup = useCallback((group: Parameters<typeof addRememberedGroup>[0]['group']) => {
         if (!overlay.ownerPubkey) {
             return;
@@ -1163,6 +1175,12 @@ export function App({ mapBridge, services }: AppProps) {
         if (invite.code) {
             params.set('code', invite.code);
         }
+
+        navigate(`/groups?${params.toString()}`);
+    }, [navigate]);
+    const openGroupDetail = useCallback((group: NostrGroupSummary) => {
+        const address = canonicalizeGroupAddress(group.id);
+        const params = new URLSearchParams({ relay: address.relay, group: address.id });
 
         navigate(`/groups?${params.toString()}`);
     }, [navigate]);
@@ -1451,6 +1469,8 @@ export function App({ mapBridge, services }: AppProps) {
                         timeline: groupsController.selectedTimeline,
                         onSelectRelay: groupsController.selectRelay,
                         onSelectGroup: groupsController.selectGroup,
+                        activeGroupDetailId: selectedGroupDetailId,
+                        onOpenGroupDetail: openGroupDetail,
                         onMessageDraftChange: groupsController.setMessageDraft,
                         onPublishMessage: groupsController.publishMessage,
                         onUploadImage: async (file) => uploadComposeImage({ file }),

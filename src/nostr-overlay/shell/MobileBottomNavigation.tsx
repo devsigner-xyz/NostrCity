@@ -8,6 +8,7 @@ import { shouldShowMobileBottomNavigation } from './mobile-navigation';
 
 interface MobileBottomNavigationProps {
     activePath: string;
+    activeSearch?: string;
     canWrite: boolean;
     canAccessFollowingFeed: boolean;
     canAccessSocialNotifications: boolean;
@@ -77,6 +78,7 @@ function MobileBottomNavigationButton({ item }: { item: MobileBottomNavigationIt
 
 export function MobileBottomNavigation({
     activePath,
+    activeSearch = '',
     canWrite,
     canAccessFollowingFeed,
     canAccessSocialNotifications,
@@ -93,7 +95,7 @@ export function MobileBottomNavigation({
     const { t } = useI18n();
     const { isMobile } = useSidebar();
 
-    if (!isMobile || !shouldShowMobileBottomNavigation(activePath)) {
+    if (!isMobile || !shouldShowMobileBottomNavigation(activePath, activeSearch)) {
         return null;
     }
 

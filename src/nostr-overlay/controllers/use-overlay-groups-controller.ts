@@ -292,6 +292,7 @@ export function useOverlayGroupsController({
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(snapshot.selectedGroupId);
     const [selectedRelayUrl, setSelectedRelayUrl] = useState<string | null | undefined>(selectedRouteGroupRelay ?? snapshot.selectedRelayUrl ?? undefined);
     const [messageDraft, setMessageDraft] = useState('');
+    const [loadedGroupDetailsByKey, setLoadedGroupDetailsByKey] = useState<Record<string, GroupsRuntimeSnapshot>>({});
     const canWrite = canUseGroupWrites(session);
     const selectedGroupAddressValue = selectedGroupId ? addressesById[selectedGroupId] : undefined;
     const selectedGroupQuery = useQuery(createSocialQueryOptions({
@@ -310,12 +311,34 @@ export function useOverlayGroupsController({
     }));
     const selectedGroupDetail = selectedGroupQuery.data ?? null;
     const selectedGroupDetailKey = selectedGroupDetail ? canonicalizeGroupAddress(selectedGroupDetail.group).key : null;
+
+    useEffect(() => {
+        if (!selectedGroupDetail || !selectedGroupDetailKey) {
+            return;
+        }
+
+        setLoadedGroupDetailsByKey((current) => {
+            if (current[selectedGroupDetailKey] === selectedGroupDetail) {
+                return current;
+            }
+
+            return {
+                ...current,
+                [selectedGroupDetailKey]: selectedGroupDetail,
+            };
+        });
+    }, [selectedGroupDetail, selectedGroupDetailKey]);
+
     const groups = snapshot.groups.map((group) => {
-        if (!selectedGroupDetail || group.id !== selectedGroupDetailKey) {
+        const loadedDetail = group.id === selectedGroupDetailKey
+            ? selectedGroupDetail
+            : loadedGroupDetailsByKey[group.id];
+
+        if (!loadedDetail) {
             return group;
         }
 
-        return summaryFromSnapshot(selectedGroupDetail, {
+        return summaryFromSnapshot(loadedDetail, {
             isSaved: Boolean(group.isSaved),
             isRemembered: Boolean(group.isRemembered),
             ...(ownerPubkey ? { ownerPubkey } : {}),

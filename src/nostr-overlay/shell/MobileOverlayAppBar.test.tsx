@@ -161,4 +161,5 @@ describe('MobileOverlayAppBar', () => {
 
         expect(rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"]')).toBeNull();
     });
+
 });

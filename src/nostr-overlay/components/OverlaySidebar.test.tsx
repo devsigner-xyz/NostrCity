@@ -540,7 +540,7 @@ describe('OverlaySidebar', () => {
         expect(rendered.onMobileAppBarBack).toHaveBeenCalledTimes(1);
     });
 
-    test('keeps bottom navigation actions out of the mobile sidebar', async () => {
+    test('keeps bottom navigation actions visible in the mobile sidebar', async () => {
         setMobileViewport();
         const rendered = await renderSidebar({ open: false });
         mounted.push(rendered);
@@ -555,11 +555,11 @@ describe('OverlaySidebar', () => {
         const mobileSidebar = document.body.querySelector('[data-mobile="true"]') as HTMLElement;
         const sidebarLabels = Array.from(mobileSidebar.querySelectorAll('button')).map((button) => button.getAttribute('aria-label'));
 
-        expect(sidebarLabels).not.toContain('Abrir mapa');
-        expect(sidebarLabels).not.toContain('Abrir Ágora');
-        expect(sidebarLabels).not.toContain('Abrir publicar');
-        expect(sidebarLabels).not.toContain('Abrir relays');
-        expect(sidebarLabels).not.toContain('Abrir notificaciones');
+        expect(sidebarLabels).toContain('Abrir mapa');
+        expect(sidebarLabels).toContain('Abrir Ágora');
+        expect(sidebarLabels).toContain('Abrir publicar');
+        expect(sidebarLabels).toContain('Abrir relays');
+        expect(sidebarLabels).toContain('Abrir notificaciones');
     });
 
     test('keeps primary actions reachable in the mobile sidebar when the bottom navigation is hidden', async () => {

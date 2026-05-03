@@ -14,7 +14,7 @@
 ![Playwright](https://img.shields.io/badge/Playwright-1.59-2EAD33?style=flat-square&logo=playwright&logoColor=white)
 [![License: LGPL-3.0-only](https://img.shields.io/badge/License-LGPL--3.0--only-blue?style=flat-square)](./LICENSE)
 
-[Overview](#overview) • [Features](#features) • [Getting Started](#getting-started) • [Project Structure](#project-structure) • [Scripts](#scripts) • [Contributing](#contributing)
+[Overview](#overview) • [Features](#features) • [Supported NIPs](#supported-nips) • [Getting Started](#getting-started) • [Project Structure](#project-structure) • [Scripts](#scripts) • [Contributing](#contributing)
 
 </div>
 
@@ -43,6 +43,40 @@ In development, Vite proxies `/v1/*` to the local BFF so the browser app can use
 - **Modern frontend stack** using React 19, Vite, Tailwind CSS v4, shadcn/ui-compatible components, Radix UI, and React Router.
 - **Documentation site** powered by VitePress.
 - **Quality gates** with ESLint, TypeScript, Vitest, and Playwright smoke tests.
+
+## Supported NIPs
+
+Nostr City currently supports or integrates the following NIPs. Notes marked partial, legacy, or scoped mean the app uses that NIP for the listed product flows rather than implementing every optional client behavior.
+
+- [x] NIP-01: Basic protocol flow description
+- [x] NIP-02: Follow List (no petname UI)
+- [x] NIP-04: Encrypted Direct Message (legacy kind `4` read/decrypt fallback)
+- [x] NIP-05: Mapping Nostr keys to DNS-based internet identifiers
+- [x] NIP-07: `window.nostr` capability for web browsers
+- [x] NIP-09: Event Deletion Request (scoped to viewer reaction deletion handling)
+- [x] NIP-10: Text Notes and Threads
+- [x] NIP-11: Relay Information Document
+- [x] NIP-17: Private Direct Messages
+- [x] NIP-18: Reposts
+- [x] NIP-19: bech32-encoded entities (`npub`, `nprofile`, `note`, `nevent`)
+- [x] NIP-21: `nostr:` URI scheme (inline content references)
+- [x] NIP-23: Long-form Content
+- [x] NIP-25: Reactions
+- [x] NIP-27: Text Note References
+- [x] NIP-29: Relay-based Groups (partial group discovery, timeline, join/leave, and saved groups flows)
+- [x] NIP-44: Encrypted Payloads (Versioned)
+- [x] NIP-46: Nostr Remote Signing
+- [x] NIP-47: Nostr Wallet Connect
+- [x] NIP-50: Search Capability
+- [x] NIP-51: Lists (`kind:10000` mute lists and `kind:10009` saved groups)
+- [x] NIP-57: Lightning Zaps
+- [x] NIP-59: Gift Wrap
+- [x] NIP-65: Relay List Metadata
+- [x] NIP-92: Media Attachments (`imeta` image/video rendering and uploaded image tags)
+- [x] NIP-98: HTTP Auth
+- [x] NIP-B7: Blossom (image upload integration)
+
+See [NIPs used](./docs/protocolo/nips-usadas.md) for the user-facing protocol explanation and current limitations.
 
 ## Getting Started
 

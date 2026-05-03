@@ -1,4 +1,4 @@
-import { act, type ReactElement } from 'react';
+import { act, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { nip19 } from 'nostr-tools';
@@ -42,7 +42,25 @@ afterEach(async () => {
     }
 
     mounted.length = 0;
+    setGroupsViewport(1280);
 });
+
+function setGroupsViewport(width: number): void {
+    Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: width,
+    });
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('1023px') ? width <= 1023 : false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    }));
+}
 
 function session(overrides: Partial<AuthSessionState> = {}): AuthSessionState {
     const method: LoginMethod = overrides.method ?? 'nip07';
@@ -227,6 +245,7 @@ describe('GroupsPage', () => {
         const groupList = rendered.container.querySelector('nav[aria-label="Lista de grupos"]');
         expect(groupList).not.toBeNull();
         expect(groupList?.className).toContain('overflow-y-auto');
+        expect(groupList?.className).toContain('gap-0');
         expect(groupList?.textContent || '').toContain("relay.example'gardeners");
         expect(groupList?.textContent || '').not.toContain("wss://relay.example'gardeners");
         const groupListCard = groupList?.closest('[data-slot="card"]');
@@ -248,6 +267,91 @@ describe('GroupsPage', () => {
         });
 
         expect(onSelectGroup).toHaveBeenCalledWith("wss://relay.example'builders");
+        expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    });
+
+    test('shows selected group detail as a mobile detail page', async () => {
+        setGroupsViewport(820);
+        const onSelectGroup = vi.fn();
+        const onOpenGroupDetail = vi.fn();
+
+        function MobileGroupsPage() {
+            const [selectedGroupId, setSelectedGroupId] = useState("wss://relay.example'gardeners");
+            const [activeGroupDetailId, setActiveGroupDetailId] = useState<string | null>(null);
+
+            return page({
+                selectedGroupId,
+                activeGroupDetailId,
+                onSelectGroup: (groupId) => {
+                    setSelectedGroupId(groupId);
+                    onSelectGroup(groupId);
+                },
+                onOpenGroupDetail: (group) => {
+                    setActiveGroupDetailId(group.id);
+                    onOpenGroupDetail(group);
+                },
+            });
+        }
+
+        const rendered = await renderElement(<MobileGroupsPage />);
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('article[aria-label="Detalle del grupo City Gardeners"]')).toBeNull();
+        expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+        expect(rendered.container.querySelector('nav[aria-label="Lista de grupos"]')).not.toBeNull();
+        expect(rendered.container.querySelector('[data-testid="groups-controls"]')).not.toBeNull();
+
+        const builders = Array.from(rendered.container.querySelectorAll('button')).find((button) => button.textContent?.includes('Builders Guild'));
+        await clickElement(builders);
+
+        expect(onSelectGroup).toHaveBeenCalledWith("wss://relay.example'builders");
+        expect(onOpenGroupDetail).toHaveBeenCalledWith(expect.objectContaining({
+            id: "wss://relay.example'builders",
+            relayUrl: 'wss://relay.example',
+        }));
+        expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+        expect(rendered.container.querySelector('nav[aria-label="Lista de grupos"]')).toBeNull();
+        expect(rendered.container.querySelector('[data-testid="groups-controls"]')).toBeNull();
+        expect(rendered.container.querySelector('article[aria-label="Detalle del grupo Builders Guild"]')).not.toBeNull();
+        expect(rendered.container.textContent || '').toContain('Builders Guild');
+        expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+        expect(onSelectGroup).toHaveBeenCalledTimes(1);
+    });
+
+    test('groups mobile and tablet controls collapse sync and invite into an options menu', async () => {
+        setGroupsViewport(820);
+        const onSyncPublicGroups = vi.fn();
+        const rendered = await renderElement(page({ onSyncPublicGroups }));
+        mounted.push(rendered);
+
+        const controls = rendered.container.querySelector('[data-testid="groups-controls"]');
+        const optionsButton = controls?.querySelector('button[aria-label="Abrir opciones de grupos"]');
+        expect(optionsButton).not.toBeNull();
+        expect(optionsButton?.className).toContain('lg:hidden');
+        expect(controls?.querySelector('button[aria-label="Relays de grupos"]')).not.toBeNull();
+
+        await clickElement(optionsButton);
+
+        const syncMenuItem = Array.from(document.body.querySelectorAll('[role="menuitem"]')).find((item) =>
+            item.textContent === 'Sincronizar relays públicos'
+        );
+        const inviteMenuItem = Array.from(document.body.querySelectorAll('[role="menuitem"]')).find((item) =>
+            item.textContent === 'Abrir grupo'
+        );
+        expect(syncMenuItem).not.toBeNull();
+        expect(inviteMenuItem).not.toBeNull();
+
+        await clickElement(syncMenuItem);
+
+        expect(onSyncPublicGroups).toHaveBeenCalledTimes(1);
+
+        await clickElement(optionsButton);
+        const reopenedInviteMenuItem = Array.from(document.body.querySelectorAll('[role="menuitem"]')).find((item) =>
+            item.textContent === 'Abrir grupo'
+        );
+        await clickElement(reopenedInviteMenuItem);
+
+        expect(document.body.querySelector('input[aria-label="Dirección de grupo"]')).not.toBeNull();
     });
 
     test('separates joined and other groups with counts', async () => {
@@ -262,6 +366,7 @@ describe('GroupsPage', () => {
         expect(rendered.container.textContent || '').toContain('City Gardeners');
         expect(rendered.container.textContent || '').toContain('Builders Guild');
         expect(rendered.container.textContent || '').not.toContain('Street Artists');
+        expect(rendered.container.querySelectorAll('nav [data-slot="item-separator"]')).toHaveLength(0);
 
         const othersRendered = await renderElement(page({ selectedGroupId: "wss://relay.example'artists" }));
         mounted.push(othersRendered);
@@ -272,7 +377,7 @@ describe('GroupsPage', () => {
         expect(othersRendered.container.textContent || '').not.toContain('Builders Guild');
     });
 
-    test('renders small shadcn item rows with an inline join action', async () => {
+    test('renders small default shadcn item rows with an inline join icon action', async () => {
         const onJoinGroup = vi.fn();
         const onSelectGroup = vi.fn();
         const rendered = await renderElement(page({
@@ -288,13 +393,16 @@ describe('GroupsPage', () => {
         const artistsItem = artistsTitle?.closest('[data-slot="item"]') as HTMLElement | null;
         expect(artistsItem).not.toBeNull();
         expect(artistsItem?.getAttribute('data-size')).toBe('sm');
-        expect(artistsItem?.getAttribute('data-variant')).toBe('outline');
+        expect(artistsItem?.getAttribute('data-variant')).toBe('default');
         expect(artistsItem?.querySelector('[data-slot="item-content"]')).not.toBeNull();
         expect(artistsItem?.querySelector('[data-slot="item-description"]')?.textContent).toContain("relay.example'artists");
 
         const joinButton = artistsItem?.querySelector('button[aria-label="Unirse a Street Artists"]') as HTMLButtonElement | null;
-        expect(joinButton?.textContent).toBe('Unirse al grupo');
-        expect(joinButton?.getAttribute('data-size')).toBe('sm');
+        expect(joinButton?.textContent).toBe('');
+        expect(joinButton?.getAttribute('data-size')).toBe('icon-sm');
+        expect(joinButton?.getAttribute('title')).toBe('Envía una solicitud para unirte a Street Artists.');
+        expect(joinButton?.querySelector('svg')).not.toBeNull();
+        expect(joinButton?.querySelector('svg')?.getAttribute('class')).toContain('lucide-plus');
 
         await clickElement(joinButton);
 
@@ -419,8 +527,11 @@ describe('GroupsPage', () => {
         const detail = other.container.querySelector('article[aria-label="Detalle del grupo Street Artists"]');
         expect(detail?.querySelector('button[aria-label="Unirse a Street Artists"]')).toBeNull();
         const joinButton = other.container.querySelector('nav [data-slot="item"] button[aria-label="Unirse a Street Artists"]') as HTMLButtonElement | null;
-        expect(joinButton?.textContent).toBe('Unirse al grupo');
-        expect(joinButton?.getAttribute('data-size')).toBe('sm');
+        expect(joinButton?.textContent).toBe('');
+        expect(joinButton?.getAttribute('data-size')).toBe('icon-sm');
+        expect(joinButton?.getAttribute('title')).toBe('Envía una solicitud para unirte a Street Artists.');
+        expect(joinButton?.querySelector('svg')).not.toBeNull();
+        expect(joinButton?.querySelector('svg')?.getAttribute('class')).toContain('lucide-plus');
         expect(other.container.querySelector('textarea[aria-label="Mensaje para Street Artists"]')).toBeNull();
         expect(other.container.querySelector('button[aria-label="Publicar mensaje en Street Artists"]')).toBeNull();
         await act(async () => {
@@ -461,8 +572,15 @@ describe('GroupsPage', () => {
         expect(rendered.container.textContent || '').not.toContain('Firmaste la solicitud, pero el relay todavía no te confirma como miembro.');
         expect(rendered.container.querySelector('[data-testid="groups-timeline"] button')?.textContent).toBe('Solicitud enviada');
         expect(rendered.container.querySelector('[data-testid="groups-timeline"] button')?.hasAttribute('disabled')).toBe(true);
+        const pendingAction = rendered.container.querySelector('nav [data-slot="item"] button[aria-label="Solicitud pendiente para Builders Guild"]') as HTMLButtonElement | null;
+        expect(pendingAction).not.toBeNull();
+        expect(pendingAction?.textContent).toBe('');
+        expect(pendingAction?.disabled).toBe(true);
+        expect(pendingAction?.getAttribute('data-size')).toBe('icon-sm');
+        expect(pendingAction?.getAttribute('title')).toBe('Solicitud enviada. El relay todavía no te confirma como miembro.');
+        expect(pendingAction?.querySelector('svg')?.getAttribute('class')).toContain('lucide-clock');
         const pendingButtons = Array.from(rendered.container.querySelectorAll('button')).filter((button) => button.textContent === 'Solicitud enviada');
-        expect(pendingButtons).toHaveLength(2);
+        expect(pendingButtons).toHaveLength(1);
         expect(pendingButtons.every((button) => button.hasAttribute('disabled'))).toBe(true);
         expect(rendered.container.querySelector('[data-testid="groups-timeline"]')?.textContent || '').not.toContain('Aún no hay mensajes en el grupo.');
         expect(rendered.container.querySelector('textarea[aria-label="Mensaje para Builders Guild"]')).toBeNull();
@@ -493,8 +611,9 @@ describe('GroupsPage', () => {
         expect(document.body.textContent || '').not.toContain('Recordado en este dispositivo');
         expect(document.body.textContent || '').not.toContain('About group');
         expect(rendered.container.textContent || '').not.toContain('Unirse recordará este grupo localmente. No se publicará tu lista pública hasta que guardes o sincronices explícitamente.');
-        const headerInviteButton = rendered.container.querySelector('[data-slot="overlay-page-header-actions"] button[aria-label="Abrir grupo NIP-29"]');
-        expect(headerInviteButton).not.toBeNull();
+        const controls = rendered.container.querySelector('[data-testid="groups-controls"]');
+        const inviteButton = controls?.querySelector('button[aria-label="Abrir grupo NIP-29"]');
+        expect(inviteButton).not.toBeNull();
 
         await openGroupActions(rendered.container);
         await clickElement(document.body.querySelector('[role="menuitem"]'));
@@ -506,7 +625,7 @@ describe('GroupsPage', () => {
         expect(document.body.textContent || '').not.toContain('Añadir relay de grupo');
 
         await act(async () => {
-            headerInviteButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            inviteButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
         expect(document.body.textContent || '').not.toContain('Formato: relay-host\'group-id');
         expect(document.body.textContent || '').not.toContain('Ejemplo: groups.example\'maps');

@@ -6,6 +6,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useI18n } from '@/i18n/useI18n';
 import { cn } from '@/lib/utils';
+import { ClockIcon, PlusIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { GroupMembershipStatus, NostrGroupSummary } from './GroupsPage';
 import { formatGroupDisplayId } from './group-display';
@@ -41,7 +42,7 @@ export function GroupList({ groups, selectedGroupId, onSelectGroup, canWrite, di
     }, [selectedTab]);
 
     const renderGroups = (items: NostrGroupSummary[]) => (
-        <nav aria-label={t('groups.list.aria')} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
+        <nav aria-label={t('groups.list.aria')} className="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto pr-1">
             {items.length === 0 ? (
                 <Empty className="min-h-[10rem] justify-center border border-dashed">
                     <EmptyHeader>
@@ -56,7 +57,7 @@ export function GroupList({ groups, selectedGroupId, onSelectGroup, canWrite, di
                 </Empty>
             ) : null}
             {items.length > 0 ? (
-                <ItemGroup className="gap-2">
+                <ItemGroup className="gap-0">
                     {items.map((group) => {
                         const isSelected = group.id === selectedGroupId;
                         const status = membershipStatus(group);
@@ -65,10 +66,10 @@ export function GroupList({ groups, selectedGroupId, onSelectGroup, canWrite, di
                             <Item
                                 key={group.id}
                                 role="listitem"
-                                variant="outline"
+                                variant="default"
                                 size="sm"
                                 data-selected={isSelected ? 'true' : undefined}
-                                className={cn('relative shrink-0', isSelected ? 'border-primary/50 bg-muted/70' : undefined)}
+                                className={cn('relative shrink-0', isSelected ? 'bg-muted/70' : undefined)}
                             >
                                 <ItemContent className="relative min-w-0">
                                     <button
@@ -92,9 +93,9 @@ export function GroupList({ groups, selectedGroupId, onSelectGroup, canWrite, di
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            size="sm"
+                                            size="icon-sm"
                                             disabled={!canWrite}
-                                            title={disabledReason ?? undefined}
+                                            title={disabledReason ?? t('groups.join.title', { name: group.name })}
                                             aria-label={t('groups.join.aria', { name: group.name })}
                                             onClick={() => {
                                                 if (!canWrite) {
@@ -104,13 +105,20 @@ export function GroupList({ groups, selectedGroupId, onSelectGroup, canWrite, di
                                                 onJoinGroup(group.id);
                                             }}
                                         >
-                                            {t('groups.join.action')}
+                                            <PlusIcon aria-hidden="true" />
                                         </Button>
                                     </ItemActions>
                                 ) : status === 'pending' ? (
                                     <ItemActions className="relative z-20">
-                                        <Button type="button" variant="secondary" size="sm" disabled>
-                                            {t('groups.join.pending.action')}
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="icon-sm"
+                                            disabled
+                                            title={t('groups.join.pending.title')}
+                                            aria-label={t('groups.join.pending.aria', { name: group.name })}
+                                        >
+                                            <ClockIcon aria-hidden="true" />
                                         </Button>
                                     </ItemActions>
                                 ) : null}

@@ -57,7 +57,6 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 import { MobileBottomNavigation } from '../shell/MobileBottomNavigation';
-import { shouldShowMobileBottomNavigation } from '../shell/mobile-navigation';
 import { MobileOverlayAppBar } from '../shell/MobileOverlayAppBar';
 
 export const OVERLAY_SIDEBAR_EXPANDED_WIDTH = 300;
@@ -165,7 +164,6 @@ function SidebarActionsMenu({
     const location = useLocation();
     const collapsed = !isMobile && state === 'collapsed';
     const activePath = location.pathname;
-    const showPrimaryActionsInSidebar = !isMobile || !shouldShowMobileBottomNavigation(activePath);
 
     const activeSettingsView = useMemo<SettingsRouteView | null>(() => settingsViewFromPathname(activePath), [activePath]);
     const isRelaysRoute = activePath === '/relays' || activePath.startsWith('/relays/');
@@ -202,23 +200,21 @@ function SidebarActionsMenu({
     return (
         <SidebarGroup className="pt-1 pb-0">
             <SidebarMenu className={cn('nostr-panel-toolbar flex flex-col gap-1.5', collapsed && 'nostr-compact-toolbar gap-1')}>
-                {showPrimaryActionsInSidebar ? (
-                    <SidebarMenuItem>
-                        <SidebarMenuButton asChild isActive={activePath === '/'}>
-                            <button
-                                type="button"
-                                aria-label={t('sidebar.openMap')}
-                                title={t('sidebar.map')}
-                                onClick={() => runNavigationAction(onOpenMap)}
-                            >
-                                <MapPinIcon />
-                                <span>{t('sidebar.map')}</span>
-                            </button>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                ) : null}
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={activePath === '/'}>
+                        <button
+                            type="button"
+                            aria-label={t('sidebar.openMap')}
+                            title={t('sidebar.map')}
+                            onClick={() => runNavigationAction(onOpenMap)}
+                        >
+                            <MapPinIcon />
+                            <span>{t('sidebar.map')}</span>
+                        </button>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
 
-                {showPrimaryActionsInSidebar && canAccessFollowingFeed ? (
+                {canAccessFollowingFeed ? (
                     <SidebarMenuItem>
                         <SidebarMenuButton asChild isActive={isAgoraActive}>
                             <button
@@ -292,28 +288,26 @@ function SidebarActionsMenu({
                     </SigningRequiredTooltip>
                 </SidebarMenuItem>
 
-                {showPrimaryActionsInSidebar ? (
-                    <SidebarMenuItem>
-                        <SidebarMenuButton asChild isActive={isRelaysRoute}>
-                            <button
-                                type="button"
-                                aria-label={t('sidebar.openRelays')}
-                                title={relaysBadgeTitle}
-                                onClick={() => runNavigationAction(onOpenRelays)}
-                            >
-                                <RadioTowerIcon />
-                                <span>{t('sidebar.relays')}</span>
-                            </button>
-                        </SidebarMenuButton>
-                        {!collapsed ? (
-                            <SidebarMenuBadge>
-                                {`${relaysConnectedCount}/${relaysTotal}`}
-                            </SidebarMenuBadge>
-                        ) : null}
-                    </SidebarMenuItem>
-                ) : null}
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={isRelaysRoute}>
+                        <button
+                            type="button"
+                            aria-label={t('sidebar.openRelays')}
+                            title={relaysBadgeTitle}
+                            onClick={() => runNavigationAction(onOpenRelays)}
+                        >
+                            <RadioTowerIcon />
+                            <span>{t('sidebar.relays')}</span>
+                        </button>
+                    </SidebarMenuButton>
+                    {!collapsed ? (
+                        <SidebarMenuBadge>
+                            {`${relaysConnectedCount}/${relaysTotal}`}
+                        </SidebarMenuBadge>
+                    ) : null}
+                </SidebarMenuItem>
 
-                {showPrimaryActionsInSidebar && (canAccessSocialNotifications || isReadonlySession) ? (
+                {canAccessSocialNotifications || isReadonlySession ? (
                     <SidebarMenuItem>
                         <SigningRequiredTooltip enabled={isReadonlySession} label={readonlyReason}>
                             <SidebarMenuButton asChild isActive={activePath === '/notifications'}>
@@ -468,11 +462,10 @@ function SidebarPublishButton({
 }: Pick<OverlaySidebarProps, 'canWrite' | 'onOpenPublish'> & { isReadonlySession: boolean }) {
     const { t } = useI18n();
     const { state, isMobile, setOpenMobile } = useSidebar();
-    const activePath = useLocation().pathname;
     const collapsed = !isMobile && state === 'collapsed';
     const readonlyReason = t('auth.readOnlySignInRequired');
 
-    if ((isMobile && shouldShowMobileBottomNavigation(activePath)) || (!canWrite && !isReadonlySession)) {
+    if (!canWrite && !isReadonlySession) {
         return null;
     }
 
@@ -811,6 +804,7 @@ export function OverlaySidebar({
             </Sidebar>
             <MobileBottomNavigation
                 activePath={location.pathname}
+                activeSearch={location.search}
                 canWrite={canWrite}
                 canAccessFollowingFeed={canAccessFollowingFeed}
                 canAccessSocialNotifications={canAccessSocialNotifications}

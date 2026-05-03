@@ -2436,6 +2436,12 @@
     align-items: end;
 }
 
+@media (max-width: 1023px) {
+    .nostr-groups-columns {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .nostr-chats-loading-page {
     min-height: min(68vh, 540px);
     display: flex;

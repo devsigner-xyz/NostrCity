@@ -19,6 +19,7 @@ describe('mobile navigation route metadata', () => {
     test('uses localized titles for top-level overlay routes', () => {
         expect(resolveMobileAppBarTitle({ pathname: '/agora', language: 'es' })).toBe('Ágora');
         expect(resolveMobileAppBarTitle({ pathname: '/chats', language: 'es' })).toBe('Chats');
+        expect(resolveMobileAppBarTitle({ pathname: '/groups', language: 'es' })).toBe('Grupos');
         expect(resolveMobileAppBarTitle({ pathname: '/notifications', language: 'es' })).toBe('Notificaciones');
         expect(resolveMobileAppBarTitle({ pathname: '/wallet', language: 'es' })).toBe('Wallet');
     });
@@ -94,6 +95,15 @@ describe('mobile navigation back behavior', () => {
 
     test('returns an active chat conversation to the chat list', () => {
         expect(resolveMobileBackBehavior({ pathname: '/chats', search: '?peer=abc' })).toEqual({ type: 'openChatList' });
+    });
+
+    test('returns an active group detail to the groups list', () => {
+        expect(resolveMobileBackBehavior({ pathname: '/groups', search: '?relay=wss%3A%2F%2Frelay.example&group=gardeners' })).toEqual({
+            type: 'navigate',
+            to: '/groups',
+        });
+        expect(shouldShowMobileBack('/groups', '?relay=wss%3A%2F%2Frelay.example&group=gardeners')).toBe(true);
+        expect(shouldShowMobileBottomNavigation('/groups', '?relay=wss%3A%2F%2Frelay.example&group=gardeners')).toBe(false);
     });
 
     test('uses navigation stack for top-level routes', () => {

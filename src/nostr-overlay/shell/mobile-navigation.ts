@@ -28,11 +28,24 @@ function titleFromMessage(language: AppLocale, key: AppMessageKey): string {
     return translate(language, key);
 }
 
-export function shouldShowMobileBack(pathname: string): boolean {
-    return !shouldShowMobileBottomNavigation(pathname);
+function hasActiveGroupDetail(pathname: string, search: string): boolean {
+    if (pathname !== '/groups') {
+        return false;
+    }
+
+    const params = new URLSearchParams(search);
+    return Boolean(params.get('relay') && params.get('group'));
 }
 
-export function shouldShowMobileBottomNavigation(pathname: string): boolean {
+export function shouldShowMobileBack(pathname: string, search = ''): boolean {
+    return hasActiveGroupDetail(pathname, search) || !shouldShowMobileBottomNavigation(pathname, search);
+}
+
+export function shouldShowMobileBottomNavigation(pathname: string, search = ''): boolean {
+    if (hasActiveGroupDetail(pathname, search)) {
+        return false;
+    }
+
     return pathname === '/'
         || pathname === '/agora'
         || pathname === '/relays'
@@ -58,6 +71,10 @@ export function resolveMobileAppBarTitle({ pathname, language }: MobileAppBarTit
 
     if (pathname === '/chats') {
         return titleFromMessage(language, 'chats.title');
+    }
+
+    if (pathname === '/groups') {
+        return titleFromMessage(language, 'groups.title');
     }
 
     if (pathname === '/notifications') {
@@ -122,6 +139,10 @@ export function resolveMobileBackBehavior({
 
     if (pathname === '/chats' && new URLSearchParams(search).has('peer')) {
         return { type: 'openChatList' };
+    }
+
+    if (hasActiveGroupDetail(pathname, search)) {
+        return { type: 'navigate', to: '/groups' };
     }
 
     return { type: 'stack' };

@@ -204,6 +204,50 @@ describe('useOverlayGroupsController', () => {
         expect(service.loadGroup).toHaveBeenCalledTimes(1);
     });
 
+    test('keeps loaded group metadata after selecting another group', async () => {
+        let controller: OverlayGroupsController | undefined;
+        const service: OverlayGroupsService = {
+            loadGroups: vi.fn(async () => ({
+                saved: [
+                    { relay: 'wss://relay.example', id: 'maps' },
+                    { relay: 'wss://relay.example', id: 'parks' },
+                ],
+                remembered: [],
+                discovered: [],
+            })),
+            loadGroup: vi.fn(async ({ group }) => {
+                const address = group as { relay: string; id: string };
+                return snapshot(address.relay, address.id, address.id === 'maps' ? 'Maps Guild' : 'Parks Club');
+            }),
+            publishMessage: vi.fn(),
+            requestJoin: vi.fn(),
+            requestLeave: vi.fn(),
+            savePublicGroups: vi.fn(),
+        };
+
+        function Harness() {
+            controller = useOverlayGroupsController({
+                enabled: true,
+                ownerPubkey: 'a'.repeat(64),
+                session: session(),
+                service,
+                configuredGroupRelays: ['wss://relay.example'],
+                errorFallbackMessage: 'Could not load groups',
+            });
+            return null;
+        }
+
+        await render(<Harness />);
+        await waitFor(() => Boolean(controller?.groups.some((group) => group.name === 'Maps Guild')));
+
+        await act(async () => {
+            controller?.selectGroup("wss://relay.example'parks");
+        });
+        await waitFor(() => Boolean(controller?.groups.some((group) => group.name === 'Parks Club')));
+
+        expect(controller?.groups.map((group) => group.name)).toEqual(['Maps Guild', 'Parks Club']);
+    });
+
     test('marks remembered groups pending until selected detail confirms membership', async () => {
         let controller: OverlayGroupsController | undefined;
         const service: OverlayGroupsService = {
