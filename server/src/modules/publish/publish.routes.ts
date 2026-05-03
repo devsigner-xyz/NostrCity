@@ -4,16 +4,39 @@ import { verifyNostrHttpAuth } from '../../nostr/http-auth-verify';
 import {
   publishForwardBodySchema,
   publishForwardResponseSchema,
+  type PublishForwardResponseDto,
   type PublishForwardRequestDto,
 } from './publish.schemas';
 import {
   createPublishService,
+  type PublishForwardResult,
   type PublishService,
   validatePublishForwardRequest,
 } from './publish.service';
 
 export interface PublishRoutesOptions {
   service?: PublishService;
+}
+
+function publishForwardResponseFromResult(
+  result: PublishForwardResult,
+  requestedRelays: string[],
+): PublishForwardResponseDto {
+  const relayIndexes = new Map(requestedRelays.map((relay, index) => [relay, index]));
+  return {
+    ackedRelayIndexes: result.ackedRelays.flatMap((relay) => {
+      const relayIndex = relayIndexes.get(relay);
+      return relayIndex === undefined ? [] : [relayIndex];
+    }),
+    failedRelays: result.failedRelays.flatMap((failure) => {
+      const relayIndex = relayIndexes.get(failure.relay);
+      return relayIndex === undefined ? [] : [{ relayIndex, reason: 'publish_failed' }];
+    }),
+    timeoutRelayIndexes: result.timeoutRelays.flatMap((relay) => {
+      const relayIndex = relayIndexes.get(relay);
+      return relayIndex === undefined ? [] : [relayIndex];
+    }),
+  };
 }
 
 export const publishRoutes: FastifyPluginAsync<PublishRoutesOptions> = async (app, options) => {
@@ -94,7 +117,8 @@ export const publishRoutes: FastifyPluginAsync<PublishRoutesOptions> = async (ap
         });
       }
 
-      return service.forward(validationResult.value);
+      const result = await service.forward(validationResult.value);
+      return publishForwardResponseFromResult(result, validationResult.value.relays);
     },
   );
 };

@@ -3,6 +3,7 @@ import { getEventHash, verifyEvent } from 'nostr-tools';
 const REQUIRED_EVENT_KEYS = ['content', 'created_at', 'id', 'kind', 'pubkey', 'sig', 'tags'] as const;
 const MAX_EVENT_CONTENT_LENGTH = 32_768;
 const MAX_EVENT_TAGS = 128;
+const MAX_CONTACT_LIST_TAGS = 4096;
 const MAX_TAG_ITEMS = 16;
 const MAX_TAG_ITEM_LENGTH = 512;
 
@@ -10,10 +11,10 @@ const isLowerHex = (value: string, length: number): boolean => {
   return value.length === length && /^[0-9a-f]+$/.test(value);
 };
 
-const isValidTags = (value: unknown): value is string[][] => {
+const isValidTags = (value: unknown, maxTags: number): value is string[][] => {
   return (
     Array.isArray(value) &&
-    value.length <= MAX_EVENT_TAGS &&
+    value.length <= maxTags &&
     value.every(
       (tag) =>
         Array.isArray(tag) &&
@@ -58,7 +59,8 @@ const hasRequiredEventShape = (value: unknown): value is SignedNostrEvent => {
     return false;
   }
 
-  if (!isValidTags(event.tags)) {
+  const maxTags = kind === 3 ? MAX_CONTACT_LIST_TAGS : MAX_EVENT_TAGS;
+  if (!isValidTags(event.tags, maxTags)) {
     return false;
   }
 

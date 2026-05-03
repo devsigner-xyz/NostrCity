@@ -11,14 +11,14 @@ export interface PublishForwardRequestDto {
 }
 
 export interface PublishForwardFailure {
-  relay: string;
+  relayIndex: number;
   reason: string;
 }
 
 export interface PublishForwardResponseDto {
-  ackedRelays: string[];
+  ackedRelayIndexes: number[];
   failedRelays: PublishForwardFailure[];
-  timeoutRelays: string[];
+  timeoutRelayIndexes: number[];
 }
 
 export const publishForwardBodySchema = {
@@ -53,7 +53,6 @@ export const publishForwardBodySchema = {
         },
         tags: {
           type: 'array',
-          maxItems: 128,
           items: {
             type: 'array',
             maxItems: 16,
@@ -74,6 +73,26 @@ export const publishForwardBodySchema = {
           maxLength: 128,
         },
       },
+      allOf: [
+        {
+          if: {
+            required: ['kind'],
+            properties: {
+              kind: { const: 3 },
+            },
+          },
+          then: {
+            properties: {
+              tags: { type: 'array', maxItems: 4096 },
+            },
+          },
+          else: {
+            properties: {
+              tags: { type: 'array', maxItems: 128 },
+            },
+          },
+        },
+      ],
     },
     relayScope: {
       type: 'string',
@@ -95,12 +114,13 @@ export const publishForwardBodySchema = {
 export const publishForwardResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['ackedRelays', 'failedRelays', 'timeoutRelays'],
+  required: ['ackedRelayIndexes', 'failedRelays', 'timeoutRelayIndexes'],
   properties: {
-    ackedRelays: {
+    ackedRelayIndexes: {
       type: 'array',
       items: {
-        type: 'string',
+        type: 'integer',
+        minimum: 0,
       },
     },
     failedRelays: {
@@ -108,10 +128,11 @@ export const publishForwardResponseSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['relay', 'reason'],
+        required: ['relayIndex', 'reason'],
         properties: {
-          relay: {
-            type: 'string',
+          relayIndex: {
+            type: 'integer',
+            minimum: 0,
           },
           reason: {
             type: 'string',
@@ -119,10 +140,11 @@ export const publishForwardResponseSchema = {
         },
       },
     },
-    timeoutRelays: {
+    timeoutRelayIndexes: {
       type: 'array',
       items: {
-        type: 'string',
+        type: 'integer',
+        minimum: 0,
       },
     },
   },

@@ -9,7 +9,7 @@ import { createLocalKeyStorage } from '../nostr/auth/local-key-storage';
 import { LocalKeyAuthProvider } from '../nostr/auth/providers/local-key-provider';
 import { createAuthSession } from '../nostr/auth/session';
 import { AUTH_SESSION_STORAGE_KEY } from '../nostr/auth/secure-storage';
-import { loadRelaySettings, RELAY_SETTINGS_STORAGE_KEY, saveRelaySettings } from '../nostr/relay-settings';
+import { loadRelaySettings, RELAY_SETTINGS_STORAGE_KEY, saveRelaySettings, type RelaySettingsState } from '../nostr/relay-settings';
 import { WALLET_SETTINGS_STORAGE_KEY } from '../nostr/wallet-settings';
 import { UI_SETTINGS_STORAGE_KEY } from '../nostr/ui-settings';
 import { EASTER_EGG_PROGRESS_STORAGE_KEY } from '../nostr/easter-egg-progress';
@@ -20,6 +20,7 @@ import * as ndkClientModule from '../nostr/ndk-client';
 import * as writeGatewayModule from '../nostr/write-gateway';
 import * as runtimeDmServiceModule from '../nostr/dm-runtime-service';
 import * as dmApiServiceModule from '../nostr-api/dm-api-service';
+import * as blossomImageUploadModule from './media/blossom-image-upload';
 import { SITE_THEME_CHANGE_EVENT } from '../site/theme-preference';
 
 const { createFireworksMock } = vi.hoisted(() => ({
@@ -35,7 +36,7 @@ vi.mock('@tsparticles/fireworks', () => ({
 import { App } from './App';
 import type { NostrOverlayServices } from './hooks/useNostrOverlay';
 import type { MapBridge } from './map-bridge';
-import type { NostrClient, NostrProfile } from '../nostr/types';
+import type { NostrClient, NostrEvent, NostrProfile } from '../nostr/types';
 import type { SocialNotificationEvent, SocialNotificationsService } from '../nostr/social-notifications-service';
 import type { SocialFeedService } from '../nostr/social-feed-service';
 import { createNostrOverlayQueryClient } from './query/query-client';
@@ -83,7 +84,8 @@ function createDeferred<T>(): Deferred<T> {
     };
 }
 
-const SAMPLE_AUTH_PUBKEY = '7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e';
+const SAMPLE_AUTH_SECRET_KEY = new Uint8Array(32).fill(1);
+const SAMPLE_AUTH_PUBKEY = getPublicKey(SAMPLE_AUTH_SECRET_KEY);
 
 function createNip07ExtensionMock(pubkey = SAMPLE_AUTH_PUBKEY) {
     return {
@@ -258,6 +260,56 @@ function createSocialFeedServiceMock() {
     };
 }
 
+function createSocialPublisherMock(ownerPubkey: string, overrides: Partial<NonNullable<NostrOverlayServices['socialPublisher']>> = {}): NonNullable<NostrOverlayServices['socialPublisher']> {
+    const publishEvent = vi.fn(async (event) => ({
+        id: '1'.repeat(64),
+        pubkey: ownerPubkey,
+        sig: '2'.repeat(128),
+        ...event,
+    }));
+
+    return {
+        publishEvent,
+        publishTextNote: vi.fn(async (content: string, tags: string[][] = []) => ({
+            id: '3'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 1,
+            created_at: Math.floor(Date.now() / 1000),
+            tags,
+            content,
+            sig: '4'.repeat(128),
+        })),
+        publishProfileMetadata: vi.fn(async (content: string) => ({
+            id: '5'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 0,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [],
+            content,
+            sig: '6'.repeat(128),
+        })),
+        publishContactList: vi.fn(async (follows: string[], _preservedTags: string[][] = []) => ({
+            id: '7'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 3,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: follows.map((pubkey) => ['p', pubkey]),
+            content: '',
+            sig: '8'.repeat(128),
+        })),
+        publishMuteList: vi.fn(async (_mutedPubkeys: string[], _preservedTags: string[][] = []) => ({
+            id: '9'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 10000,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [],
+            content: 'encrypted-mute-list',
+            sig: 'a'.repeat(128),
+        })),
+        ...overrides,
+    };
+}
+
 function createFeedNote(id: string, pubkey: string, createdAt: number, content: string) {
     return {
         id,
@@ -274,6 +326,31 @@ function createFeedNote(id: string, pubkey: string, createdAt: number, content: 
             content,
         },
     };
+}
+
+function createReplaceableEvent(ownerPubkey: string, kind: number, tags: string[][] = [], content = ''): NostrEvent {
+    if (ownerPubkey === SAMPLE_AUTH_PUBKEY) {
+        return finalizeEvent({
+            kind,
+            created_at: 1700000001,
+            tags,
+            content,
+        }, SAMPLE_AUTH_SECRET_KEY) as NostrEvent;
+    }
+
+    return {
+        id: '9'.repeat(64),
+        pubkey: ownerPubkey,
+        kind,
+        created_at: 1700000001,
+        tags,
+        content,
+        sig: '8'.repeat(128),
+    };
+}
+
+function createContactListEvent(ownerPubkey: string, follows: string[] = []): NostrEvent {
+    return createReplaceableEvent(ownerPubkey, 3, follows.map((pubkey) => ['p', pubkey]));
 }
 
 function createBasicOverlayServices(ownerPubkey: string = 'f'.repeat(64), overrides: Partial<NostrOverlayServices> = {}): NostrOverlayServices {
@@ -1020,6 +1097,96 @@ describe('Nostr overlay App', () => {
         });
 
         await waitFor(() => getLocationText(relayDetailRendered.container) === '/relays');
+    });
+
+    test('profile save uses social publisher ACKs and keeps owner profile unchanged when publish fails', async () => {
+        const ownerPubkey = persistDmCapableSession('b'.repeat(64));
+        const rawPublishProfileMetadata = vi.fn(async (content: string) => ({
+            id: 'c'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 0,
+            created_at: 200,
+            tags: [],
+            content,
+            sig: 'd'.repeat(128),
+        }));
+        vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
+            publishEvent: vi.fn(async (event: { kind: number }) => ({
+                id: 'e'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: event.kind,
+                created_at: 200,
+                tags: [],
+                content: '',
+                sig: 'f'.repeat(128),
+            })),
+            publishTextNote: vi.fn(),
+            publishProfileMetadata: rawPublishProfileMetadata,
+            encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
+            decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
+        } as any);
+        const socialPublishProfileMetadata = vi.fn(async (_content: string) => {
+            throw new Error('No relay ACKs');
+        });
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishProfileMetadata: socialPublishProfileMetadata,
+        });
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <>
+                <App
+                    mapBridge={bridge}
+                    services={createBasicOverlayServices(ownerPubkey, {
+                        socialPublisher,
+                        fetchProfilesFn: vi.fn().mockResolvedValue({
+                            [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner Stable' },
+                        }),
+                    })}
+                />
+                <LocationProbe />
+            </>,
+            { initialEntries: ['/profile'] }
+        );
+        mounted.push(rendered);
+
+        await waitFor(() => (rendered.container.textContent || '').includes('Editar perfil'));
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner Stable'));
+
+        const displayNameInput = rendered.container.querySelector('input[name="displayName"]') as HTMLInputElement;
+        expect(displayNameInput).toBeDefined();
+        await act(async () => {
+            const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+            valueSetter?.call(displayNameInput, 'Acked Later');
+            displayNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+            displayNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        const saveButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            (button.textContent || '').includes('Guardar perfil')
+        ) as HTMLButtonElement;
+        expect(saveButton).toBeDefined();
+        await act(async () => {
+            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (rendered.container.textContent || '').includes('No se pudieron publicar los metadatos del perfil.'));
+
+        expect(socialPublishProfileMetadata).toHaveBeenCalledTimes(1);
+        const publishedContent = socialPublishProfileMetadata.mock.calls[0]?.[0] as string;
+        expect(JSON.parse(publishedContent)).toMatchObject({ display_name: 'Acked Later' });
+        expect(rawPublishProfileMetadata).not.toHaveBeenCalled();
+
+        const backButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            (button.textContent || '').trim() === 'Volver'
+        ) as HTMLButtonElement;
+        expect(backButton).toBeDefined();
+        await act(async () => {
+            backButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => getLocationText(rendered.container) === '/');
+        expect(rendered.container.textContent || '').toContain('Owner Stable');
+        expect(rendered.container.textContent || '').not.toContain('Acked Later');
     });
 
     test('uses mobile back to return an active chat conversation to the chat list', async () => {
@@ -2676,7 +2843,7 @@ describe('Nostr overlay App', () => {
         }
     });
 
-    test('applies optimistic reaction and repost counters and rolls back on mutation failure', async () => {
+    test('keeps reaction and repost counters unchanged on mutation failure without surfacing raw errors', async () => {
         const ownerPubkey = 'f'.repeat(64);
         const eventId = '1'.repeat(64);
         const socialFeed = createSocialFeedServiceMock();
@@ -2729,6 +2896,7 @@ describe('Nostr overlay App', () => {
                     created_at: 200,
                     tags: [],
                     content: '',
+                    sig: '5'.repeat(128),
                 };
             }
 
@@ -2739,7 +2907,11 @@ describe('Nostr overlay App', () => {
                 created_at: 200,
                 tags: [],
                 content: '',
+                sig: '6'.repeat(128),
             };
+        });
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishEvent,
         });
         vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
             publishEvent,
@@ -2778,6 +2950,7 @@ describe('Nostr overlay App', () => {
                         scannedBatches: 1,
                         complete: true,
                     }),
+                    socialPublisher,
                     socialFeedService: socialFeed.service,
                 }}
             />
@@ -2809,13 +2982,15 @@ describe('Nostr overlay App', () => {
             repostItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Repostear (3)"]')));
-        expect((rendered.container.querySelector('button[aria-label="Repostear (3)"]') as HTMLButtonElement).disabled).toBe(true);
+        await waitFor(() => publishEvent.mock.calls.some(([event]) => event.kind === 6));
+        expect((rendered.container.querySelector('button[aria-label="Repostear (2)"]') as HTMLButtonElement).disabled).toBe(true);
+        expect(rendered.container.querySelector('button[aria-label="Repostear (3)"]')).toBeNull();
         await act(async () => {
-            repostFailure.reject(new Error('repost-failed'));
+            repostFailure.reject(new Error('raw repost failure with wss://sensitive-relay.example.invalid'));
         });
         await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Repostear (2)"]')));
-        await waitFor(() => (rendered.container.textContent || '').includes('repost-failed'));
+        await waitFor(() => (rendered.container.textContent || '').includes('No se pudo actualizar el repost'));
+        expect(rendered.container.textContent || '').not.toContain('raw repost failure');
 
         const reactionButton = rendered.container.querySelector('button[aria-label="Reaccionar (3)"]') as HTMLButtonElement;
 
@@ -2836,49 +3011,181 @@ describe('Nostr overlay App', () => {
         });
 
         await waitFor(() => publishEvent.mock.calls.some(([event]) => event.kind === 7 && (event as { content?: string }).content === '🔥'));
+        expect(rendered.container.querySelector('button[aria-label="Reaccionar (3)"]')).not.toBeNull();
+        expect(Array.from(rendered.container.querySelectorAll('button')).some((button) =>
+            (button.getAttribute('aria-label') || '').startsWith('Quitar reacción')
+        )).toBe(false);
 
         await act(async () => {
-            reactionFailure.reject(new Error('reaction-failed'));
+            reactionFailure.reject(new Error('raw reaction failure with profile payload'));
         });
-        await waitFor(() => (rendered.container.textContent || '').includes('reaction-failed'));
+        await waitFor(() => (rendered.container.textContent || '').includes('No se pudo actualizar la reaccion'));
+        expect(rendered.container.textContent || '').not.toContain('raw reaction failure');
 
         expect(publishEvent).toHaveBeenCalledWith(expect.objectContaining({ kind: 7 }));
         expect(publishEvent).toHaveBeenCalledWith(expect.objectContaining({ kind: 6 }));
     });
 
-    test('loads an existing emoji reaction and removes it with a deletion event', async () => {
+    test('keeps reaction and repost counts unchanged until publish ACK resolves', async () => {
         const ownerPubkey = 'f'.repeat(64);
         const eventId = '2'.repeat(64);
-        const reactionEventId = '7'.repeat(64);
         const socialFeed = createSocialFeedServiceMock();
         (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
-            items: [createFeedNote(eventId, 'a'.repeat(64), 100, 'already reacted')],
+            items: [createFeedNote(eventId, 'a'.repeat(64), 100, 'ack gated target')],
+            hasMore: false,
+        });
+        (socialFeed.service.loadEngagement as ReturnType<typeof vi.fn>).mockResolvedValue({
+            [eventId]: {
+                replies: 0,
+                reposts: 2,
+                reactions: 3,
+                zaps: 0,
+                zapSats: 0,
+            },
+        });
+
+        const reactionDeferred = createDeferred<{ id: string; pubkey: string; kind: number; created_at: number; tags: string[][]; content: string; sig: string }>();
+        const repostDeferred = createDeferred<{ id: string; pubkey: string; kind: number; created_at: number; tags: string[][]; content: string; sig: string }>();
+        const publishEvent = vi.fn((event: { kind: number }) => {
+            if (event.kind === 7) {
+                return reactionDeferred.promise;
+            }
+
+            if (event.kind === 6) {
+                return repostDeferred.promise;
+            }
+
+            return Promise.resolve({
+                id: '5'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: event.kind,
+                created_at: 200,
+                tags: [],
+                content: '',
+                sig: '6'.repeat(128),
+            });
+        });
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, { publishEvent });
+
+        const rendered = await renderApp(
+            <App
+                mapBridge={createMapBridgeStub().bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: ['a'.repeat(64)],
+                        relayHints: [],
+                    }),
+                    socialPublisher,
+                    socialFeedService: socialFeed.service,
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
+        await act(async () => {
+            feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Reaccionar (3)"]')));
+
+        const repostButton = rendered.container.querySelector('button[aria-label="Repostear (2)"]') as HTMLButtonElement;
+        await act(async () => {
+            repostButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+            repostButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        const repostItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((item) =>
+            (item.textContent || '').trim() === 'Repost'
+        ) as HTMLElement;
+        await act(async () => {
+            repostItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            await Promise.resolve();
+        });
+
+        expect(rendered.container.querySelector('button[aria-label="Repostear (2)"]')).not.toBeNull();
+        expect(rendered.container.querySelector('button[aria-label="Repostear (3)"]')).toBeNull();
+
+        await act(async () => {
+            repostDeferred.resolve({
+                id: '7'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 6,
+                created_at: 201,
+                tags: [['e', eventId]],
+                content: '',
+                sig: '8'.repeat(128),
+            });
+        });
+        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Repostear (3)"]')));
+
+        const reactionButton = rendered.container.querySelector('button[aria-label="Reaccionar (3)"]') as HTMLButtonElement;
+        await act(async () => {
+            reactionButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+            reactionButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).some((item) =>
+            item.getAttribute('aria-label') === 'Reaccionar con 🔥'
+        ));
+        const fireReactionItem = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+            item.getAttribute('aria-label') === 'Reaccionar con 🔥'
+        ) as HTMLElement;
+        await act(async () => {
+            fireReactionItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            await Promise.resolve();
+        });
+
+        expect(rendered.container.querySelector('button[aria-label="Reaccionar (3)"]')).not.toBeNull();
+        expect(Array.from(rendered.container.querySelectorAll('button')).some((button) =>
+            (button.getAttribute('aria-label') || '').startsWith('Quitar reacción') && (button.getAttribute('aria-label') || '').endsWith('(4)')
+        )).toBe(false);
+
+        await act(async () => {
+            reactionDeferred.resolve({
+                id: '9'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 7,
+                created_at: 202,
+                tags: [['e', eventId]],
+                content: '🔥',
+                sig: 'a'.repeat(128),
+            });
+        });
+        await waitFor(() => Array.from(rendered.container.querySelectorAll('button')).some((button) =>
+            (button.getAttribute('aria-label') || '').startsWith('Quitar reacción') && (button.getAttribute('aria-label') || '').endsWith('(4)')
+        ));
+    });
+
+    test('does not use raw signer for feed reactions when social publisher is unavailable', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const eventId = '3'.repeat(64);
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [createFeedNote(eventId, 'a'.repeat(64), 100, 'raw signer fallback target')],
             hasMore: false,
         });
         (socialFeed.service.loadEngagement as ReturnType<typeof vi.fn>).mockResolvedValue({
             [eventId]: {
                 replies: 0,
                 reposts: 0,
-                reactions: 4,
+                reactions: 0,
                 zaps: 0,
                 zapSats: 0,
             },
         });
-        (socialFeed.service.loadViewerReactions as ReturnType<typeof vi.fn>).mockResolvedValue({
-            [eventId]: {
-                eventId,
-                reactionEventId,
-                emoji: '👏',
-                createdAt: 120,
-            },
-        });
-        const publishEvent = vi.fn(async (event: { kind: number; tags: string[][]; content: string; created_at: number }) => ({
-            id: 'd'.repeat(64),
+        const rawPublishEvent = vi.fn(async (event: { kind: number }) => ({
+            id: 'e'.repeat(64),
             pubkey: ownerPubkey,
-            ...event,
+            kind: event.kind,
+            created_at: 200,
+            tags: [],
+            content: '+',
         }));
         vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
-            publishEvent,
+            publishEvent: rawPublishEvent,
             publishTextNote: vi.fn(),
             encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
             decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
@@ -2921,6 +3228,109 @@ describe('Nostr overlay App', () => {
             feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
+        await waitFor(() => Boolean(rendered.container.querySelector('button[aria-label="Reaccionar (0)"]')));
+        const reactionButton = rendered.container.querySelector('button[aria-label="Reaccionar (0)"]') as HTMLButtonElement;
+
+        await act(async () => {
+            reactionButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+            reactionButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).some((item) =>
+            item.getAttribute('aria-label') === 'Reaccionar con 🔥'
+        ));
+        const fireReactionItem = Array.from(document.body.querySelectorAll('[data-slot="dropdown-menu-item"]')).find((item) =>
+            item.getAttribute('aria-label') === 'Reaccionar con 🔥'
+        ) as HTMLElement;
+
+        await act(async () => {
+            fireReactionItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            await Promise.resolve();
+        });
+
+        expect(rawPublishEvent).not.toHaveBeenCalled();
+    });
+
+    test('loads an existing emoji reaction and removes it with a deletion event', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const eventId = '2'.repeat(64);
+        const reactionEventId = '7'.repeat(64);
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
+            items: [createFeedNote(eventId, 'a'.repeat(64), 100, 'already reacted')],
+            hasMore: false,
+        });
+        (socialFeed.service.loadEngagement as ReturnType<typeof vi.fn>).mockResolvedValue({
+            [eventId]: {
+                replies: 0,
+                reposts: 0,
+                reactions: 4,
+                zaps: 0,
+                zapSats: 0,
+            },
+        });
+        (socialFeed.service.loadViewerReactions as ReturnType<typeof vi.fn>).mockResolvedValue({
+            [eventId]: {
+                eventId,
+                reactionEventId,
+                emoji: '👏',
+                createdAt: 120,
+            },
+        });
+        const publishEvent = vi.fn(async (event: { kind: number; tags: string[][]; content: string; created_at: number }) => ({
+            id: 'd'.repeat(64),
+            pubkey: ownerPubkey,
+            sig: 'e'.repeat(128),
+            ...event,
+        }));
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishEvent,
+        });
+        vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
+            publishEvent,
+            publishTextNote: vi.fn(),
+            encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
+            decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
+        } as any);
+
+        const { bridge } = createMapBridgeStub();
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async () => null,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: ['a'.repeat(64)],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialPublisher,
+                    socialFeedService: socialFeed.service,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const feedButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
+        await act(async () => {
+            feedButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
         await waitFor(() => Array.from(rendered.container.querySelectorAll('button')).some((button) =>
             button.getAttribute('aria-label') === 'Quitar reacción 👏 (4)'
         ));
@@ -2939,7 +3349,7 @@ describe('Nostr overlay App', () => {
         }));
     });
 
-    test('inserts optimistic reply and reconciles to published reply', async () => {
+    test('shows a feed reply only after publish ACK resolves', async () => {
         const ownerPubkey = 'f'.repeat(64);
         const socialFeed = createSocialFeedServiceMock();
         (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -3044,6 +3454,9 @@ describe('Nostr overlay App', () => {
                 sig: '1'.repeat(128),
             };
         });
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishTextNote,
+        });
 
         vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
             publishEvent: vi.fn(async () => ({
@@ -3088,6 +3501,7 @@ describe('Nostr overlay App', () => {
                         scannedBatches: 1,
                         complete: true,
                     }),
+                    socialPublisher,
                     socialFeedService: socialFeed.service,
                 }}
             />
@@ -3125,7 +3539,12 @@ describe('Nostr overlay App', () => {
             sendReplyButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        await waitFor(() => (rendered.container.textContent || '').includes('respuesta optimista'));
+        await waitFor(() => publishTextNote.mock.calls.length > 0);
+        const threadNodeTextBeforeAck = Array.from(rendered.container.querySelectorAll('.nostr-following-feed-thread-node'))
+            .map((node) => node.textContent || '')
+            .join('\n');
+        expect(threadNodeTextBeforeAck).not.toContain('respuesta optimista');
+        expect(threadNodeTextBeforeAck).not.toContain('respuesta final');
 
         await act(async () => {
             publishReplyDeferred.resolve({
@@ -5157,34 +5576,44 @@ describe('Nostr overlay App', () => {
         expect(document.body.querySelector('textarea[aria-label="Redactar nota"]')).not.toBeNull();
     });
 
-    test('publishes from the global compose dialog and shows success toast', async () => {
+    test('shows a global compose post only after publish ACK resolves', async () => {
         const ownerPubkey = 'f'.repeat(64);
         const mentionPubkey = 'a'.repeat(64);
-        const socialPublisher = {
-            publishEvent: vi.fn(async () => ({
-                id: 'a'.repeat(64),
-                pubkey: ownerPubkey,
-                kind: 1,
-                created_at: 200,
-                tags: [],
-                content: '',
-                sig: 'b'.repeat(128),
-            })),
-            publishTextNote: vi.fn(async (content: string, tags: string[][] = []) => ({
-                id: 'c'.repeat(64),
-                pubkey: ownerPubkey,
-                kind: 1,
-                created_at: 200,
-                tags,
-                content,
-                sig: 'd'.repeat(128),
-            })),
-        };
+        const socialFeed = createSocialFeedServiceMock();
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce({
+                items: [createFeedNote('existing-post', mentionPubkey, 100, 'nota existente')],
+                hasMore: false,
+            })
+            .mockResolvedValue({
+                items: [
+                    createFeedNote('acked-post', ownerPubkey, 200, 'hola publicada'),
+                    createFeedNote('existing-post', mentionPubkey, 100, 'nota existente'),
+                ],
+                hasMore: false,
+            });
+        const publishPostDeferred = createDeferred<{
+            id: string;
+            pubkey: string;
+            kind: number;
+            created_at: number;
+            tags: string[][];
+            content: string;
+            sig: string;
+        }>();
+        const publishTextNote = vi.fn((_content: string, _tags: string[][] = []) => publishPostDeferred.promise);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, { publishTextNote });
         const rendered = await renderApp(
             <App
                 mapBridge={createMapBridgeStub().bridge}
                 services={createBasicOverlayServices(ownerPubkey, {
+                    socialFeedService: socialFeed.service,
                     socialPublisher,
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [mentionPubkey],
+                        relayHints: [],
+                    }),
                     searchUsersFn: vi.fn(async () => ({
                         pubkeys: [mentionPubkey],
                         profiles: {
@@ -5198,6 +5627,12 @@ describe('Nostr overlay App', () => {
 
         await loginWithNip07(rendered.container);
         await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const agoraButton = rendered.container.querySelector('.nostr-panel-toolbar button[aria-label="Abrir Ágora"]') as HTMLButtonElement;
+        await act(async () => {
+            agoraButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => (rendered.container.textContent || '').includes('nota existente'));
 
         const publishButton = rendered.container.querySelector('[data-slot="sidebar-footer"] button[aria-label="Abrir publicar"]') as HTMLButtonElement;
         await act(async () => {
@@ -5215,59 +5650,119 @@ describe('Nostr overlay App', () => {
             submitButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        await waitFor(() => socialPublisher.publishTextNote.mock.calls.length > 0);
-        const [publishedContent, publishedTags] = socialPublisher.publishTextNote.mock.calls[0] as [string, string[][]];
+        await waitFor(() => publishTextNote.mock.calls.length > 0);
+        const [publishedContent, publishedTags] = publishTextNote.mock.calls[0] as [string, string[][]];
         expect(publishedContent).toContain('hola ');
         expect(publishedContent).toContain('nostr:nprofile1');
         expect(publishedTags).toEqual([['p', mentionPubkey]]);
-        await waitFor(() => (document.body.textContent || '').includes('Publicación enviada'));
-    });
-
-    test('opens quote dialog from repost menu and publishes quote content with nevent reference', async () => {
-        const ownerPubkey = 'f'.repeat(64);
-        const targetPubkey = 'a'.repeat(64);
-        const mentionPubkey = targetPubkey;
-        const socialFeed = createSocialFeedServiceMock();
-        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>).mockResolvedValue({
-            items: [
-                {
-                    id: '1'.repeat(64),
-                    pubkey: targetPubkey,
-                    createdAt: 100,
-                    content: 'nota original',
-                    kind: 'note',
-                    rawEvent: {
-                        id: '1'.repeat(64),
-                        pubkey: targetPubkey,
-                        kind: 1,
-                        created_at: 100,
-                        tags: [],
-                        content: 'nota original',
-                    },
-                },
-            ],
-            hasMore: false,
+        await act(async () => {
+            await Promise.resolve();
         });
-        const socialPublisher = {
-            publishEvent: vi.fn(async () => ({
-                id: 'a'.repeat(64),
-                pubkey: ownerPubkey,
-                kind: 1,
-                created_at: 200,
-                tags: [],
-                content: '',
-                sig: 'b'.repeat(128),
-            })),
-            publishTextNote: vi.fn(async (content: string, tags: string[][] = []) => ({
+
+        const feedList = rendered.container.querySelector('[data-testid="following-feed-list"]') as HTMLDivElement;
+        expect(feedList.textContent || '').not.toContain('hola');
+        const followingFeedCacheBeforeAck = rendered.queryClient.getQueryCache()
+            .findAll({ queryKey: nostrOverlayQueryKeys.invalidation.followingFeed() })
+            .map((query) => query.state.data);
+        expect(JSON.stringify(followingFeedCacheBeforeAck)).not.toContain('hola');
+
+        await act(async () => {
+            publishPostDeferred.resolve({
                 id: 'c'.repeat(64),
                 pubkey: ownerPubkey,
                 kind: 1,
                 created_at: 200,
-                tags,
-                content,
+                tags: publishedTags,
+                content: publishedContent,
                 sig: 'd'.repeat(128),
-            })),
-        };
+            });
+        });
+
+        await waitFor(() => (feedList.textContent || '').includes('hola publicada'));
+        await waitFor(() => (document.body.textContent || '').includes('Publicación enviada'));
+    });
+
+    test('does not upload compose images when social publisher is unavailable', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        Object.defineProperty(URL, 'createObjectURL', {
+            configurable: true,
+            value: vi.fn(() => 'blob:compose-preview'),
+        });
+        Object.defineProperty(URL, 'revokeObjectURL', {
+            configurable: true,
+            value: vi.fn(),
+        });
+        const uploadImageToBlossom = vi.spyOn(blossomImageUploadModule, 'uploadImageToBlossom').mockResolvedValue({
+            url: 'https://media.example.invalid/city.png',
+            tags: [['url', 'https://media.example.invalid/city.png']],
+        });
+        const rendered = await renderApp(
+            <App
+                mapBridge={createMapBridgeStub().bridge}
+                services={createBasicOverlayServices(ownerPubkey)}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const publishButton = rendered.container.querySelector('[data-slot="sidebar-footer"] button[aria-label="Abrir publicar"]') as HTMLButtonElement;
+        await act(async () => {
+            publishButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const input = document.body.querySelector('input[type="file"]') as HTMLInputElement;
+        const image = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], 'city.png', { type: 'image/png' });
+        await act(async () => {
+            Object.defineProperty(input, 'files', {
+                configurable: true,
+                value: [image],
+            });
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        const textarea = document.body.querySelector('textarea[aria-label="Redactar nota"]') as HTMLTextAreaElement;
+        await fillTextarea(textarea, 'Imagen sin publisher');
+
+        const submitButton = document.body.querySelector('[data-slot="dialog-footer"] button:last-of-type') as HTMLButtonElement;
+        await act(async () => {
+            submitButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            await Promise.resolve();
+        });
+
+        expect(uploadImageToBlossom).not.toHaveBeenCalled();
+    });
+
+    test('shows a quote only after publish ACK resolves', async () => {
+        const ownerPubkey = 'f'.repeat(64);
+        const targetPubkey = 'a'.repeat(64);
+        const mentionPubkey = targetPubkey;
+        const socialFeed = createSocialFeedServiceMock();
+        const originalNote = createFeedNote('1'.repeat(64), targetPubkey, 100, 'nota original');
+        (socialFeed.service.loadFollowingFeed as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce({
+                items: [originalNote],
+                hasMore: false,
+            })
+            .mockResolvedValue({
+                items: [
+                    createFeedNote('acked-quote', ownerPubkey, 200, 'mi comentario publicado'),
+                    originalNote,
+                ],
+                hasMore: false,
+            });
+        const publishQuoteDeferred = createDeferred<{
+            id: string;
+            pubkey: string;
+            kind: number;
+            created_at: number;
+            tags: string[][];
+            content: string;
+            sig: string;
+        }>();
+        const publishTextNote = vi.fn((_content: string, _tags: string[][] = []) => publishQuoteDeferred.promise);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, { publishTextNote });
         const rendered = await renderApp(
             <App
                 mapBridge={createMapBridgeStub().bridge}
@@ -5328,8 +5823,8 @@ describe('Nostr overlay App', () => {
             submitButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        await waitFor(() => socialPublisher.publishTextNote.mock.calls.length > 0);
-        const [quoteContent, quoteTags] = socialPublisher.publishTextNote.mock.calls[0] as [string, string[][]];
+        await waitFor(() => publishTextNote.mock.calls.length > 0);
+        const [quoteContent, quoteTags] = publishTextNote.mock.calls[0] as [string, string[][]];
         expect(quoteContent).toContain('mi comentario');
         expect(quoteContent).toContain('nostr:nprofile1');
         expect(quoteContent).toContain('nostr:nevent1');
@@ -5338,6 +5833,30 @@ describe('Nostr overlay App', () => {
             ['p', targetPubkey],
         ]));
         expect(quoteTags.filter((tag) => tag[0] === 'p' && tag[1] === targetPubkey)).toHaveLength(1);
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        const feedList = rendered.container.querySelector('[data-testid="following-feed-list"]') as HTMLDivElement;
+        expect(feedList.textContent || '').not.toContain('mi comentario');
+        const followingFeedCacheBeforeAck = rendered.queryClient.getQueryCache()
+            .findAll({ queryKey: nostrOverlayQueryKeys.invalidation.followingFeed() })
+            .map((query) => query.state.data);
+        expect(JSON.stringify(followingFeedCacheBeforeAck)).not.toContain('mi comentario');
+
+        await act(async () => {
+            publishQuoteDeferred.resolve({
+                id: 'c'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 1,
+                created_at: 200,
+                tags: quoteTags,
+                content: quoteContent,
+                sig: 'd'.repeat(128),
+            });
+        });
+
+        await waitFor(() => (feedList.textContent || '').includes('mi comentario publicado'));
         await waitFor(() => (document.body.textContent || '').includes('Cita publicada'));
     });
 
@@ -6823,15 +7342,8 @@ describe('Nostr overlay App', () => {
         const ownerPubkey = SAMPLE_AUTH_PUBKEY;
         const followedPubkey = 'a'.repeat(64);
         const followerPubkey = 'b'.repeat(64);
-        const publishContactList = vi.fn(async () => ({
-            id: '1'.repeat(64),
-            pubkey: ownerPubkey,
-            kind: 3,
-            created_at: Math.floor(Date.now() / 1000),
-            tags: [['p', followedPubkey], ['p', followerPubkey]],
-            content: '',
-            sig: '2'.repeat(128),
-        }));
+        const writeGatewayPublishContactList = vi.fn();
+        const socialPublisher = createSocialPublisherMock(ownerPubkey);
 
         vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
             publishEvent: vi.fn(async (event: any) => ({
@@ -6840,7 +7352,7 @@ describe('Nostr overlay App', () => {
                 pubkey: ownerPubkey,
                 sig: '4'.repeat(128),
             })),
-            publishContactList,
+            publishContactList: writeGatewayPublishContactList,
             encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
             decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
         } as any);
@@ -6852,7 +7364,9 @@ describe('Nostr overlay App', () => {
                 services={{
                     createClient: () => ({
                         connect: async () => {},
-                        fetchLatestReplaceableEvent: async () => null,
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => kind === 3
+                            ? createContactListEvent(ownerPubkey, [followedPubkey])
+                            : null,
                         fetchEvents: async () => [],
                     }),
                     fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
@@ -6870,6 +7384,7 @@ describe('Nostr overlay App', () => {
                         scannedBatches: 1,
                         complete: true,
                     }),
+                    socialPublisher,
                 }}
             />
         );
@@ -6895,8 +7410,10 @@ describe('Nostr overlay App', () => {
             followBobButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        expect(publishContactList).toHaveBeenCalledTimes(1);
-        expect(publishContactList).toHaveBeenCalledWith([followedPubkey, followerPubkey]);
+        await waitFor(() => (socialPublisher.publishContactList as ReturnType<typeof vi.fn>).mock.calls.length === 1);
+        expect(socialPublisher.publishContactList).toHaveBeenCalledTimes(1);
+        expect(socialPublisher.publishContactList).toHaveBeenCalledWith([followedPubkey, followerPubkey], [['p', followedPubkey]]);
+        expect(writeGatewayPublishContactList).not.toHaveBeenCalled();
 
         await waitFor(() => {
             const followingButton = document.body.querySelector('button[aria-label="Dejar de seguir a Bob"]') as HTMLButtonElement | null;
@@ -6904,18 +7421,869 @@ describe('Nostr overlay App', () => {
         });
     });
 
+    test('serializes follow writes and rebases each publish on the latest kind 3', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const firstFollowerPubkey = 'b'.repeat(64);
+        const secondFollowerPubkey = 'c'.repeat(64);
+        const firstPublish = createDeferred<{ id: string; pubkey: string; kind: number; created_at: number; tags: string[][]; content: string; sig: string }>();
+        const secondPublish = createDeferred<{ id: string; pubkey: string; kind: number; created_at: number; tags: string[][]; content: string; sig: string }>();
+        let publishCount = 0;
+        const publishContactList = vi.fn(() => {
+            publishCount += 1;
+            return publishCount === 1 ? firstPublish.promise : secondPublish.promise;
+        });
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, { publishContactList });
+        let kind3FetchCount = 0;
+        const fetchLatestReplaceableEvent = vi.fn(async (_pubkey: string, kind: number) => {
+            if (kind !== 3) {
+                return null;
+            }
+
+            kind3FetchCount += 1;
+            return createContactListEvent(
+                ownerPubkey,
+                kind3FetchCount === 1 ? [followedPubkey] : [followedPubkey, firstFollowerPubkey]
+            );
+        });
+
+        const { bridge } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                        [firstFollowerPubkey]: { pubkey: firstFollowerPubkey, displayName: 'Bob' },
+                        [secondFollowerPubkey]: { pubkey: secondFollowerPubkey, displayName: 'Carol' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [firstFollowerPubkey, secondFollowerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Bob'));
+        await waitFor(() => (document.body.textContent || '').includes('Carol'));
+
+        const followBobButton = document.body.querySelector('button[aria-label="Seguir a Bob"]') as HTMLButtonElement;
+        await act(async () => {
+            followBobButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => publishContactList.mock.calls.length === 1);
+
+        const followCarolButton = document.body.querySelector('button[aria-label="Seguir a Carol"]') as HTMLButtonElement;
+        await act(async () => {
+            followCarolButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            await Promise.resolve();
+        });
+
+        expect(fetchLatestReplaceableEvent.mock.calls.filter((call) => call[1] === 3)).toHaveLength(1);
+        expect(publishContactList).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            firstPublish.resolve({
+                id: '7'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 3,
+                created_at: 1700000002,
+                tags: [['p', followedPubkey], ['p', firstFollowerPubkey]],
+                content: '',
+                sig: '8'.repeat(128),
+            });
+        });
+
+        await waitFor(() => fetchLatestReplaceableEvent.mock.calls.filter((call) => call[1] === 3).length === 2);
+        await waitFor(() => publishContactList.mock.calls.length === 2);
+        expect(publishContactList).toHaveBeenLastCalledWith(
+            [followedPubkey, firstFollowerPubkey, secondFollowerPubkey],
+            [['p', followedPubkey], ['p', firstFollowerPubkey]]
+        );
+
+        await act(async () => {
+            secondPublish.resolve({
+                id: '9'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 3,
+                created_at: 1700000003,
+                tags: [['p', followedPubkey], ['p', firstFollowerPubkey], ['p', secondFollowerPubkey]],
+                content: '',
+                sig: 'a'.repeat(128),
+            });
+        });
+
+        await waitFor(() => document.body.querySelector('button[aria-label="Dejar de seguir a Carol"]') !== null);
+    });
+
+    test('uses fresh kind 3 follows before publishing a follow toggle', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const localFollowPubkey = 'a'.repeat(64);
+        const freshFollowPubkey = 'b'.repeat(64);
+        const followerPubkey = 'c'.repeat(64);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey);
+        const connect = vi.fn(async () => {});
+        const fetchLatestReplaceableEvent = vi.fn(async (_pubkey: string, kind: number) => {
+            if (kind !== 3) {
+                return null;
+            }
+
+            return createReplaceableEvent(ownerPubkey, 3, [
+                    ['p', localFollowPubkey, 'wss://relay.example', 'Alice'],
+                    ['p', freshFollowPubkey, 'wss://relay.example', 'Bob'],
+                ]);
+        });
+
+        const { bridge } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect,
+                        fetchLatestReplaceableEvent,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [localFollowPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [localFollowPubkey]: { pubkey: localFollowPubkey, displayName: 'Alice' },
+                        [freshFollowPubkey]: { pubkey: freshFollowPubkey, displayName: 'Bob' },
+                        [followerPubkey]: { pubkey: followerPubkey, displayName: 'Carol' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [followerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        expect(followersItem).toBeDefined();
+
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Carol'));
+
+        const followCarolButton = document.body.querySelector('button[aria-label="Seguir a Carol"]') as HTMLButtonElement;
+        expect(followCarolButton).toBeDefined();
+
+        await act(async () => {
+            followCarolButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const freshKind3CallIndex = fetchLatestReplaceableEvent.mock.calls.findIndex((call) => call[1] === 3);
+        expect(freshKind3CallIndex).toBeGreaterThanOrEqual(0);
+        expect(connect).toHaveBeenCalledTimes(1);
+        expect(connect.mock.invocationCallOrder[0]!).toBeLessThan(fetchLatestReplaceableEvent.mock.invocationCallOrder[freshKind3CallIndex]!);
+        expect(fetchLatestReplaceableEvent).toHaveBeenCalledWith(ownerPubkey, 3);
+        expect(socialPublisher.publishContactList).toHaveBeenCalledTimes(1);
+        expect(socialPublisher.publishContactList).toHaveBeenCalledWith([
+            localFollowPubkey,
+            freshFollowPubkey,
+            followerPubkey,
+        ], [
+            ['p', localFollowPubkey, 'wss://relay.example', 'Alice'],
+            ['p', freshFollowPubkey, 'wss://relay.example', 'Bob'],
+        ]);
+
+        await waitFor(() => {
+            const followingButton = document.body.querySelector('button[aria-label="Dejar de seguir a Carol"]') as HTMLButtonElement | null;
+            return Boolean(followingButton && !followingButton.disabled);
+        });
+
+        const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
+        expect(followingItem).toBeDefined();
+
+        await act(async () => {
+            followingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => {
+            const text = document.body.textContent || '';
+            return text.includes('Alice') && text.includes('Bob') && text.includes('Carol');
+        });
+    });
+
+    test('publishes first follow when no fresh kind 3 exists', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followerPubkey = 'c'.repeat(64);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey);
+        const fetchLatestReplaceableEvent = vi.fn(async () => null);
+
+        const rendered = await renderApp(
+            <App
+                mapBridge={createMapBridgeStub(8).bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followerPubkey]: { pubkey: followerPubkey, displayName: 'Carol' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [followerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Carol'));
+
+        const followCarolButton = document.body.querySelector('button[aria-label="Seguir a Carol"]') as HTMLButtonElement;
+        await act(async () => {
+            followCarolButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(fetchLatestReplaceableEvent).toHaveBeenCalledWith(ownerPubkey, 3);
+        expect(socialPublisher.publishContactList).toHaveBeenCalledWith([followerPubkey], []);
+        await waitFor(() => document.body.querySelector('button[aria-label="Dejar de seguir a Carol"]') !== null);
+    });
+
+    test('does not publish follow when fresh kind 3 belongs to another owner', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const followerPubkey = 'c'.repeat(64);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey);
+        const fetchLatestReplaceableEvent = vi.fn(async () => createContactListEvent('b'.repeat(64), [followedPubkey]));
+
+        const rendered = await renderApp(
+            <App
+                mapBridge={createMapBridgeStub(8).bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                        [followerPubkey]: { pubkey: followerPubkey, displayName: 'Carol' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [followerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Carol'));
+
+        const followCarolButton = document.body.querySelector('button[aria-label="Seguir a Carol"]') as HTMLButtonElement;
+        await act(async () => {
+            followCarolButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(fetchLatestReplaceableEvent).toHaveBeenCalledWith(ownerPubkey, 3);
+        expect(socialPublisher.publishContactList).not.toHaveBeenCalled();
+        expect(document.body.querySelector('button[aria-label="Seguir a Carol"]')).not.toBeNull();
+        expect(document.body.querySelector('button[aria-label="Dejar de seguir a Carol"]')).toBeNull();
+    });
+
+    test('does not publish follow when fresh kind 3 fails NIP-01 verification', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const followerPubkey = 'c'.repeat(64);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey);
+        const fetchLatestReplaceableEvent = vi.fn(async (_pubkey: string, kind: number) => {
+            if (kind !== 3) {
+                return null;
+            }
+
+            return {
+                id: '9'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 3,
+                created_at: 1700000001,
+                tags: [['p', followedPubkey]],
+                content: '',
+                sig: '8'.repeat(128),
+            };
+        });
+
+        const rendered = await renderApp(
+            <App
+                mapBridge={createMapBridgeStub(8).bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                        [followerPubkey]: { pubkey: followerPubkey, displayName: 'Carol' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [followerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Carol'));
+
+        const followCarolButton = document.body.querySelector('button[aria-label="Seguir a Carol"]') as HTMLButtonElement;
+        await act(async () => {
+            followCarolButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(fetchLatestReplaceableEvent).toHaveBeenCalledWith(ownerPubkey, 3);
+        expect(socialPublisher.publishContactList).not.toHaveBeenCalled();
+        expect(document.body.querySelector('button[aria-label="Seguir a Carol"]')).not.toBeNull();
+        expect(document.body.querySelector('button[aria-label="Dejar de seguir a Carol"]')).toBeNull();
+    });
+
+    test('uses published kind 3 ACK event follows for local follow state', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const localFollowPubkey = 'a'.repeat(64);
+        const freshFollowPubkey = 'b'.repeat(64);
+        const followerPubkey = 'c'.repeat(64);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishContactList: vi.fn(async () => ({
+                id: '7'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 3,
+                created_at: 1700000002,
+                tags: [
+                    ['p', localFollowPubkey],
+                    ['p', followerPubkey],
+                ],
+                content: '',
+                sig: '8'.repeat(128),
+            })),
+        });
+        const fetchLatestReplaceableEvent = vi.fn(async (_pubkey: string, kind: number) => {
+            if (kind !== 3) {
+                return null;
+            }
+
+            return createReplaceableEvent(ownerPubkey, 3, [
+                    ['p', localFollowPubkey],
+                    ['p', freshFollowPubkey],
+                ]);
+        });
+
+        const { bridge } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [localFollowPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [localFollowPubkey]: { pubkey: localFollowPubkey, displayName: 'Alice' },
+                        [freshFollowPubkey]: { pubkey: freshFollowPubkey, displayName: 'Beto' },
+                        [followerPubkey]: { pubkey: followerPubkey, displayName: 'Carol' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [followerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Carol'));
+
+        const followCarolButton = document.body.querySelector('button[aria-label="Seguir a Carol"]') as HTMLButtonElement;
+        await act(async () => {
+            followCarolButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(socialPublisher.publishContactList).toHaveBeenCalledWith([
+            localFollowPubkey,
+            freshFollowPubkey,
+            followerPubkey,
+        ], [
+            ['p', localFollowPubkey],
+            ['p', freshFollowPubkey],
+        ]);
+
+        const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
+        await act(async () => {
+            followingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => {
+            const text = document.body.textContent || '';
+            return text.includes('Alice') && text.includes('Carol');
+        });
+        expect(document.body.textContent || '').not.toContain('Beto');
+    });
+
+    test('does not publish follow when owner changes before fresh kind 3 fetch resolves', async () => {
+        const ownerPubkeyA = SAMPLE_AUTH_PUBKEY;
+        const ownerPubkeyB = 'e'.repeat(64);
+        const localFollowPubkey = 'a'.repeat(64);
+        const followerPubkey = 'c'.repeat(64);
+        const ownerBFollowPubkey = 'd'.repeat(64);
+        const npubB = encodeHexToNpub(ownerPubkeyB);
+        const freshContactListDeferred = createDeferred<NostrEvent | null>();
+        const socialPublisher = createSocialPublisherMock(ownerPubkeyA);
+        const fetchFollowsByPubkeyFn = vi.fn().mockResolvedValue({
+            ownerPubkey: ownerPubkeyA,
+            follows: [localFollowPubkey],
+            relayHints: [],
+        });
+        const fetchFollowsByNpubFn = vi.fn().mockResolvedValue({
+            ownerPubkey: ownerPubkeyB,
+            follows: [ownerBFollowPubkey],
+            relayHints: [],
+        });
+
+        const { bridge } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: vi.fn(async (_pubkey: string, kind: number) => {
+                            if (kind === 3) {
+                                return freshContactListDeferred.promise;
+                            }
+
+                            return null;
+                        }),
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn,
+                    fetchFollowsByNpubFn,
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkeyA]: { pubkey: ownerPubkeyA, displayName: 'Owner-A' },
+                        [ownerPubkeyB]: { pubkey: ownerPubkeyB, displayName: 'Owner-B' },
+                        [localFollowPubkey]: { pubkey: localFollowPubkey, displayName: 'Alice' },
+                        [followerPubkey]: { pubkey: followerPubkey, displayName: 'Carol' },
+                        [ownerBFollowPubkey]: { pubkey: ownerBFollowPubkey, displayName: 'Dylan' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockImplementation(async (input: { pubkey?: string; targetPubkey?: string }) => ({
+                        followers: input.pubkey === ownerPubkeyB || input.targetPubkey === ownerPubkeyB ? [] : [followerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    })),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner-A'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Carol'));
+
+        const followCarolButton = document.body.querySelector('button[aria-label="Seguir a Carol"]') as HTMLButtonElement;
+        await act(async () => {
+            followCarolButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await selectUserMenuAction(rendered.container, 'Cerrar sesión');
+        await waitFor(() => (rendered.container.textContent || '').includes('Método de acceso'));
+
+        const npubInput = rendered.container.querySelector('input[name="npub"]') as HTMLInputElement;
+        const form = rendered.container.querySelector('form');
+        await act(async () => {
+            const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+            valueSetter?.call(npubInput, npubB);
+            npubInput.dispatchEvent(new Event('input', { bubbles: true }));
+            npubInput.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await act(async () => {
+            form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        });
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner-B'));
+
+        freshContactListDeferred.resolve(createContactListEvent(ownerPubkeyA, [localFollowPubkey]));
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(socialPublisher.publishContactList).not.toHaveBeenCalled();
+
+        const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
+        await act(async () => {
+            followingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Dylan'));
+        const text = document.body.textContent || '';
+        expect(text).not.toContain('Alice');
+        expect(text).not.toContain('Carol');
+    });
+
+    test('keeps local follows unchanged when published contact list ACK has wrong kind', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const followerPubkey = 'c'.repeat(64);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishContactList: vi.fn(async () => ({
+                id: '7'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 1,
+                created_at: 1700000002,
+                tags: [['p', followedPubkey], ['p', followerPubkey]],
+                content: '',
+                sig: '8'.repeat(128),
+            })),
+        });
+
+        const { bridge } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => kind === 3
+                            ? createContactListEvent(ownerPubkey, [followedPubkey])
+                            : null,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                        [followerPubkey]: { pubkey: followerPubkey, displayName: 'Carol' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [followerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Carol'));
+
+        const followCarolButton = document.body.querySelector('button[aria-label="Seguir a Carol"]') as HTMLButtonElement;
+        await act(async () => {
+            followCarolButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('No se pudo actualizar el seguimiento de esta cuenta'));
+        expect(document.body.textContent || '').not.toContain('Published contact list ACK did not match the active owner');
+
+        const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
+        await act(async () => {
+            followingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Alice'));
+        expect(document.body.textContent || '').not.toContain('Carol');
+    });
+
+    test('does not apply delayed published kind 3 follows after owner changes', async () => {
+        const ownerPubkeyA = SAMPLE_AUTH_PUBKEY;
+        const ownerPubkeyB = 'e'.repeat(64);
+        const localFollowPubkey = 'a'.repeat(64);
+        const followerPubkey = 'c'.repeat(64);
+        const ownerBFollowPubkey = 'd'.repeat(64);
+        const publishDeferred = createDeferred<Awaited<ReturnType<NonNullable<NostrOverlayServices['socialPublisher']>['publishContactList']>>>();
+        const socialPublisher = createSocialPublisherMock(ownerPubkeyA, {
+            publishContactList: vi.fn(() => publishDeferred.promise),
+        });
+        const npubB = encodeHexToNpub(ownerPubkeyB);
+        const fetchFollowsByPubkeyFn = vi.fn().mockResolvedValue({
+            ownerPubkey: ownerPubkeyA,
+            follows: [localFollowPubkey],
+            relayHints: [],
+        });
+        const fetchFollowsByNpubFn = vi.fn().mockResolvedValue({
+            ownerPubkey: ownerPubkeyB,
+            follows: [ownerBFollowPubkey],
+            relayHints: [],
+        });
+
+        const { bridge } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => kind === 3
+                            ? createContactListEvent(ownerPubkeyA, [localFollowPubkey])
+                            : null,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn,
+                    fetchFollowsByNpubFn,
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkeyA]: { pubkey: ownerPubkeyA, displayName: 'Owner-A' },
+                        [ownerPubkeyB]: { pubkey: ownerPubkeyB, displayName: 'Owner-B' },
+                        [localFollowPubkey]: { pubkey: localFollowPubkey, displayName: 'Alice' },
+                        [followerPubkey]: { pubkey: followerPubkey, displayName: 'Carol' },
+                        [ownerBFollowPubkey]: { pubkey: ownerBFollowPubkey, displayName: 'Dylan' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockImplementation(async (input: { pubkey?: string; targetPubkey?: string }) => ({
+                        followers: input.pubkey === ownerPubkeyB || input.targetPubkey === ownerPubkeyB ? [] : [followerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    })),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner-A'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Carol'));
+
+        const followCarolButton = document.body.querySelector('button[aria-label="Seguir a Carol"]') as HTMLButtonElement;
+        await act(async () => {
+            followCarolButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        await waitFor(() => (socialPublisher.publishContactList as ReturnType<typeof vi.fn>).mock.calls.length === 1);
+
+        await selectUserMenuAction(rendered.container, 'Cerrar sesión');
+        await waitFor(() => (rendered.container.textContent || '').includes('Método de acceso'));
+
+        const npubInput = rendered.container.querySelector('input[name="npub"]') as HTMLInputElement;
+        const form = rendered.container.querySelector('form');
+        await act(async () => {
+            const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+            valueSetter?.call(npubInput, npubB);
+            npubInput.dispatchEvent(new Event('input', { bubbles: true }));
+            npubInput.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await act(async () => {
+            form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        });
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner-B'));
+
+        publishDeferred.resolve({
+            id: '7'.repeat(64),
+            pubkey: ownerPubkeyA,
+            kind: 3,
+            created_at: 1700000002,
+            tags: [
+                ['p', localFollowPubkey],
+                ['p', followerPubkey],
+            ],
+            content: '',
+            sig: '8'.repeat(128),
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
+        await act(async () => {
+            followingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Dylan'));
+        const text = document.body.textContent || '';
+        expect(text).not.toContain('Alice');
+        expect(text).not.toContain('Carol');
+    });
+
+    test('keeps follower row unfollowed when contact list publish is not acknowledged', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const followerPubkey = 'b'.repeat(64);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishContactList: vi.fn(async () => {
+                throw new Error('raw contact list relay failure with wss://sensitive-relay.example.invalid');
+            }),
+        });
+
+        const { bridge } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => kind === 3
+                            ? createContactListEvent(ownerPubkey, [followedPubkey])
+                            : null,
+                        fetchEvents: async () => [],
+                    }),
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                        [followerPubkey]: { pubkey: followerPubkey, displayName: 'Bob' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [followerPubkey],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                    socialPublisher,
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        const followersItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidores"]') as HTMLButtonElement;
+        expect(followersItem).toBeDefined();
+
+        await act(async () => {
+            followersItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Bob'));
+
+        const followBobButton = document.body.querySelector('button[aria-label="Seguir a Bob"]') as HTMLButtonElement;
+        expect(followBobButton).toBeDefined();
+
+        await act(async () => {
+            followBobButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(socialPublisher.publishContactList).toHaveBeenCalledWith([followedPubkey, followerPubkey], [['p', followedPubkey]]);
+        await waitFor(() => (document.body.textContent || '').includes('No se pudo actualizar el seguimiento de esta cuenta'));
+        expect(document.body.textContent || '').not.toContain('raw contact list relay failure');
+        expect(document.body.querySelector('button[aria-label="Seguir a Bob"]')).not.toBeNull();
+        expect(document.body.querySelector('button[aria-label="Dejar de seguir a Bob"]')).toBeNull();
+    });
+
     test('allows unfollowing from following tab and updates row state to follow', async () => {
         const ownerPubkey = SAMPLE_AUTH_PUBKEY;
         const followedPubkey = 'a'.repeat(64);
-        const publishContactList = vi.fn(async () => ({
-            id: '1'.repeat(64),
-            pubkey: ownerPubkey,
-            kind: 3,
-            created_at: Math.floor(Date.now() / 1000),
-            tags: [],
-            content: '',
-            sig: '2'.repeat(128),
-        }));
+        const socialPublisher = createSocialPublisherMock(ownerPubkey);
 
         vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
             publishEvent: vi.fn(async (event: any) => ({
@@ -6924,7 +8292,7 @@ describe('Nostr overlay App', () => {
                 pubkey: ownerPubkey,
                 sig: '4'.repeat(128),
             })),
-            publishContactList,
+            publishContactList: vi.fn(),
             encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
             decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
         } as any);
@@ -6936,7 +8304,9 @@ describe('Nostr overlay App', () => {
                 services={{
                     createClient: () => ({
                         connect: async () => {},
-                        fetchLatestReplaceableEvent: async () => null,
+                        fetchLatestReplaceableEvent: async (_pubkey: string, kind: number) => kind === 3
+                            ? createContactListEvent(ownerPubkey, [followedPubkey])
+                            : null,
                         fetchEvents: async () => [],
                     }),
                     fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
@@ -6953,6 +8323,7 @@ describe('Nostr overlay App', () => {
                         scannedBatches: 1,
                         complete: true,
                     }),
+                    socialPublisher,
                 }}
             />
         );
@@ -6990,8 +8361,8 @@ describe('Nostr overlay App', () => {
             unfollowAliceItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        expect(publishContactList).toHaveBeenCalledTimes(1);
-        expect(publishContactList).toHaveBeenCalledWith([]);
+        expect(socialPublisher.publishContactList).toHaveBeenCalledTimes(1);
+        expect(socialPublisher.publishContactList).toHaveBeenCalledWith([], [['p', followedPubkey]]);
 
         await waitFor(() => {
             const text = document.body.textContent || '';
@@ -7977,7 +9348,7 @@ describe('Nostr overlay App', () => {
             content: '',
             sig: '2'.repeat(128),
         }));
-        const publishMuteList = vi.fn(async () => ({
+        const rawPublishMuteList = vi.fn(async () => ({
             id: '3'.repeat(64),
             pubkey: ownerPubkey,
             kind: 10000,
@@ -7986,6 +9357,17 @@ describe('Nostr overlay App', () => {
             content: JSON.stringify([['p', followedPubkey]]),
             sig: '4'.repeat(128),
         }));
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishMuteList: vi.fn(async (_mutedPubkeys: string[], preservedTags: string[][] = []) => ({
+                id: '3'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 10000,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: preservedTags,
+                content: JSON.stringify([['p', followedPubkey]]),
+                sig: '4'.repeat(128),
+            })),
+        });
 
         vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
             publishEvent: vi.fn(async (event: any) => ({
@@ -7995,7 +9377,7 @@ describe('Nostr overlay App', () => {
                 sig: '6'.repeat(128),
             })),
             publishContactList,
-            publishMuteList,
+            publishMuteList: rawPublishMuteList,
             encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
             decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
         } as any);
@@ -8010,6 +9392,7 @@ describe('Nostr overlay App', () => {
                         fetchLatestReplaceableEvent: async () => null,
                         fetchEvents: async () => [],
                     }),
+                    socialPublisher,
                     fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
                         ownerPubkey,
                         follows: [followedPubkey],
@@ -8050,8 +9433,9 @@ describe('Nostr overlay App', () => {
             muteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        expect(publishMuteList).toHaveBeenCalledTimes(1);
-        expect(publishMuteList).toHaveBeenCalledWith([followedPubkey], []);
+        expect(socialPublisher.publishMuteList).toHaveBeenCalledTimes(1);
+        expect(socialPublisher.publishMuteList).toHaveBeenCalledWith([followedPubkey], []);
+        expect(rawPublishMuteList).not.toHaveBeenCalled();
         expect(publishContactList).not.toHaveBeenCalled();
 
         const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
@@ -8064,10 +9448,10 @@ describe('Nostr overlay App', () => {
         await waitFor(() => (document.body.textContent || '').includes('Alice'));
     });
 
-    test('falls back to cached mute list when live fetch times out during silencing', async () => {
+    test('keeps followed user available when mute publish receives no relay ACK', async () => {
         const ownerPubkey = SAMPLE_AUTH_PUBKEY;
         const followedPubkey = 'a'.repeat(64);
-        const publishMuteList = vi.fn(async () => ({
+        const rawPublishMuteList = vi.fn(async () => ({
             id: '3'.repeat(64),
             pubkey: ownerPubkey,
             kind: 10000,
@@ -8076,6 +9460,11 @@ describe('Nostr overlay App', () => {
             content: JSON.stringify([['p', followedPubkey]]),
             sig: '4'.repeat(128),
         }));
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishMuteList: vi.fn(async () => {
+                throw new Error('raw mute relay failure with encrypted payload context');
+            }),
+        });
 
         vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
             publishEvent: vi.fn(async (event: any) => ({
@@ -8085,7 +9474,204 @@ describe('Nostr overlay App', () => {
                 sig: '6'.repeat(128),
             })),
             publishContactList: vi.fn(),
-            publishMuteList,
+            publishMuteList: rawPublishMuteList,
+            encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
+            decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
+        } as any);
+
+        const { bridge, triggerOccupiedBuildingContextMenu } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={{
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent: async () => null,
+                        fetchEvents: async () => [],
+                    }),
+                    socialPublisher,
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                    }),
+                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
+                        followers: [],
+                        scannedBatches: 1,
+                        complete: true,
+                    }),
+                }}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: followedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        const muteItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
+            (node.textContent || '').trim() === 'Silenciar'
+        ) as HTMLElement;
+
+        await act(async () => {
+            muteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('No se pudo actualizar el silenciamiento de esta cuenta'));
+        expect(document.body.textContent || '').not.toContain('raw mute relay failure');
+        expect(socialPublisher.publishMuteList).toHaveBeenCalledWith([followedPubkey], []);
+        expect(rawPublishMuteList).not.toHaveBeenCalled();
+
+        const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
+        expect(followingItem.closest('[data-slot="sidebar-menu-item"]')?.textContent || '').toContain('1');
+
+        await act(async () => {
+            followingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Alice'));
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: followedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        expect(document.body.textContent || '').not.toContain('Desilenciar');
+    });
+
+    test('keeps followed user available when mute list ACK has wrong owner', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishMuteList: vi.fn(async (_mutedPubkeys: string[], preservedTags: string[][] = []) => ({
+                id: '3'.repeat(64),
+                pubkey: 'b'.repeat(64),
+                kind: 10000,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: preservedTags,
+                content: JSON.stringify([['p', followedPubkey]]),
+                sig: '4'.repeat(128),
+            })),
+        });
+
+        const { bridge, triggerOccupiedBuildingContextMenu } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    socialPublisher,
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                    }),
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: followedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        const muteItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
+            (node.textContent || '').trim() === 'Silenciar'
+        ) as HTMLElement;
+
+        await act(async () => {
+            muteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('No se pudo actualizar el silenciamiento de esta cuenta'));
+        expect(document.body.textContent || '').not.toContain('Published mute list ACK did not match the active owner');
+        expect(socialPublisher.publishMuteList).toHaveBeenCalledWith([followedPubkey], []);
+
+        const followingItem = rendered.container.querySelector('button[aria-label="Abrir lista de seguidos"]') as HTMLButtonElement;
+        expect(followingItem.closest('[data-slot="sidebar-menu-item"]')?.textContent || '').toContain('1');
+
+        await act(async () => {
+            followingItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Alice'));
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: followedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        expect(document.body.textContent || '').not.toContain('Desilenciar');
+    });
+
+    test('does not publish mute list when fresh mute list fetch fails during silencing', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const rawPublishMuteList = vi.fn(async () => ({
+            id: '3'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 10000,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [],
+            content: JSON.stringify([['p', followedPubkey]]),
+            sig: '4'.repeat(128),
+        }));
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, {
+            publishMuteList: vi.fn(async (_mutedPubkeys: string[], preservedTags: string[][] = []) => ({
+                id: '3'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 10000,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: preservedTags,
+                content: JSON.stringify([['p', followedPubkey]]),
+                sig: '4'.repeat(128),
+            })),
+        });
+
+        vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
+            publishEvent: vi.fn(async (event: any) => ({
+                ...event,
+                id: '5'.repeat(64),
+                pubkey: ownerPubkey,
+                sig: '6'.repeat(128),
+            })),
+            publishContactList: vi.fn(),
+            publishMuteList: rawPublishMuteList,
             encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
             decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
         } as any);
@@ -8104,12 +9690,13 @@ describe('Nostr overlay App', () => {
                                 if (muteFetchCount === 1) {
                                     return null;
                                 }
-                                throw new Error('NDK fetchEvents timed out after 5000ms');
+                                throw new Error('raw mute fetch timeout with wss://sensitive-relay.example.invalid');
                             }
                             return null;
                         },
                         fetchEvents: async () => [],
                     }),
+                    socialPublisher,
                     fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
                         ownerPubkey,
                         follows: [followedPubkey],
@@ -8150,8 +9737,223 @@ describe('Nostr overlay App', () => {
             muteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
+        await waitFor(() => (document.body.textContent || '').includes('No se pudo actualizar el silenciamiento de esta cuenta'));
+        expect(document.body.textContent || '').not.toContain('raw mute fetch timeout');
+        expect(socialPublisher.publishMuteList).not.toHaveBeenCalled();
+        expect(rawPublishMuteList).not.toHaveBeenCalled();
+    });
+
+    test('does not publish mute list when fresh kind 10000 fails NIP-01 verification', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const followedPubkey = 'a'.repeat(64);
+        const rawPublishMuteList = vi.fn(async () => ({
+            id: '3'.repeat(64),
+            pubkey: ownerPubkey,
+            kind: 10000,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [],
+            content: JSON.stringify([['p', followedPubkey]]),
+            sig: '4'.repeat(128),
+        }));
+        const socialPublisher = createSocialPublisherMock(ownerPubkey);
+        const fetchLatestReplaceableEvent = vi.fn(async (_pubkey: string, kind: number) => {
+            if (kind !== 10000) {
+                return null;
+            }
+
+            return {
+                id: '5'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 10000,
+                created_at: 1700000001,
+                tags: [],
+                content: '',
+                sig: '6'.repeat(128),
+            };
+        });
+
+        vi.spyOn(writeGatewayModule, 'createWriteGateway').mockReturnValue({
+            publishEvent: vi.fn(async (event: any) => ({
+                ...event,
+                id: '5'.repeat(64),
+                pubkey: ownerPubkey,
+                sig: '6'.repeat(128),
+            })),
+            publishContactList: vi.fn(),
+            publishMuteList: rawPublishMuteList,
+            encryptDm: vi.fn(async (_pubkey: string, plaintext: string) => plaintext),
+            decryptDm: vi.fn(async (_pubkey: string, ciphertext: string) => ciphertext),
+        } as any);
+
+        const { bridge, triggerOccupiedBuildingContextMenu } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent,
+                        fetchEvents: async () => [],
+                    }),
+                    socialPublisher,
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [followedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [followedPubkey]: { pubkey: followedPubkey, displayName: 'Alice' },
+                    }),
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+        fetchLatestReplaceableEvent.mockClear();
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: followedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        const muteItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
+            (node.textContent || '').trim() === 'Silenciar'
+        ) as HTMLElement;
+
+        await act(async () => {
+            muteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(fetchLatestReplaceableEvent).toHaveBeenCalledWith(ownerPubkey, 10000);
+        expect(socialPublisher.publishMuteList).not.toHaveBeenCalled();
+        expect(rawPublishMuteList).not.toHaveBeenCalled();
+    });
+
+    test('serializes mute writes and rebases each publish on the latest kind 10000', async () => {
+        const ownerPubkey = SAMPLE_AUTH_PUBKEY;
+        const firstMutedPubkey = 'a'.repeat(64);
+        const secondMutedPubkey = 'b'.repeat(64);
+        const firstPublish = createDeferred<{ id: string; pubkey: string; kind: number; created_at: number; tags: string[][]; content: string; sig: string }>();
+        const secondPublish = createDeferred<{ id: string; pubkey: string; kind: number; created_at: number; tags: string[][]; content: string; sig: string }>();
+        let publishCount = 0;
+        const publishMuteList = vi.fn(() => {
+            publishCount += 1;
+            return publishCount === 1 ? firstPublish.promise : secondPublish.promise;
+        });
+        const socialPublisher = createSocialPublisherMock(ownerPubkey, { publishMuteList });
+        let latestMuteTags: string[][] = [];
+        const fetchLatestReplaceableEvent = vi.fn(async (_pubkey: string, kind: number) => {
+            if (kind !== 10000) {
+                return null;
+            }
+
+            return createReplaceableEvent(ownerPubkey, 10000, latestMuteTags);
+        });
+
+        const { bridge, triggerOccupiedBuildingContextMenu } = createMapBridgeStub(8);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices(ownerPubkey, {
+                    createClient: () => ({
+                        connect: async () => {},
+                        fetchLatestReplaceableEvent,
+                        fetchEvents: async () => [],
+                    }),
+                    socialPublisher,
+                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                        ownerPubkey,
+                        follows: [firstMutedPubkey, secondMutedPubkey],
+                        relayHints: [],
+                    }),
+                    fetchProfilesFn: vi.fn().mockResolvedValue({
+                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
+                        [firstMutedPubkey]: { pubkey: firstMutedPubkey, displayName: 'Alice' },
+                        [secondMutedPubkey]: { pubkey: secondMutedPubkey, displayName: 'Bob' },
+                    }),
+                })}
+            />
+        );
+        mounted.push(rendered);
+
+        await loginWithNip07(rendered.container);
+        await waitFor(() => (rendered.container.textContent || '').includes('Owner'));
+        fetchLatestReplaceableEvent.mockClear();
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 2,
+                pubkey: firstMutedPubkey,
+                clientX: 320,
+                clientY: 240,
+            });
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        const firstMuteItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
+            (node.textContent || '').trim() === 'Silenciar'
+        ) as HTMLElement;
+        await act(async () => {
+            firstMuteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
         await waitFor(() => publishMuteList.mock.calls.length === 1);
-        expect(publishMuteList).toHaveBeenCalledWith([followedPubkey], []);
+
+        await act(async () => {
+            triggerOccupiedBuildingContextMenu({
+                buildingIndex: 3,
+                pubkey: secondMutedPubkey,
+                clientX: 360,
+                clientY: 260,
+            });
+        });
+        await waitFor(() => (document.body.textContent || '').includes('Silenciar'));
+        const secondMuteItem = Array.from(document.body.querySelectorAll('[data-slot="context-menu-item"]')).find((node) =>
+            (node.textContent || '').trim() === 'Silenciar'
+        ) as HTMLElement;
+        await act(async () => {
+            secondMuteItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            await Promise.resolve();
+        });
+
+        expect(fetchLatestReplaceableEvent.mock.calls.filter((call) => call[1] === 10000)).toHaveLength(1);
+        expect(publishMuteList).toHaveBeenCalledTimes(1);
+
+        latestMuteTags = [['p', firstMutedPubkey]];
+        await act(async () => {
+            firstPublish.resolve({
+                id: '7'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 10000,
+                created_at: 1700000002,
+                tags: [],
+                content: 'encrypted-mute-list',
+                sig: '8'.repeat(128),
+            });
+        });
+
+        await waitFor(() => fetchLatestReplaceableEvent.mock.calls.filter((call) => call[1] === 10000).length === 2);
+        await waitFor(() => publishMuteList.mock.calls.length === 2);
+        expect(publishMuteList).toHaveBeenLastCalledWith([firstMutedPubkey, secondMutedPubkey], []);
+
+        await act(async () => {
+            secondPublish.resolve({
+                id: 'a'.repeat(64),
+                pubkey: ownerPubkey,
+                kind: 10000,
+                created_at: 1700000003,
+                tags: [],
+                content: 'encrypted-mute-list',
+                sig: 'b'.repeat(128),
+            });
+        });
+
+        await waitFor(() => publishMuteList.mock.results[1]?.type === 'return');
     });
 
     test('redirects zap actions to wallet when no wallet is connected', async () => {
@@ -11205,13 +13007,43 @@ describe('Nostr overlay App', () => {
         delete (window as any).nostr;
     });
 
-    test('creates a local account from the login gate, signs bootstrap events, and scopes relay settings to the owner', async () => {
+    test('creates a local account from the login gate, publishes ACK bootstrap events, and scopes relay settings to the owner', async () => {
         const { bridge } = createMapBridgeStub();
         const signEventSpy = vi.spyOn(LocalKeyAuthProvider.prototype, 'signEvent');
+        let activeServiceOwnerPubkey: string | undefined;
+        let activeBootstrapRelaySettings: RelaySettingsState | undefined;
+        const setOwnerPubkey = vi.fn((ownerPubkey: string | undefined) => {
+            activeServiceOwnerPubkey = ownerPubkey;
+        });
+        const setBootstrapRelaySettings = vi.fn((relaySettings: RelaySettingsState | undefined) => {
+            activeBootstrapRelaySettings = relaySettings;
+        });
+        const socialPublisher = createSocialPublisherMock('f'.repeat(64), {
+            publishEvent: vi.fn(async (event) => {
+                if (!activeServiceOwnerPubkey) {
+                    throw new Error('social publisher owner was not configured before bootstrap');
+                }
+
+                if (!activeBootstrapRelaySettings?.byType.nip65Both.includes('wss://relay.damus.io')) {
+                    throw new Error('social publisher bootstrap relays were not configured before bootstrap');
+                }
+
+                return {
+                    ...event,
+                    id: '1'.repeat(64),
+                    pubkey: activeServiceOwnerPubkey,
+                    sig: '2'.repeat(128),
+                };
+            }),
+        });
+        const publishEvent = vi.mocked(socialPublisher.publishEvent);
         const rendered = await renderApp(
             <App
                 mapBridge={bridge}
                 services={createBasicOverlayServices('f'.repeat(64), {
+                    setOwnerPubkey,
+                    setBootstrapRelaySettings,
+                    socialPublisher,
                     fetchFollowsByPubkeyFn: vi.fn().mockImplementation(async (pubkey: string) => ({
                         ownerPubkey: pubkey,
                         follows: [],
@@ -11261,24 +13093,103 @@ describe('Nostr overlay App', () => {
         });
 
         await clickButton('Continuar');
-        await fillControl('input[name="profile-name"]', 'Pablo');
-        await fillControl('textarea[name="profile-about"]', 'Mapa y Nostr');
+        await fillControl('input[name="profile-name"]', 'Synthetic Mapper');
+        await fillControl('textarea[name="profile-about"]', 'Synthetic map profile');
         await clickButton('Continuar');
         await clickButton('Crear cuenta ahora');
 
-        await waitFor(() => signEventSpy.mock.calls.length >= 3);
+        await waitFor(() => publishEvent.mock.calls.length >= 3);
 
-        const signedKinds = signEventSpy.mock.calls.map((call) => call[0]?.kind);
-        expect(signedKinds).toContain(0);
-        expect(signedKinds).toContain(10002);
-        expect(signedKinds).toContain(10050);
+        const publishedKinds = publishEvent.mock.calls.map((call) => call[0]?.kind);
+        expect(publishedKinds).toContain(0);
+        expect(publishedKinds).toContain(10002);
+        expect(publishedKinds).toContain(10050);
+        expect(signEventSpy).not.toHaveBeenCalled();
 
         const storedSessionRaw = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
         expect(storedSessionRaw).not.toBeNull();
         const storedSession = JSON.parse(storedSessionRaw ?? '{}') as { pubkey: string };
+        expect(setOwnerPubkey).toHaveBeenCalledWith(storedSession.pubkey);
+        expect(setBootstrapRelaySettings).toHaveBeenCalledWith(expect.objectContaining({
+            byType: expect.objectContaining({
+                nip65Both: expect.arrayContaining(['wss://relay.damus.io']),
+            }),
+        }));
+        expect(setBootstrapRelaySettings).toHaveBeenLastCalledWith(undefined);
         const savedRelaySettings = loadRelaySettings({ ownerPubkey: storedSession.pubkey });
         expect(savedRelaySettings.byType.nip65Both).toContain('wss://relay.damus.io');
         expect(savedRelaySettings.byType.dmInbox).toContain('wss://relay.snort.social');
+    });
+
+    test('does not save local relay settings or expose raw bootstrap errors when ACK publishing fails', async () => {
+        const { bridge } = createMapBridgeStub();
+        const rawError = 'raw relay failure with profile payload and wss://sensitive-relay.example.invalid';
+        const socialPublisher = createSocialPublisherMock('f'.repeat(64), {
+            publishEvent: vi.fn(async () => {
+                throw new Error(rawError);
+            }),
+        });
+        const publishEvent = vi.mocked(socialPublisher.publishEvent);
+        const rendered = await renderApp(
+            <App
+                mapBridge={bridge}
+                services={createBasicOverlayServices('f'.repeat(64), {
+                    socialPublisher,
+                    fetchFollowsByPubkeyFn: vi.fn().mockImplementation(async (pubkey: string) => ({
+                        ownerPubkey: pubkey,
+                        follows: [],
+                        relayHints: [],
+                    })),
+                })}
+            />,
+        );
+        mounted.push(rendered);
+
+        const clickButton = async (label: string) => {
+            const button = Array.from(rendered.container.querySelectorAll('button')).find((candidate) =>
+                (candidate.textContent || '').includes(label)
+            ) as HTMLButtonElement | undefined;
+            expect(button).toBeDefined();
+            await act(async () => {
+                button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            });
+        };
+
+        const fillControl = async (selector: string, value: string) => {
+            const input = rendered.container.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement;
+            expect(input).toBeDefined();
+            await act(async () => {
+                const valueSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set;
+                valueSetter?.call(input, value);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        };
+
+        await clickButton('Crear cuenta');
+        await clickButton('Crear una cuenta local');
+        await clickButton('Continuar');
+
+        const backupCheckbox = rendered.container.querySelector('input[name="confirm-backup"]') as HTMLInputElement;
+        expect(backupCheckbox).toBeDefined();
+        await act(async () => {
+            backupCheckbox.click();
+        });
+
+        await clickButton('Continuar');
+        await fillControl('input[name="profile-name"]', 'Synthetic Mapper');
+        await fillControl('textarea[name="profile-about"]', 'Synthetic map profile');
+        await clickButton('Continuar');
+        await clickButton('Crear cuenta ahora');
+
+        await waitFor(() => publishEvent.mock.calls.length >= 3);
+        await waitFor(() => (document.body.textContent || '').includes('No se pudo completar el bootstrap inicial de la cuenta local'));
+        expect(document.body.textContent || '').not.toContain(rawError);
+
+        const storedSessionRaw = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+        expect(storedSessionRaw).not.toBeNull();
+        const storedSession = JSON.parse(storedSessionRaw ?? '{}') as { pubkey: string };
+        expect(window.localStorage.getItem(`${RELAY_SETTINGS_STORAGE_KEY}:user:${storedSession.pubkey}`)).toBeNull();
     });
 
     test('shows the unlock gate when restoring a passphrase-protected local account', async () => {

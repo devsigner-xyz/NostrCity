@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { fetchFollowsByNpub, fetchFollowsByPubkey, parseFollowsFromKind3, __resetFollowsCacheForTests } from './follows';
+import { buildContactListTags, fetchFollowsByNpub, fetchFollowsByPubkey, parseFollowsFromKind3, __resetFollowsCacheForTests } from './follows';
 import type { NostrClient, NostrEvent } from './types';
 
 vi.mock('./npub', () => ({
@@ -36,6 +36,49 @@ describe('parseFollowsFromKind3', () => {
         };
 
         expect(parseFollowsFromKind3(event)).toEqual([]);
+    });
+});
+
+describe('buildContactListTags', () => {
+    test('preserves retained p-tag metadata, removes unfollowed tags, filters invalid pubkeys, dedupes, and appends new follows', () => {
+        const retained = 'a'.repeat(64);
+        const duplicateRetained = 'b'.repeat(64);
+        const unfollowed = 'c'.repeat(64);
+        const appended = 'd'.repeat(64);
+
+        const tags = buildContactListTags([
+            retained,
+            'not-a-pubkey',
+            duplicateRetained,
+            retained,
+            appended,
+        ], [
+            ['p', retained, 'wss://relay.example', 'Alice'],
+            ['p', duplicateRetained, 'wss://relay.one', 'First Bob'],
+            ['p', duplicateRetained, 'wss://relay.two', 'Second Bob'],
+            ['p', unfollowed, 'wss://relay.example', 'Carol'],
+            ['p', 'not-a-pubkey', 'wss://relay.example', 'Invalid'],
+            ['e', '1'.repeat(64)],
+        ]);
+
+        expect(tags).toEqual([
+            ['p', retained, 'wss://relay.example', 'Alice'],
+            ['p', duplicateRetained, 'wss://relay.one', 'First Bob'],
+            ['p', appended],
+        ]);
+    });
+
+    test('keeps the deduped follows order when preserved tags are ordered differently', () => {
+        const first = 'a'.repeat(64);
+        const second = 'b'.repeat(64);
+
+        expect(buildContactListTags([second, first], [
+            ['p', first, 'wss://relay.example', 'Alice'],
+            ['p', second, 'wss://relay.example', 'Bob'],
+        ])).toEqual([
+            ['p', second, 'wss://relay.example', 'Bob'],
+            ['p', first, 'wss://relay.example', 'Alice'],
+        ]);
     });
 });
 

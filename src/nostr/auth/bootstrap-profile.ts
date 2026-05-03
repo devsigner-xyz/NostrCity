@@ -10,7 +10,7 @@ interface PublishEventLike {
 }
 
 interface BootstrapLocalAccountInput {
-    writeGateway: PublishEventLike;
+    publisher: PublishEventLike;
     relaySettings: RelaySettingsState;
     profile?: {
         name?: string;
@@ -94,7 +94,7 @@ export async function bootstrapLocalAccount(input: BootstrapLocalAccountInput): 
     let lastError: unknown;
     for (const event of bootstrapEvents) {
         try {
-            await input.writeGateway.publishEvent(event);
+            await input.publisher.publishEvent(event);
         } catch (error) {
             lastError = error;
         }

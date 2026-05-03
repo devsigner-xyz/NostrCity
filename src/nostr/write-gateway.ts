@@ -7,6 +7,7 @@ import {
 } from './auth/providers/types';
 import type { NostrEvent } from './types';
 import { buildEncryptedMuteListContent } from './mute-list';
+import { buildContactListTags } from './follows';
 
 interface WriteGatewayOptions {
     getSession: () => AuthSessionState | undefined;
@@ -79,8 +80,8 @@ export function createWriteGateway(options: WriteGatewayOptions) {
             });
         },
 
-        async publishContactList(follows: string[]): Promise<NostrEvent> {
-            const tags = dedupePubkeys(follows).map((pubkey) => ['p', pubkey]);
+        async publishContactList(follows: string[], preservedTags: string[][] = []): Promise<NostrEvent> {
+            const tags = buildContactListTags(follows, preservedTags);
 
             return this.publishEvent({
                 kind: 3,

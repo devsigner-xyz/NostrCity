@@ -224,6 +224,42 @@ describe('ProfileEditorPage', () => {
         await act(async () => rendered.root.unmount());
     });
 
+    test.each([
+        ['kind', (content: string) => ({ kind: 1, content })],
+        ['pubkey', (content: string) => ({ pubkey: 'a'.repeat(64), content })],
+        ['content', () => ({ content: JSON.stringify({ display_name: 'Different Alice' }) })],
+    ])('rejects ACKed profile metadata with mismatched %s before applying it locally', async (_caseName, buildEventOverride) => {
+        window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
+        const onProfileSaved = vi.fn();
+        const rendered = await renderPage({
+            onProfileSaved,
+            onPublishProfileMetadata: vi.fn(async (content: string): Promise<NostrEvent> => ({
+                id: '3'.repeat(64),
+                pubkey: OWNER_PUBKEY,
+                kind: 0,
+                created_at: 124,
+                tags: [],
+                sig: '4'.repeat(128),
+                ...buildEventOverride(content),
+            })),
+        });
+        const displayName = rendered.container.querySelector('input[name="displayName"]') as HTMLInputElement;
+        await act(async () => changeValue(displayName, 'Updated Alice'));
+
+        const saveButton = Array.from(rendered.container.querySelectorAll('button')).find((button) =>
+            (button.textContent || '').includes('Save profile')
+        ) as HTMLButtonElement;
+        await act(async () => {
+            saveButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onProfileSaved).not.toHaveBeenCalled();
+        expect(toastSuccessMock).not.toHaveBeenCalled();
+        expect(toastErrorMock).toHaveBeenCalledWith('Could not publish profile metadata.', { duration: 2200 });
+
+        await act(async () => rendered.root.unmount());
+    });
+
     test('shows an error toast when profile publishing fails', async () => {
         window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ language: 'en' }));
         const rendered = await renderPage({

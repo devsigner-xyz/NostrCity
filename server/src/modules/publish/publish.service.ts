@@ -7,7 +7,6 @@ import {
 } from '../../nostr/event-verify';
 import type {
   PublishForwardRequestDto,
-  PublishForwardResponseDto,
   RelayScope,
 } from './publish.schemas';
 
@@ -34,7 +33,7 @@ const SCOPE_POLICY: Record<RelayScope, {
 }> = {
   social: {
     maxRelays: 8,
-    allowedKinds: null,
+    allowedKinds: new Set([0, 1, 3, 5, 6, 7, 10000, 10002, 10050]),
     allowedRelayHosts: SOCIAL_ALLOWED_RELAY_HOSTS,
   },
   dm: {
@@ -165,6 +164,7 @@ const buildRelayPolicyError = (code: PublishForwardValidationErrorCode, message:
 export type PublishForwardValidationErrorCode =
   | NostrEventVerifyFailureCode
   | 'RELAY_COUNT_EXCEEDED'
+  | 'RELAY_DUPLICATE'
   | 'RELAY_URL_INVALID'
   | 'RELAY_URL_PRIVATE'
   | 'RELAY_SCOPE_POLICY_VIOLATION';
@@ -253,7 +253,13 @@ class WsPublishRelayForwarder implements PublishRelayForwarder {
 }
 
 export interface PublishService {
-  forward(request: PublishForwardRequestDto): Promise<PublishForwardResponseDto>;
+  forward(request: PublishForwardRequestDto): Promise<PublishForwardResult>;
+}
+
+export interface PublishForwardResult {
+  ackedRelays: string[];
+  failedRelays: Array<{ relay: string; reason: string }>;
+  timeoutRelays: string[];
 }
 
 export interface PublishServiceOptions {
@@ -295,26 +301,28 @@ export const validatePublishForwardRequest = (
   for (const relayUrl of request.relays) {
     const normalizedRelayUrl = normalizeRelayUrl(relayUrl);
     if (!normalizedRelayUrl) {
-      return buildRelayPolicyError('RELAY_URL_INVALID', `relay URL is invalid or not wss:// (${relayUrl})`);
+      return buildRelayPolicyError('RELAY_URL_INVALID', 'relay URL is invalid or not wss://');
     }
 
     const hostname = new URL(normalizedRelayUrl).hostname;
     if (isPrivateOrInternalHost(hostname)) {
-      return buildRelayPolicyError('RELAY_URL_PRIVATE', `relay host is private/internal (${hostname})`);
+      return buildRelayPolicyError('RELAY_URL_PRIVATE', 'relay host is private/internal');
     }
 
     const normalizedHost = normalizeHostname(hostname);
     if (!scopePolicy.allowedRelayHosts.has(normalizedHost)) {
       return buildRelayPolicyError(
         'RELAY_SCOPE_POLICY_VIOLATION',
-        `relay host is not allowed for relayScope ${request.relayScope} (${normalizedHost})`,
+        `relay host is not allowed for relayScope ${request.relayScope}`,
       );
     }
 
-    if (!seenRelays.has(normalizedRelayUrl)) {
-      seenRelays.add(normalizedRelayUrl);
-      normalizedRelays.push(normalizedRelayUrl);
+    if (seenRelays.has(normalizedRelayUrl)) {
+      return buildRelayPolicyError('RELAY_DUPLICATE', 'relay entries must be unique');
     }
+
+    seenRelays.add(normalizedRelayUrl);
+    normalizedRelays.push(normalizedRelayUrl);
   }
 
   return {
@@ -330,7 +338,7 @@ export const validatePublishForwardRequest = (
 class PublishForwardService implements PublishService {
   constructor(private readonly relayForwarder: PublishRelayForwarder) {}
 
-  async forward(request: PublishForwardRequestDto): Promise<PublishForwardResponseDto> {
+  async forward(request: PublishForwardRequestDto): Promise<PublishForwardResult> {
     const ackedRelays: string[] = [];
     const timeoutRelays: string[] = [];
     const failedRelays: Array<{ relay: string; reason: string }> = [];

@@ -19,6 +19,32 @@ describe('bootstrap publish handling', () => {
             timeoutRelays: [],
         });
     });
+
+    test('forwards preserved contact-list tags through the deferred write gateway', async () => {
+        const preservedTags = [['p', 'a'.repeat(64), 'wss://relay.example', 'Alice']];
+        const publishContactList = vi.fn(async () => ({
+            id: '1'.repeat(64),
+            pubkey: 'f'.repeat(64),
+            kind: 3,
+            created_at: 1,
+            tags: preservedTags,
+            content: '',
+            sig: '2'.repeat(128),
+        }));
+        const gateway = __bootstrapTestUtils.createDeferredWriteGateway(() => ({
+            publishEvent: vi.fn(),
+            publishTextNote: vi.fn(),
+            publishProfileMetadata: vi.fn(),
+            publishContactList,
+            publishMuteList: vi.fn(),
+            encryptDm: vi.fn(),
+            decryptDm: vi.fn(),
+        } as any));
+
+        await gateway.publishContactList(['a'.repeat(64)], preservedTags);
+
+        expect(publishContactList).toHaveBeenCalledWith(['a'.repeat(64)], preservedTags);
+    });
 });
 
 describe('bootstrap groups service helpers', () => {

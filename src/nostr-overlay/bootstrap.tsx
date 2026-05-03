@@ -16,7 +16,7 @@ import { createGroupsRuntimeService } from '../nostr/groups-runtime-service';
 import { fetchNip11RelayInfo } from '../nostr/groups-transport';
 import { createLazyNdkClient } from '../nostr/lazy-ndk-client';
 import { getBootstrapRelays } from '../nostr/relay-policy';
-import { loadRelaySettings } from '../nostr/relay-settings';
+import { getRelaySetByType, loadRelaySettings, type RelaySettingsState } from '../nostr/relay-settings';
 import type { PublishResult } from '../nostr/dm-types';
 import type { NostrClient, NostrEvent } from '../nostr/types';
 import { createDmApiService } from '../nostr-api/dm-api-service';
@@ -41,6 +41,18 @@ interface MountNostrOverlayOptions {
 }
 
 type OverlayWriteGateway = NonNullable<Parameters<NonNullable<OverlayServices['setWriteGateway']>>[0]>;
+
+function createDeferredWriteGateway(requireWriteGateway: () => OverlayWriteGateway): OverlayWriteGateway {
+    return {
+        publishEvent: (event) => requireWriteGateway().publishEvent(event),
+        publishTextNote: (content, tags) => requireWriteGateway().publishTextNote(content, tags),
+        publishProfileMetadata: (content) => requireWriteGateway().publishProfileMetadata(content),
+        publishContactList: (follows, preservedTags) => requireWriteGateway().publishContactList(follows, preservedTags),
+        publishMuteList: (mutedPubkeys, preservedTags) => requireWriteGateway().publishMuteList(mutedPubkeys, preservedTags),
+        encryptDm: (pubkey, plaintext) => requireWriteGateway().encryptDm(pubkey, plaintext),
+        decryptDm: (pubkey, ciphertext, scheme) => requireWriteGateway().decryptDm(pubkey, ciphertext, scheme),
+    };
+}
 
 async function publishSignedEventToRelays(event: NostrEvent, relayUrls: string[]): Promise<PublishResult> {
     const pool = new SimplePool();
@@ -94,19 +106,19 @@ export function createBootstrapOverlayServices(): OverlayServices {
     let ownerPubkey: string | undefined;
     let writeGateway: OverlayWriteGateway | undefined;
     let directMessageRelays: { inbox: string[]; outbox: string[] } = { inbox: [], outbox: [] };
+    let bootstrapRelaySettings: RelaySettingsState | undefined;
 
     const client = createHttpClient({
         getAuthHeaders: (context) => getAuthHeaders?.(context),
     });
     const requireWriteGateway = (): OverlayWriteGateway => writeGateway ?? missingWriteGateway();
-    const deferredWriteGateway: OverlayWriteGateway = {
-        publishEvent: (event) => requireWriteGateway().publishEvent(event),
-        publishTextNote: (content, tags) => requireWriteGateway().publishTextNote(content, tags),
-        publishProfileMetadata: (content) => requireWriteGateway().publishProfileMetadata(content),
-        publishContactList: (follows) => requireWriteGateway().publishContactList(follows),
-        publishMuteList: (mutedPubkeys) => requireWriteGateway().publishMuteList(mutedPubkeys),
-        encryptDm: (pubkey, plaintext) => requireWriteGateway().encryptDm(pubkey, plaintext),
-        decryptDm: (pubkey, ciphertext, scheme) => requireWriteGateway().decryptDm(pubkey, ciphertext, scheme),
+    const deferredWriteGateway = createDeferredWriteGateway(requireWriteGateway);
+    const resolveSocialPublishRelays = (): string[] => {
+        const relaySettings = bootstrapRelaySettings ?? loadRelaySettings(ownerPubkey ? { ownerPubkey } : undefined);
+        return [
+            ...getRelaySetByType(relaySettings, 'nip65Both'),
+            ...getRelaySetByType(relaySettings, 'nip65Write'),
+        ];
     };
     let runtimeDirectMessagesService: ReturnType<typeof createRuntimeDirectMessagesService> | undefined;
     let runtimeGroupsService: ReturnType<typeof createGroupsRuntimeService> | undefined;
@@ -196,6 +208,7 @@ export function createBootstrapOverlayServices(): OverlayServices {
             writeGateway: deferredWriteGateway,
             client,
             resolveOwnerPubkey: () => ownerPubkey,
+            resolveRelays: resolveSocialPublishRelays,
         }),
         groupsService: {
             async loadGroups(input) {
@@ -243,10 +256,14 @@ export function createBootstrapOverlayServices(): OverlayServices {
         setDirectMessageRelays: (nextDirectMessageRelays) => {
             directMessageRelays = nextDirectMessageRelays;
         },
+        setBootstrapRelaySettings: (nextBootstrapRelaySettings) => {
+            bootstrapRelaySettings = nextBootstrapRelaySettings;
+        },
     });
 }
 
 export const __bootstrapTestUtils = {
+    createDeferredWriteGateway,
     loadVerifiedPublicSavedGroupsEvent,
     publishAttemptsToResult,
     verifiedDiscoveredGroups,

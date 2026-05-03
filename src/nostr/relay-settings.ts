@@ -248,7 +248,16 @@ export function loadRelaySettings(input?: RelaySettingsInput): RelaySettingsStat
         return getDefaultRelaySettings();
     }
 
-    const legacy = parseRelaySettings(storage.getItem(RELAY_SETTINGS_STORAGE_KEY)) ?? getDefaultRelaySettings();
+    const legacyRaw = storage.getItem(RELAY_SETTINGS_STORAGE_KEY);
+    if (legacyRaw === null) {
+        return getDefaultRelaySettings();
+    }
+
+    const legacy = parseRelaySettings(legacyRaw);
+    if (!legacy) {
+        return getDefaultRelaySettings();
+    }
+
     storage.setItem(keys.scopedKey, JSON.stringify({
         relays: legacy.relays,
         byType: legacy.byType,

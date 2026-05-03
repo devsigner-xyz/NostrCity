@@ -42,6 +42,26 @@ export function parseFollowsFromKind3(event: NostrEvent): string[] {
     return [...follows];
 }
 
+export function buildContactListTags(follows: string[], preservedTags: string[][] = []): string[][] {
+    const retainedFollows = [...new Set(follows.filter(isHexPubkey))];
+    const preservedTagByPubkey = new Map<string, string[]>();
+
+    for (const tag of preservedTags) {
+        if (tag[0] !== 'p') {
+            continue;
+        }
+
+        const pubkey = tag[1];
+        if (typeof pubkey !== 'string' || !isHexPubkey(pubkey) || preservedTagByPubkey.has(pubkey)) {
+            continue;
+        }
+
+        preservedTagByPubkey.set(pubkey, [...tag]);
+    }
+
+    return retainedFollows.map((pubkey) => preservedTagByPubkey.get(pubkey) ?? ['p', pubkey]);
+}
+
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
     return new Promise<T>((resolve, reject) => {
         const timer = setTimeout(() => {

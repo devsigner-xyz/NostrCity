@@ -165,7 +165,8 @@ export function ProfileEditorPage({
                 ...(birthday ? { birthday } : {}),
             });
             const event = await onPublishProfileMetadata(content);
-            onProfileSaved?.(parseProfileMetadata({ ...event, pubkey: ownerPubkey, content }), content);
+            assertPublishedProfileMetadata(event, ownerPubkey, content);
+            onProfileSaved?.(parseProfileMetadata(event), content);
             setStatus(t('profileEditor.saveSuccess'));
             toast.success(t('profileEditor.saveSuccess'), { duration: 1800 });
         } catch {
@@ -334,6 +335,12 @@ function TextField({
             <Input id={id} name={name} value={value} disabled={disabled} onChange={(event) => onChange(event.currentTarget.value)} />
         </Field>
     );
+}
+
+function assertPublishedProfileMetadata(event: NostrEvent, ownerPubkey: string, content: string): void {
+    if (event.kind !== 0 || event.pubkey !== ownerPubkey || event.content !== content) {
+        throw new Error('Published profile metadata does not match the requested update');
+    }
 }
 
 function formStateFromProfile(profile: NostrProfile | undefined): ProfileEditorFormState {

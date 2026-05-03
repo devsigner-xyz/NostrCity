@@ -15,13 +15,13 @@ const SECRET_KEY = Uint8Array.from(Array.from({ length: 32 }, () => 0x33));
 const OTHER_SECRET_KEY = Uint8Array.from(Array.from({ length: 32 }, () => 0x44));
 const HOST = 'api.local.test';
 
-const buildSignedEvent = (kind = 1) => {
+const buildSignedEvent = (kind = 1, overrides: { tags?: string[][]; content?: string } = {}) => {
   return finalizeEvent(
     {
       kind,
       created_at: 1_719_000_000,
-      tags: [],
-      content: 'hello',
+      tags: overrides.tags ?? [],
+      content: overrides.content ?? 'hello',
     },
     SECRET_KEY,
   );
@@ -114,7 +114,7 @@ describe('publish routes', () => {
     await app.close();
   });
 
-  it('returns 200 with relay ack arrays for valid signed event', async () => {
+  it('returns 200 with relay result indexes for valid signed event without echoing relay URLs', async () => {
     forwardMock.mockResolvedValueOnce({
       ackedRelays: ['wss://relay.damus.io'],
       failedRelays: [{ relay: 'wss://nos.lol', reason: 'publish_failed' }],
@@ -124,10 +124,12 @@ describe('publish routes', () => {
     const response = await requestPublish(buildPayload());
 
     expect(response.statusCode).toBe(200);
+    expect(JSON.stringify(response.json())).not.toContain('wss://relay.damus.io');
+    expect(JSON.stringify(response.json())).not.toContain('wss://nos.lol');
     expect(response.json()).toEqual({
-      ackedRelays: ['wss://relay.damus.io'],
-      failedRelays: [{ relay: 'wss://nos.lol', reason: 'publish_failed' }],
-      timeoutRelays: [],
+      ackedRelayIndexes: [0],
+      failedRelays: [{ relayIndex: 1, reason: 'publish_failed' }],
+      timeoutRelayIndexes: [],
     });
     expect(forwardMock).toHaveBeenCalledOnce();
   });
@@ -201,6 +203,48 @@ describe('publish routes', () => {
       },
     });
     expect(forwardMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards supported social delete events', async () => {
+    forwardMock.mockResolvedValueOnce({
+      ackedRelays: ['wss://relay.damus.io'],
+      failedRelays: [],
+      timeoutRelays: [],
+    });
+    const payload = buildPayload();
+    payload.event = buildSignedEvent(5);
+
+    const response = await requestPublish(payload);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      ackedRelayIndexes: [0],
+    });
+    expect(forwardMock).toHaveBeenCalledOnce();
+  });
+
+  it('forwards large contact lists for established accounts', async () => {
+    forwardMock.mockResolvedValueOnce({
+      ackedRelays: ['wss://relay.damus.io'],
+      failedRelays: [],
+      timeoutRelays: [],
+    });
+    const payload = buildPayload();
+    payload.event = buildSignedEvent(3, {
+      tags: Array.from({ length: 160 }, (_, index) => [
+        'p',
+        index.toString(16).padStart(64, '0'),
+      ]),
+      content: '',
+    });
+
+    const response = await requestPublish(payload);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      ackedRelayIndexes: [0],
+    });
+    expect(forwardMock).toHaveBeenCalledOnce();
   });
 
   it('fails closed when publish auth replay storage fails', async () => {
@@ -296,6 +340,8 @@ describe('publish routes', () => {
       const response = await requestPublish(payload);
 
       expect(response.statusCode).toBe(400);
+      const body = response.json();
+      expect(JSON.stringify(body)).not.toContain(relay);
       expect(response.json()).toMatchObject({
         error: {
           code: 'RELAY_URL_INVALID',
@@ -306,6 +352,21 @@ describe('publish routes', () => {
     expect(forwardMock).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when relay entries normalize to duplicates', async () => {
+    const payload = buildPayload();
+    payload.relays = ['wss://relay.damus.io', 'wss://relay.damus.io/'];
+
+    const response = await requestPublish(payload);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: 'RELAY_DUPLICATE',
+      },
+    });
+    expect(forwardMock).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when relay destination is private/internal', async () => {
     const payload = buildPayload();
     payload.relays = ['wss://127.0.0.1'];
@@ -313,6 +374,7 @@ describe('publish routes', () => {
     const response = await requestPublish(payload);
 
     expect(response.statusCode).toBe(400);
+    expect(JSON.stringify(response.json())).not.toContain('127.0.0.1');
     expect(response.json()).toMatchObject({
       error: {
         code: 'RELAY_URL_PRIVATE',
@@ -343,6 +405,22 @@ describe('publish routes', () => {
   it('returns 400 when relayScope policy blocks event kind', async () => {
     const payload = buildPayload();
     payload.relayScope = 'dm';
+
+    const response = await requestPublish(payload);
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.stringify(response.json())).not.toContain('relay.example.com');
+    expect(response.json()).toMatchObject({
+      error: {
+        code: 'RELAY_SCOPE_POLICY_VIOLATION',
+      },
+    });
+    expect(forwardMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when social relayScope receives an unsupported event kind', async () => {
+    const payload = buildPayload();
+    payload.event = buildSignedEvent(30_078);
 
     const response = await requestPublish(payload);
 

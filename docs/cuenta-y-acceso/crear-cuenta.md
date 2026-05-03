@@ -17,6 +17,8 @@ Nostr City no necesita una cuenta central en un servidor propio para empezar. Lo
 
 Una cuenta local puede firmar eventos desde este navegador/dispositivo mientras esté desbloqueada. Si eliges una passphrase, guárdala con cuidado: Nostr City no puede recuperarla por ti.
 
+Al crear una cuenta local con datos iniciales, la app intenta publicar el perfil inicial, la lista pública de relays NIP-65 y los relays de inbox de DMs. Nostr City solo guarda esa configuración local como completada cuando cada publicación de bootstrap requerida recibe ACK de al menos un relay. Si la publicación falla, la cuenta local puede existir en el dispositivo, pero la app no presenta esos relays o metadata como sincronizados.
+
 ## Cuándo conviene reutilizar una identidad existente
 
 - Ya tienes contactos y follows en Nostr.
@@ -39,6 +41,7 @@ Reutilizar una identidad suele dar una visualización más representativa, porqu
 
 - Una cuenta local no convierte a Nostr City en custodio central de tu identidad.
 - Los eventos que publiques en Nostr pueden ser públicos según su tipo y los relays donde se publiquen.
+- El perfil inicial, los relays NIP-65 y los relays de inbox de DMs son metadata pública o enrutable de Nostr cuando se publican.
 - Los grupos guardados se publican como una lista pública `kind:10009`; guardar un grupo no demuestra membresía.
 - Si usas una cuenta local, conserva cualquier material de recuperación o passphrase que hayas elegido. Sin eso, la cuenta puede quedar inaccesible desde este dispositivo.
 

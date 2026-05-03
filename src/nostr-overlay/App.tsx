@@ -358,9 +358,8 @@ export function App({ mapBridge, services }: AppProps) {
 
         try {
             await overlay.followPerson(pubkey);
-        } catch (error) {
-            const message = error instanceof Error ? error.message : translate(uiSettings.language, 'app.toast.followUpdateFailed');
-            toast.error(message, { duration: 2200 });
+        } catch {
+            toast.error(translate(uiSettings.language, 'app.toast.followUpdateFailed'), { duration: 2200 });
         }
     }, [overlay.canWrite, overlay.followPerson, uiSettings.language]);
     const handleToggleMutedPerson = useCallback(async (pubkey: string): Promise<void> => {
@@ -370,9 +369,8 @@ export function App({ mapBridge, services }: AppProps) {
 
         try {
             await overlay.toggleMutedPerson(pubkey);
-        } catch (error) {
-            const message = error instanceof Error ? error.message : translate(uiSettings.language, 'app.toast.muteUpdateFailed');
-            toast.error(message, { duration: 2200 });
+        } catch {
+            toast.error(translate(uiSettings.language, 'app.toast.muteUpdateFailed'), { duration: 2200 });
         }
     }, [canUsePrivateMuteList, overlay.toggleMutedPerson, uiSettings.language]);
     const socialFeed = useOverlaySocialFeedController({
@@ -382,7 +380,7 @@ export function App({ mapBridge, services }: AppProps) {
         isAgoraRoute,
         canWrite: overlay.canWrite,
         service: overlay.socialFeedService,
-        ...((overlay.socialPublisher ?? overlay.writeGateway) ? { writeGateway: overlay.socialPublisher ?? overlay.writeGateway } : {}),
+        ...(overlay.socialPublisher ? { writeGateway: overlay.socialPublisher } : {}),
         onFollowPerson: handleFollowPerson,
         ...(activeAgoraNoteEventId ? { activeThreadRootEventId: activeAgoraNoteEventId } : {}),
         onOpenThread: (eventId) => openNoteDetail(eventId),
@@ -821,6 +819,10 @@ export function App({ mapBridge, services }: AppProps) {
 
     const publishReplyWithImage = useCallback(async (input: Omit<Parameters<typeof followingFeed.publishReply>[0], 'image'> & { image?: { file: File } }): Promise<boolean> => {
         const { image: selectedImage, ...replyInput } = input;
+        if (selectedImage && !overlay.socialPublisher) {
+            return false;
+        }
+
         const image = await uploadComposeImage(selectedImage);
         if (selectedImage && !image) {
             return false;
@@ -830,7 +832,7 @@ export function App({ mapBridge, services }: AppProps) {
             ...replyInput,
             ...(image ? { image } : {}),
         });
-    }, [followingFeed.publishReply, uploadComposeImage]);
+    }, [followingFeed.publishReply, overlay.socialPublisher, uploadComposeImage]);
 
     const submitSocialCompose = useCallback(async (input: SocialComposeSubmitInput): Promise<void> => {
         if (!socialComposeState) {
@@ -841,6 +843,14 @@ export function App({ mapBridge, services }: AppProps) {
 
         setIsSubmittingSocialCompose(true);
         try {
+            if (input.image && !overlay.socialPublisher) {
+                toast.error(translate(
+                    uiSettings.language,
+                    socialComposeState.mode === 'post' ? 'feed.toast.postPublishFailed' : 'feed.toast.quotePublishFailed'
+                ), { duration: 2200 });
+                return;
+            }
+
             const image = await uploadComposeImage(input.image);
             if (input.image && !image) {
                 return;
@@ -884,7 +894,7 @@ export function App({ mapBridge, services }: AppProps) {
         } finally {
             setIsSubmittingSocialCompose(false);
         }
-    }, [followingFeed.publishPost, followingFeed.publishQuote, socialComposeState, uiSettings.language, uploadComposeImage]);
+    }, [followingFeed.publishPost, followingFeed.publishQuote, overlay.socialPublisher, socialComposeState, uiSettings.language, uploadComposeImage]);
 
     const openMentionedProfile = (pubkey: string): void => {
         if (!pubkey) {
@@ -1528,11 +1538,11 @@ export function App({ mapBridge, services }: AppProps) {
                         onUploadProfileImage: uploadProfileImage,
                         onLoadLatestProfileMetadata: loadLatestProfileMetadata,
                         onPublishProfileMetadata: async (content) => {
-                            if (!overlay.writeGateway) {
-                                throw new Error('Write gateway is unavailable');
+                            if (!overlay.socialPublisher) {
+                                throw new Error('Social publisher is unavailable');
                             }
 
-                            return overlay.writeGateway.publishProfileMetadata(content);
+                            return overlay.socialPublisher.publishProfileMetadata(content);
                         },
                         onProfileSaved: (profile) => overlay.applyOwnerProfile(profile),
                     }}

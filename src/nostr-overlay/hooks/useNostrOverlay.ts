@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { verifyEvent } from 'nostr-tools/pure';
 import { bootstrapLocalAccount } from '../../nostr/auth/bootstrap-profile';
 import type { ProviderResolveInput } from '../../nostr/auth/providers/types';
 import {
@@ -9,7 +10,7 @@ import {
 import { assignPubkeysToBuildings, hashPubkeyToIndex, type AssignmentResult } from '../../nostr/domain/assignment';
 import { buildOccupancyState } from '../../nostr/domain/occupancy';
 import { fetchFollowersBestEffort } from '../../nostr/followers';
-import { fetchFollowsByNpub, fetchFollowsByPubkey } from '../../nostr/follows';
+import { fetchFollowsByNpub, fetchFollowsByPubkey, parseFollowsFromKind3 } from '../../nostr/follows';
 import { fetchLatestPostsByPubkey } from '../../nostr/posts';
 import { extractMuteListTags, parseMutedPubkeysFromTags } from '../../nostr/mute-list';
 import { loadProfileRelaySuggestions } from '../../nostr/profile-relay-discovery';
@@ -18,7 +19,7 @@ import { cacheProfile, fetchProfiles } from '../../nostr/profiles';
 import { searchUsers as searchUsersDomain } from '../../nostr/user-search';
 import { buildFollowDrivenTargetBuildings } from '../domain/map-generation-target';
 import type { SocialFeedService } from '../../nostr/social-feed-service';
-import { getDefaultRelaySettings, getRelaySetByType, loadRelaySettings, saveRelaySettings, type RelaySettingsByType } from '../../nostr/relay-settings';
+import { getDefaultRelaySettings, getRelaySetByType, loadRelaySettings, saveRelaySettings, type RelaySettingsByType, type RelaySettingsState } from '../../nostr/relay-settings';
 import {
     dmInboxRelayListFromKind10050Event,
     getBootstrapRelays,
@@ -114,6 +115,7 @@ export interface NostrOverlayServices {
     setOwnerPubkey?: (ownerPubkey: string | undefined) => void;
     setWriteGateway?: (writeGateway: ReturnType<typeof createWriteGateway> | undefined) => void;
     setDirectMessageRelays?: (relays: { inbox: string[]; outbox: string[] }) => void;
+    setBootstrapRelaySettings?: (relaySettings: RelaySettingsState | undefined) => void;
 }
 
 interface UseNostrOverlayOptions {
@@ -320,6 +322,24 @@ function dedupe(values: string[]): string[] {
     return [...new Set(values)];
 }
 
+function toggleFollow(follows: string[], pubkey: string): string[] {
+    return follows.includes(pubkey)
+        ? follows.filter((entry) => entry !== pubkey)
+        : dedupe([...follows, pubkey]);
+}
+
+function isVerifiedReplaceableEvent(event: NostrEvent | null, ownerPubkey: string, kind: number): event is NostrEvent {
+    if (!event || event.kind !== kind || event.pubkey !== ownerPubkey || !event.sig) {
+        return false;
+    }
+
+    try {
+        return verifyEvent(event as Parameters<typeof verifyEvent>[0]);
+    } catch {
+        return false;
+    }
+}
+
 function resolveTargetBuildingsFromFollows(follows: string[]): number {
     return buildFollowDrivenTargetBuildings({ follows });
 }
@@ -387,6 +407,8 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
     const latestStateRef = useRef(state);
     const occupancyAnimationTokenRef = useRef(0);
     const skipNextMapGeneratedRef = useRef(false);
+    const followMutationQueueRef = useRef<Promise<void>>(Promise.resolve());
+    const muteMutationQueueRef = useRef<Promise<void>>(Promise.resolve());
     const sessionController = useOverlaySessionController({
         authService: services?.authService,
         enabled: Boolean(mapBridge),
@@ -1370,6 +1392,7 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
     const startSession = async (method: LoginMethod, input: ProviderResolveInput): Promise<void> => {
         try {
             const { session } = await sessionController.startSession(method, input);
+            services?.setOwnerPubkey?.(session.pubkey);
             const previousOwnerPubkey = latestStateRef.current.data.ownerPubkey;
             const shouldResetOverlayData = Boolean(previousOwnerPubkey && previousOwnerPubkey !== session.pubkey);
             if (shouldResetOverlayData) {
@@ -1385,19 +1408,25 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
             if (method === 'local' && (input.profile || input.relaySettings)) {
                 const ownerInput = createRelaySettingsInput(session.pubkey);
                 const relaySettings = input.relaySettings ?? getDefaultRelaySettings();
-                saveRelaySettings(relaySettings, ownerInput);
+                const bootstrapFailureMessage = 'No se pudo completar el bootstrap inicial de la cuenta local';
 
                 try {
+                    services?.setBootstrapRelaySettings?.(relaySettings);
+                    if (!socialPublisher) {
+                        throw new Error(bootstrapFailureMessage);
+                    }
+
                     await bootstrapLocalAccount({
-                        writeGateway,
+                        publisher: socialPublisher,
                         relaySettings,
                         ...(input.profile ? { profile: input.profile } : {}),
                     });
-                } catch (error) {
-                    const message = error instanceof Error
-                        ? error.message
-                        : 'No se pudo completar el bootstrap inicial de la cuenta local';
-                    toast.error(message, { duration: 2200 });
+                    saveRelaySettings(relaySettings, ownerInput);
+                } catch {
+                    toast.error(bootstrapFailureMessage, { duration: 2200 });
+                    return;
+                } finally {
+                    services?.setBootstrapRelaySettings?.(undefined);
                 }
             }
 
@@ -1545,14 +1574,9 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
         }));
     };
 
-    const followPerson = async (pubkey: string): Promise<void> => {
-        const normalizedPubkey = pubkey.trim().toLowerCase();
-        if (!/^[a-f0-9]{64}$/.test(normalizedPubkey)) {
-            throw new Error('La cuenta a seguir no es valida');
-        }
-
+    const runFollowPerson = async (normalizedPubkey: string): Promise<void> => {
         const current = latestStateRef.current;
-        if (!hasLoadedOverlayData(current.status)) {
+        if (!hasLoadedOverlayData(current.status) || !current.data.ownerPubkey) {
             throw new Error('La red social aun se esta cargando');
         }
 
@@ -1564,22 +1588,55 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
             return;
         }
 
-        const nextFollows = current.data.follows.includes(normalizedPubkey)
-            ? current.data.follows.filter((entry) => entry !== normalizedPubkey)
-            : dedupe([...current.data.follows, normalizedPubkey]);
+        if (!socialPublisher) {
+            throw new Error('No social publisher available');
+        }
 
-        await writeGateway.publishContactList(nextFollows);
+        const overlayRelays = resolveOverlayRelays(current.data.relayHints);
+        const client = createClient(overlayRelays);
+        let latestContactList: NostrEvent | null;
+        try {
+            await client.connect();
+            latestContactList = await client.fetchLatestReplaceableEvent(current.data.ownerPubkey, 3);
+        } catch {
+            throw new Error('No se pudo confirmar la lista de seguidos mas reciente antes de publicar');
+        }
+
+        const validLatestContactList = latestContactList && isVerifiedReplaceableEvent(latestContactList, current.data.ownerPubkey, 3)
+            ? latestContactList
+            : null;
+        if (latestContactList && !validLatestContactList) {
+            throw new Error('No se pudo confirmar la lista de seguidos mas reciente antes de publicar');
+        }
+
+        const baseFollows = validLatestContactList ? parseFollowsFromKind3(validLatestContactList) : [];
+        const nextFollows = toggleFollow(baseFollows, normalizedPubkey);
+
+        const latestAfterFreshFetch = latestStateRef.current;
+        if (
+            !hasLoadedOverlayData(latestAfterFreshFetch.status) ||
+            latestAfterFreshFetch.data.ownerPubkey !== current.data.ownerPubkey ||
+            !sessionController.canWrite
+        ) {
+            return;
+        }
+
+        const publishedContactList = await socialPublisher.publishContactList(nextFollows, validLatestContactList?.tags ?? []);
+        if (publishedContactList.kind !== 3 || publishedContactList.pubkey !== current.data.ownerPubkey) {
+            throw new Error('Published contact list ACK did not match the active owner');
+        }
+        const publishedFollows = parseFollowsFromKind3(publishedContactList);
 
         setState((nextState) => {
-            if (!hasLoadedOverlayData(nextState.status) || !nextState.data.ownerPubkey) {
+            if (
+                !hasLoadedOverlayData(nextState.status) ||
+                !nextState.data.ownerPubkey ||
+                nextState.data.ownerPubkey !== current.data.ownerPubkey
+            ) {
                 return nextState;
             }
 
-            const updatedFollows = nextState.data.follows.includes(normalizedPubkey)
-                ? nextState.data.follows.filter((entry) => entry !== normalizedPubkey)
-                : dedupe([...nextState.data.follows, normalizedPubkey]);
-
-            const assignmentPubkeys = dedupe([...updatedFollows, ...nextState.data.featuredPubkeys]);
+            const assignmentPubkeys = dedupe([...publishedFollows, ...nextState.data.featuredPubkeys]);
             let assignments = nextState.data.assignments;
             let ownerBuildingIndex = nextState.data.ownerBuildingIndex;
             let buildingsCount = nextState.data.buildingsCount;
@@ -1614,7 +1671,7 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
                 ...nextState,
                 data: {
                     ...nextState.data,
-                    follows: updatedFollows,
+                    follows: publishedFollows,
                     assignments,
                     ownerBuildingIndex,
                     buildingsCount,
@@ -1627,12 +1684,20 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
         void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.activeProfile() });
     };
 
-    const toggleMutedPerson = async (pubkey: string): Promise<void> => {
+    const followPerson = async (pubkey: string): Promise<void> => {
         const normalizedPubkey = pubkey.trim().toLowerCase();
         if (!/^[a-f0-9]{64}$/.test(normalizedPubkey)) {
-            throw new Error('La cuenta a silenciar no es valida');
+            throw new Error('La cuenta a seguir no es valida');
         }
 
+        const queuedMutation = followMutationQueueRef.current
+            .catch(() => undefined)
+            .then(() => runFollowPerson(normalizedPubkey));
+        followMutationQueueRef.current = queuedMutation.catch(() => {});
+        await queuedMutation;
+    };
+
+    const runToggleMutedPerson = async (normalizedPubkey: string): Promise<void> => {
         const current = latestStateRef.current;
         if (!hasLoadedOverlayData(current.status) || !current.data.ownerPubkey) {
             throw new Error('La red social aun se esta cargando');
@@ -1646,23 +1711,27 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
             return;
         }
 
+        if (!socialPublisher) {
+            throw new Error('No social publisher available');
+        }
+
         const overlayRelays = resolveOverlayRelays(current.data.relayHints);
         const client = createClient(overlayRelays);
         const provider = sessionController.authService.getActiveProvider();
         let latestMuteTags: string[][];
         try {
             const latestMuteEvent = await client.fetchLatestReplaceableEvent(current.data.ownerPubkey, 10000);
+            if (latestMuteEvent && !isVerifiedReplaceableEvent(latestMuteEvent, current.data.ownerPubkey, 10000)) {
+                throw new Error('Invalid mute list event');
+            }
             latestMuteTags = await extractMuteListTags({
                 event: latestMuteEvent,
                 ...(provider ? { provider } : {}),
                 ownerPubkey: current.data.ownerPubkey,
                 strict: true,
             });
-        } catch (error) {
-            if (!current.data.muteListLoaded) {
-                throw error;
-            }
-            latestMuteTags = current.data.muteListTags;
+        } catch {
+            throw new Error('No se pudo confirmar la lista de silenciados mas reciente antes de publicar');
         }
         const latestMutedPubkeys = parseMutedPubkeysFromTags(latestMuteTags);
         const nextMutedPubkeys = latestMutedPubkeys.includes(normalizedPubkey)
@@ -1678,10 +1747,28 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
             }).catch(() => ({}))
             : {};
 
-        await writeGateway.publishMuteList(nextMutedPubkeys, preservedMuteTags);
+        const latestBeforePublish = latestStateRef.current;
+        if (
+            !hasLoadedOverlayData(latestBeforePublish.status) ||
+            latestBeforePublish.data.ownerPubkey !== current.data.ownerPubkey ||
+            !sessionController.canWrite ||
+            !sessionController.canDirectMessages
+        ) {
+            return;
+        }
+
+        const publishedMuteList = await socialPublisher.publishMuteList(nextMutedPubkeys, preservedMuteTags);
+        if (publishedMuteList.kind !== 10000 || publishedMuteList.pubkey !== current.data.ownerPubkey) {
+            throw new Error('Published mute list ACK did not match the active owner');
+        }
 
         setState((nextState) => {
-            if (!hasLoadedOverlayData(nextState.status)) {
+            if (
+                !hasLoadedOverlayData(nextState.status) ||
+                nextState.data.ownerPubkey !== current.data.ownerPubkey ||
+                !sessionController.canWrite ||
+                !sessionController.canDirectMessages
+            ) {
                 return nextState;
             }
 
@@ -1717,6 +1804,19 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
         void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.followingFeed() });
         void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.notifications() });
         void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.activeProfile() });
+    };
+
+    const toggleMutedPerson = async (pubkey: string): Promise<void> => {
+        const normalizedPubkey = pubkey.trim().toLowerCase();
+        if (!/^[a-f0-9]{64}$/.test(normalizedPubkey)) {
+            throw new Error('La cuenta a silenciar no es valida');
+        }
+
+        const queuedMutation = muteMutationQueueRef.current
+            .catch(() => undefined)
+            .then(() => runToggleMutedPerson(normalizedPubkey));
+        muteMutationQueueRef.current = queuedMutation.catch(() => {});
+        await queuedMutation;
     };
 
     const openActiveProfile = (pubkey: string, buildingIndex?: number): void => {

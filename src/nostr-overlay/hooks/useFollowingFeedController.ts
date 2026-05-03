@@ -8,7 +8,6 @@ import type {
     SocialThreadPage,
     ViewerReaction,
     ViewerReactionByEventId,
-    ViewerReply,
     ViewerReplyByEventId,
     ViewerZapByEventId,
 } from '../../nostr/social-feed-service';
@@ -17,11 +16,8 @@ import {
     buildQuoteTags,
     buildPendingByEventId,
     buildReplyTags,
-    buildTemporaryFeedNote,
-    buildTemporaryThreadReply,
     followingFeedMutationKeys,
     prependFeedItem,
-    prependReply,
     sanitizeContent,
     toFeedItemFromPublished,
     toThreadItemFromPublished,
@@ -36,7 +32,6 @@ import {
     applyEngagementDeltas,
     collectEngagementEventIds,
     createEmptyEngagementByEventIds,
-    mergeFeedItems,
     mergeThreadReplies,
     normalizeEventIds,
     selectFeedItemsFromPages,
@@ -84,12 +79,6 @@ interface ToggleReactionMutationVariables {
     previous: ViewerReaction | undefined;
     next: boolean;
     reactionEventId: string | undefined;
-}
-
-interface ToggleReactionMutationContext {
-    eventId: string;
-    optimisticDelta: number;
-    previous: ViewerReaction | undefined;
 }
 
 interface ToggleRepostMutationVariables {
@@ -143,10 +132,8 @@ interface PublishQuoteComposerInput extends Omit<PublishQuoteInput, 'content'> {
 }
 
 interface PublishReplyMutationContext {
-    tempId: string;
     targetEventId: string;
     threadKey: ReturnType<typeof nostrOverlayQueryKeys.thread>;
-    previousReply: ViewerReply | undefined;
 }
 
 const EMPTY_ENGAGEMENT_METRICS: SocialEngagementMetrics = {
@@ -532,65 +519,23 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
 
             return options.writeGateway.publishTextNote(variables.content, variables.tags);
         },
-        onMutate: async (variables) => {
+        onMutate: async () => {
             if (!options.ownerPubkey) {
-                return { tempId: '' };
+                return;
             }
 
             setPublishError(null);
-            const tempId = `temp-post:${Date.now()}`;
-            const tempNote = buildTemporaryFeedNote(tempId, options.ownerPubkey, now(), variables.visibleContent, variables.tags);
-
-            queryClient.setQueryData<InfiniteData<SocialFeedPage>>(feedQueryKey, (current) =>
-                prependFeedItem(current, tempNote)
-            );
-
-            return { tempId };
         },
-        onSuccess: (published, _variables, context) => {
-            if (!context?.tempId) {
+        onSuccess: (published) => {
+            const publishedItem = toFeedItemFromPublished(published);
+            if (!publishedItem) {
                 return;
             }
 
-            queryClient.setQueryData<InfiniteData<SocialFeedPage>>(feedQueryKey, (current) => {
-                if (!current || current.pages.length === 0) {
-                    return current;
-                }
-
-                const publishedItem = toFeedItemFromPublished(published);
-                const firstPage = current.pages[0];
-                if (!firstPage) {
-                    return current;
-                }
-                const withoutTemp = firstPage.items.filter((item) => item.id !== context.tempId);
-                const updatedItems = publishedItem ? mergeFeedItems([publishedItem], withoutTemp) : withoutTemp;
-                return {
-                    pages: [{ ...firstPage, items: updatedItems }, ...current.pages.slice(1)],
-                    pageParams: current.pageParams,
-                };
-            });
+            queryClient.setQueryData<InfiniteData<SocialFeedPage>>(feedQueryKey, (current) => prependFeedItem(current, publishedItem));
         },
-        onError: (error, _variables, context) => {
-            if (!context?.tempId) {
-                setPublishError(error instanceof Error ? error.message : 'No se pudo publicar la nota');
-                return;
-            }
-
-            queryClient.setQueryData<InfiniteData<SocialFeedPage>>(feedQueryKey, (current) => {
-                if (!current || current.pages.length === 0) {
-                    return current;
-                }
-
-                const firstPage = current.pages[0];
-                if (!firstPage) {
-                    return current;
-                }
-                return {
-                    pages: [{ ...firstPage, items: firstPage.items.filter((item) => item.id !== context.tempId) }, ...current.pages.slice(1)],
-                    pageParams: current.pageParams,
-                };
-            });
-            setPublishError(error instanceof Error ? error.message : 'No se pudo publicar la nota');
+        onError: () => {
+            setPublishError('No se pudo publicar la nota');
         },
         onSettled: () => {
             void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.followingFeed() });
@@ -606,65 +551,23 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
 
             return options.writeGateway.publishTextNote(variables.content, variables.tags);
         },
-        onMutate: async (variables) => {
+        onMutate: async () => {
             if (!options.ownerPubkey) {
-                return { tempId: '' };
+                return;
             }
 
             setPublishError(null);
-            const tempId = `temp-quote:${Date.now()}`;
-            const tempNote = buildTemporaryFeedNote(tempId, options.ownerPubkey, now(), variables.visibleContent, variables.tags);
-
-            queryClient.setQueryData<InfiniteData<SocialFeedPage>>(feedQueryKey, (current) =>
-                prependFeedItem(current, tempNote)
-            );
-
-            return { tempId };
         },
-        onSuccess: (published, _variables, context) => {
-            if (!context?.tempId) {
+        onSuccess: (published) => {
+            const publishedItem = toFeedItemFromPublished(published);
+            if (!publishedItem) {
                 return;
             }
 
-            queryClient.setQueryData<InfiniteData<SocialFeedPage>>(feedQueryKey, (current) => {
-                if (!current || current.pages.length === 0) {
-                    return current;
-                }
-
-                const publishedItem = toFeedItemFromPublished(published);
-                const firstPage = current.pages[0];
-                if (!firstPage) {
-                    return current;
-                }
-                const withoutTemp = firstPage.items.filter((item) => item.id !== context.tempId);
-                const updatedItems = publishedItem ? mergeFeedItems([publishedItem], withoutTemp) : withoutTemp;
-                return {
-                    pages: [{ ...firstPage, items: updatedItems }, ...current.pages.slice(1)],
-                    pageParams: current.pageParams,
-                };
-            });
+            queryClient.setQueryData<InfiniteData<SocialFeedPage>>(feedQueryKey, (current) => prependFeedItem(current, publishedItem));
         },
-        onError: (error, _variables, context) => {
-            if (!context?.tempId) {
-                setPublishError(error instanceof Error ? error.message : 'No se pudo publicar la cita');
-                return;
-            }
-
-            queryClient.setQueryData<InfiniteData<SocialFeedPage>>(feedQueryKey, (current) => {
-                if (!current || current.pages.length === 0) {
-                    return current;
-                }
-
-                const firstPage = current.pages[0];
-                if (!firstPage) {
-                    return current;
-                }
-                return {
-                    pages: [{ ...firstPage, items: firstPage.items.filter((item) => item.id !== context.tempId) }, ...current.pages.slice(1)],
-                    pageParams: current.pageParams,
-                };
-            });
-            setPublishError(error instanceof Error ? error.message : 'No se pudo publicar la cita');
+        onError: () => {
+            setPublishError('No se pudo publicar la cita');
         },
         onSettled: () => {
             void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.followingFeed() });
@@ -688,41 +591,20 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
 
             if (!options.ownerPubkey) {
                 return {
-                    tempId: '',
                     targetEventId: variables.input.targetEventId,
                     threadKey,
-                    previousReply: undefined,
                 };
             }
 
             setPublishError(null);
-            const tempId = `temp-reply:${Date.now()}`;
-            const tempReply = buildTemporaryThreadReply(
-                tempId,
-                options.ownerPubkey,
-                now(),
-                variables.visibleContent,
-                variables.input.targetEventId
-            );
-            applyEngagementDelta(variables.input.targetEventId, 'replies', 1);
-            const previousReply = viewerReplyByEventId[variables.input.targetEventId];
-            setViewerReplyByEventId((current) => ({
-                ...current,
-                [variables.input.targetEventId]: {
-                    eventId: variables.input.targetEventId,
-                    replyEventId: tempId,
-                    createdAt: now(),
-                },
-            }));
-
-            queryClient.setQueryData<InfiniteData<SocialThreadPage>>(threadKey, (current) => prependReply(current, tempReply));
-            return { tempId, targetEventId: variables.input.targetEventId, threadKey, previousReply };
+            return { targetEventId: variables.input.targetEventId, threadKey };
         },
         onSuccess: (published, _variables, context) => {
-            if (!context?.threadKey || !context.tempId) {
+            if (!context?.threadKey) {
                 return;
             }
 
+            applyEngagementDelta(context.targetEventId, 'replies', 1);
             setViewerReplyByEventId((current) => ({
                 ...current,
                 [context.targetEventId]: {
@@ -742,45 +624,20 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
                 if (!firstPage) {
                     return current;
                 }
-                const withoutTemp = firstPage.replies.filter((reply) => reply.id !== context.tempId);
-                const updatedReplies = mergeThreadReplies([publishedReply], withoutTemp);
+                const updatedReplies = mergeThreadReplies([publishedReply], firstPage.replies);
                 return {
                     pages: [{ ...firstPage, replies: updatedReplies }, ...current.pages.slice(1)],
                     pageParams: current.pageParams,
                 };
             });
         },
-        onError: (error, _variables, context) => {
+        onError: (_error, _variables, context) => {
             if (!context?.threadKey) {
-                setPublishError(error instanceof Error ? error.message : 'No se pudo publicar la respuesta');
+                setPublishError('No se pudo publicar la respuesta');
                 return;
             }
 
-            applyEngagementDelta(context.targetEventId, 'replies', -1);
-            setViewerReplyByEventId((current) => {
-                const next = { ...current };
-                if (context.previousReply) {
-                    next[context.targetEventId] = context.previousReply;
-                } else {
-                    delete next[context.targetEventId];
-                }
-                return next;
-            });
-            queryClient.setQueryData<InfiniteData<SocialThreadPage>>(context.threadKey as readonly unknown[], (current) => {
-                if (!current || current.pages.length === 0) {
-                    return current;
-                }
-
-                const firstPage = current.pages[0];
-                if (!firstPage) {
-                    return current;
-                }
-                return {
-                    pages: [{ ...firstPage, replies: firstPage.replies.filter((reply) => reply.id !== context.tempId) }, ...current.pages.slice(1)],
-                    pageParams: current.pageParams,
-                };
-            });
-            setPublishError(error instanceof Error ? error.message : 'No se pudo publicar la respuesta');
+            setPublishError('No se pudo publicar la respuesta');
         },
         onSettled: () => {
             void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.followingFeed() });
@@ -820,27 +677,8 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
 
             return {};
         },
-        onMutate: async (variables): Promise<ToggleReactionMutationContext> => {
-            const eventId = variables.input.eventId;
-            const optimisticDelta = variables.next ? 1 : -1;
+        onMutate: async () => {
             setPublishError(null);
-            setViewerReactionByEventId((current) => {
-                const next = { ...current };
-                if (variables.next) {
-                    next[eventId] = {
-                        eventId,
-                        reactionEventId: `temp-reaction:${eventId}:${Date.now()}`,
-                        emoji: variables.input.emoji && variables.input.emoji.length > 0 ? variables.input.emoji : '❤️',
-                        createdAt: now(),
-                    };
-                    return next;
-                }
-
-                delete next[eventId];
-                return next;
-            });
-            applyEngagementDelta(eventId, 'reactions', optimisticDelta);
-            return { eventId, optimisticDelta, previous: variables.previous };
         },
         onSuccess: (result, variables) => {
             const eventId = variables.input.eventId;
@@ -854,22 +692,21 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
                         createdAt: now(),
                     },
                 }));
+                applyEngagementDelta(eventId, 'reactions', 1);
+                return;
+            }
+
+            if (!variables.next) {
+                setViewerReactionByEventId((current) => {
+                    const next = { ...current };
+                    delete next[eventId];
+                    return next;
+                });
+                applyEngagementDelta(eventId, 'reactions', -1);
             }
         },
-        onError: (error, variables, context) => {
-            setViewerReactionByEventId((current) => {
-                const next = { ...current };
-                if (context?.previous) {
-                    next[variables.input.eventId] = context.previous;
-                } else {
-                    delete next[variables.input.eventId];
-                }
-                return next;
-            });
-            if (context) {
-                applyEngagementDelta(context.eventId, 'reactions', -context.optimisticDelta);
-            }
-            setPublishError(error instanceof Error ? error.message : 'No se pudo actualizar la reaccion');
+        onError: () => {
+            setPublishError('No se pudo actualizar la reaccion');
         },
         onSettled: () => {
             void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.social() });
@@ -911,15 +748,14 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
         },
         onMutate: async (variables) => {
             const eventId = variables.input.eventId;
-            const optimisticDelta = variables.next ? 1 : -1;
             setPublishError(null);
-            setRepostByEventId((current) => ({ ...current, [eventId]: variables.next }));
-            applyEngagementDelta(eventId, 'reposts', optimisticDelta);
-            return { eventId, optimisticDelta };
+            return { eventId };
         },
         onSuccess: (result, variables) => {
             const eventId = variables.input.eventId;
             if (variables.next && result.publishedRepostEventId) {
+                setRepostByEventId((current) => ({ ...current, [eventId]: true }));
+                applyEngagementDelta(eventId, 'reposts', 1);
                 setRepostEventIdByTarget((current) => ({
                     ...current,
                     [eventId]: result.publishedRepostEventId,
@@ -928,6 +764,8 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
             }
 
             if (!variables.next) {
+                setRepostByEventId((current) => ({ ...current, [eventId]: false }));
+                applyEngagementDelta(eventId, 'reposts', -1);
                 setRepostEventIdByTarget((current) => {
                     const next = { ...current };
                     delete next[eventId];
@@ -935,12 +773,8 @@ export function useFollowingFeedController(options: UseFollowingFeedControllerOp
                 });
             }
         },
-        onError: (error, variables, context) => {
-            setRepostByEventId((current) => ({ ...current, [variables.input.eventId]: variables.previous }));
-            if (context) {
-                applyEngagementDelta(context.eventId, 'reposts', -context.optimisticDelta);
-            }
-            setPublishError(error instanceof Error ? error.message : 'No se pudo actualizar el repost');
+        onError: () => {
+            setPublishError('No se pudo actualizar el repost');
         },
         onSettled: () => {
             void queryClient.invalidateQueries({ queryKey: nostrOverlayQueryKeys.invalidation.followingFeed() });

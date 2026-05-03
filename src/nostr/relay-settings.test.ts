@@ -298,6 +298,15 @@ describe('relay-settings', () => {
         expect(loadedB).toEqual(getDefaultRelaySettings());
     });
 
+    test('does not persist scoped default relay settings when loading a new owner', () => {
+        const ownerPubkey = 'c'.repeat(64);
+
+        const loaded = loadRelaySettings({ ownerPubkey });
+
+        expect(loaded).toEqual(getDefaultRelaySettings());
+        expect(window.localStorage.getItem(`${RELAY_SETTINGS_STORAGE_KEY}:user:${ownerPubkey}`)).toBeNull();
+    });
+
     test('migrates legacy global relay settings once to first owner', () => {
         window.localStorage.setItem(
             RELAY_SETTINGS_STORAGE_KEY,

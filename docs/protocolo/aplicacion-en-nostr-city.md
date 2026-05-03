@@ -19,6 +19,24 @@ La metadata ayuda a representar perfiles con más contexto visual y semántico d
 
 El resultado depende de los relays consultados. Si tu actividad, perfil o lista de follows no está en los relays configurados, Nostr City puede mostrar una vista parcial.
 
+### Escrituras confirmadas por relays
+
+Las escrituras visibles y persistentes listadas en esta sección pasan por un publicador que exige al menos un ACK de relay antes de actualizar la interfaz local. Esto aplica a:
+
+- Metadata de perfil (`kind:0`).
+- Lista de follows (`kind:3`).
+- Mute list (`kind:10000`).
+- Bootstrap de cuenta local para perfil, lista de relays NIP-65 (`kind:10002`) y relays de inbox de DMs (`kind:10050`).
+- Publicaciones del feed social, respuestas, quotes, reacciones y reposts.
+
+Si ningún relay confirma la publicación, la app muestra el fallo y no presenta esa escritura como guardada. Para eventos reemplazables como follows y mute list, Nostr City vuelve a leer el estado más reciente disponible antes de publicar, para reducir el riesgo de sobrescribir cambios hechos desde otro cliente.
+
+Un ACK confirma que al menos un relay aceptó el evento, no que todos los relays lo hayan guardado ni que otros clientes lean exactamente desde los mismos relays. Por eso la visibilidad puede variar entre clientes, relays y momentos de sincronización.
+
+No todas las firmas son publicaciones a relays. Las autorizaciones de Blossom y NIP-98 se firman para servicios HTTP, y las zap requests se firman para el flujo LNURL correspondiente; Nostr City no las publica como eventos persistentes del feed social.
+
+Los grupos NIP-29 tienen reglas y relays propios. Sus acciones de escritura se explican en la sección de grupos y no deben inferirse automáticamente desde esta lista.
+
 ## Silenciar cuentas
 
 Nostr City usa la `mute list` estándar de Nostr (`kind:10000`, NIP-51) para silenciar cuentas. En la interfaz aparece como `Silenciar` o `Desilenciar`, pero no crea una lista propietaria separada.
@@ -59,6 +77,7 @@ Para escribir en grupos, la sesión debe poder firmar. Publicar mensajes, guarda
 - El navegador puede conservar estado local de la aplicación y preferencias del usuario. Trata ese almacenamiento como persistencia local del dispositivo; el índice persistido de DMs ya no guarda plaintext de mensajes.
 - Muchos eventos de Nostr son públicos por diseño. No publiques información sensible si no entiendes el tipo de evento y los relays usados.
 - Los relays pueden aceptar, rechazar, ocultar o limitar eventos según sus reglas.
+- Un ACK de publicación confirma aceptación por al menos un relay objetivo, pero no garantiza replicación universal ni retención indefinida.
 - Los eventos cifrados protegen contenido, pero no eliminan todos los metadatos de transporte.
 - La lista `kind:10009` de grupos guardados es pública.
 - La mute list forma parte de tu actividad Nostr. Nostr City intenta mantenerla cifrada cuando la sesión soporta NIP-44, pero la privacidad efectiva también depende del firmante y de los relays desde los que leas o republíques datos.

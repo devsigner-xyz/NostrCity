@@ -18,6 +18,12 @@ export interface PublishForwardApi {
     forward(input: PublishForwardInput): Promise<PublishResult>;
 }
 
+interface PublishForwardResponse {
+    ackedRelayIndexes: number[];
+    failedRelays: Array<{ relayIndex: number; reason: string }>;
+    timeoutRelayIndexes: number[];
+}
+
 export interface CreatePublishForwardApiOptions {
     client?: HttpClient;
 }
@@ -27,7 +33,7 @@ export function createPublishForwardApi(options: CreatePublishForwardApiOptions 
 
     return {
         async forward(input) {
-            return client.postJson<PublishResult>('/publish/forward', {
+            const response = await client.postJson<PublishForwardResponse>('/publish/forward', {
                 includeAuth: true,
                 body: {
                     event: input.event,
@@ -35,6 +41,21 @@ export function createPublishForwardApi(options: CreatePublishForwardApiOptions 
                     relays: input.relays,
                 },
             });
+            const relayAt = (relayIndex: number): string | undefined => input.relays[relayIndex];
+            return {
+                ackedRelays: response.ackedRelayIndexes.flatMap((relayIndex) => {
+                    const relay = relayAt(relayIndex);
+                    return relay ? [relay] : [];
+                }),
+                failedRelays: response.failedRelays.flatMap((failure) => {
+                    const relay = relayAt(failure.relayIndex);
+                    return relay ? [{ relay, reason: failure.reason }] : [];
+                }),
+                timeoutRelays: response.timeoutRelayIndexes.flatMap((relayIndex) => {
+                    const relay = relayAt(relayIndex);
+                    return relay ? [relay] : [];
+                }),
+            };
         },
     };
 }

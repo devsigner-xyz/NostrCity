@@ -93,6 +93,33 @@ describe('createWriteGateway', () => {
         });
     });
 
+    test('publishes contact list with preserved relay and petname metadata for retained follows', async () => {
+        const provider = buildProvider();
+        const gateway = createWriteGateway({
+            getSession: () => buildSession(),
+            getProvider: () => provider,
+            now: () => 223,
+        });
+        const retained = 'a'.repeat(64);
+        const removed = 'b'.repeat(64);
+        const appended = 'c'.repeat(64);
+
+        await gateway.publishContactList([retained, appended], [
+            ['p', retained, 'wss://relay.example', 'Alice'],
+            ['p', removed, 'wss://relay.example', 'Bob'],
+        ]);
+
+        expect(provider.signEvent).toHaveBeenCalledWith({
+            kind: 3,
+            content: '',
+            created_at: 223,
+            tags: [
+                ['p', retained, 'wss://relay.example', 'Alice'],
+                ['p', appended],
+            ],
+        });
+    });
+
     test('publishes encrypted kind 10000 mute list', async () => {
         const provider = buildProvider();
         const gateway = createWriteGateway({
