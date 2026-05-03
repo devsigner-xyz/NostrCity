@@ -2,7 +2,7 @@ services:
   nostr-city:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
       args:
         NOSTR_CITY_PUBLIC_DEMO_MODE: ${NOSTR_CITY_PUBLIC_DEMO_MODE:-false}
     image: nostr-city:local

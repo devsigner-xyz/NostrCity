@@ -25,7 +25,7 @@ describe('production deployment config', () => {
     expect(packageJson.scripts?.start).toBe('node server/dist/main.js');
   });
 
-  it('defines Railway build, start, and healthcheck settings', async () => {
+  it('defines Railway build, start, and healthcheck settings without requiring pnpm at runtime', async () => {
     const railwayJson = JSON.parse(
       await readFile(join(repoRoot, 'railway.json'), 'utf8'),
     ) as {
@@ -35,7 +35,7 @@ describe('production deployment config', () => {
 
     expect(railwayJson.build?.builder).toBe('RAILPACK');
     expect(railwayJson.build?.buildCommand).toContain('pnpm build');
-    expect(railwayJson.deploy?.startCommand).toBe('pnpm start');
+    expect(railwayJson.deploy?.startCommand).toBe('node server/dist/main.js');
     expect(railwayJson.deploy?.healthcheckPath).toBe('/v1/health');
   });
 });

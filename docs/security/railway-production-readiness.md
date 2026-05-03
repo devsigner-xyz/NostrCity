@@ -37,8 +37,9 @@ When reporting, say only whether each required variable is present. Do not inclu
 ## Deployment Config
 
 - `railway.json` build command uses `pnpm install --frozen-lockfile` and `pnpm build`.
-- Start command is `pnpm start`.
+- Start command is `node server/dist/main.js`; Railway runtime does not need `pnpm` to start the built server.
 - Healthcheck path is `/v1/health`.
+- The local Dockerfile lives at `docker/Dockerfile`, not the repository root, so Railway keeps using Railpack auto-detection unless explicitly configured otherwise.
 
 ## Audit Evidence
 

@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -8,8 +8,15 @@ import { describe, expect, it } from 'vitest';
 const root = join(__dirname, '..', '..');
 
 describe('Docker local distribution config', () => {
+  it('keeps the Dockerfile outside the repository root so Railway uses Railpack', async () => {
+    await expect(access(join(root, 'Dockerfile'))).rejects.toThrow();
+
+    const compose = await readFile(join(root, 'docker-compose.yml'), 'utf8');
+    expect(compose).toContain('dockerfile: docker/Dockerfile');
+  });
+
   it('uses Node 24, pnpm build, non-root runtime, and the built server entrypoint', async () => {
-    const dockerfile = await readFile(join(root, 'Dockerfile'), 'utf8');
+    const dockerfile = await readFile(join(root, 'docker', 'Dockerfile'), 'utf8');
 
     expect(dockerfile).toContain('FROM node:24');
     expect(dockerfile).toContain('corepack enable');
@@ -53,7 +60,7 @@ describe('Docker local distribution config', () => {
   });
 
   it('does not require git metadata while building docs inside Docker', async () => {
-    const dockerfile = await readFile(join(root, 'Dockerfile'), 'utf8');
+    const dockerfile = await readFile(join(root, 'docker', 'Dockerfile'), 'utf8');
     const vitepressConfig = await readFile(join(root, 'docs', '.vitepress', 'config.mts'), 'utf8');
 
     expect(dockerfile).toContain('VITEPRESS_LAST_UPDATED=false');
