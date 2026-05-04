@@ -1397,6 +1397,14 @@ describe('OccupantProfileDialog', () => {
         expect(postList?.className).toContain('pt-1');
     });
 
+    test('prevents active profile feed content from widening mobile tabs', () => {
+        expect(overlayStyles).toMatch(/\.nostr-profile-dialog-tabs\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%/s);
+        expect(overlayStyles).toMatch(/\.nostr-profile-tab-panel-scroll\s*\{[^}]*max-width:\s*100%;[^}]*min-width:\s*0/s);
+        expect(overlayStyles).toMatch(/\.nostr-profile-tab-panel\s*\{[^}]*max-width:\s*100%;[^}]*min-width:\s*0/s);
+        expect(overlayStyles).toMatch(/\.nostr-profile-post-list\s*\{[^}]*display:\s*grid;[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*min-width:\s*0/s);
+        expect(overlayStyles).toMatch(/\.nostr-profile-post-list > article,\s*\.nostr-profile-post-list \[data-slot="card"\]\s*\{[^}]*max-width:\s*100%;[^}]*min-width:\s*0/s);
+    });
+
     test('clicking a post hashtag emits callback to open agora hashtag feed', async () => {
         const onSelectHashtag = vi.fn();
         const rendered = await renderElement(

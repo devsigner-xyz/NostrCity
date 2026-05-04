@@ -2485,6 +2485,8 @@
 .nostr-profile-dialog-tabs {
     flex: 1;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
     height: 100%;
     gap: 0;
 }
@@ -2508,13 +2510,17 @@
 
 .nostr-profile-tab-panel {
     min-height: min(48vh, 420px);
+    max-width: 100%;
+    min-width: 0;
     overflow: visible;
     padding: 0.85rem;
 }
 
 .nostr-profile-tab-panel-scroll {
     height: 100%;
+    max-width: 100%;
     min-height: 0;
+    min-width: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 0.1rem;
@@ -2530,6 +2536,8 @@
 
 .nostr-profile-posts {
     min-height: 100%;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .nostr-profile-posts-empty-state {
@@ -2679,7 +2687,16 @@
     margin: 0;
     padding: 0;
     display: grid;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     gap: 0.46rem;
+}
+
+.nostr-profile-post-list > article,
+.nostr-profile-post-list [data-slot="card"] {
+    max-width: 100%;
+    min-width: 0;
 }
 
 .nostr-profile-post-content {
