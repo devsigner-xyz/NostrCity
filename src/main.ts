@@ -26,6 +26,7 @@ import { calculatePinchZoom, hasMovedBeyondTouchTapThreshold, midpointBetweenTou
 import { runMapGeneration } from './ts/ui/map_generation_runner';
 import { calculateGeneratedMapCoverView } from './ts/ui/map_view_fit';
 import { createViewChangeScheduler } from './ts/ui/view_change_scheduler';
+import { installBrowserZoomLock } from './ts/ui/browser_zoom_lock';
 import type { EasterEggId } from './ts/ui/easter_eggs';
 
 interface OccupiedBuildingClickPayload {
@@ -1086,6 +1087,7 @@ type WindowWithLog = Window & {
 const mapWindow = window as WindowWithLog;
 mapWindow.log = log;
 window.addEventListener('load', (): void => {
+    installBrowserZoomLock();
     const main = new Main();
     window.mapGeneratorMain = main;
     mountNostrOverlay();
