@@ -102,6 +102,7 @@ interface OverlaySidebarProps {
     onOpenMissions: () => void;
     mobileAppBarTitle: string;
     mobileAppBarShowBack: boolean;
+    mobileAppBarShowMenu?: boolean;
     onMobileAppBarBack: () => void;
     children: ReactNode;
 }
@@ -158,7 +159,7 @@ function SidebarActionsMenu({
     relaysConnectedCount,
     relaysTotal,
     onOpenMissions,
-}: Omit<OverlaySidebarProps, 'open' | 'onOpenChange' | 'resolvedTheme' | 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'canWrite' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout' | 'onOpenPublish' | 'mobileAppBarTitle' | 'mobileAppBarShowBack' | 'onMobileAppBarBack' | 'children'> & { isReadonlySession: boolean }) {
+}: Omit<OverlaySidebarProps, 'open' | 'onOpenChange' | 'resolvedTheme' | 'authSession' | 'ownerPubkey' | 'ownerProfile' | 'canWrite' | 'onCopyOwnerNpub' | 'onLocateOwner' | 'onViewOwnerDetails' | 'onLogout' | 'onOpenPublish' | 'mobileAppBarTitle' | 'mobileAppBarShowBack' | 'mobileAppBarShowMenu' | 'onMobileAppBarBack' | 'children'> & { isReadonlySession: boolean }) {
     const { t } = useI18n();
     const { state, isMobile, setOpenMobile } = useSidebar();
     const location = useLocation();
@@ -729,6 +730,7 @@ export function OverlaySidebar({
     onOpenMissions,
     mobileAppBarTitle,
     mobileAppBarShowBack,
+    mobileAppBarShowMenu = true,
     onMobileAppBarBack,
     children,
 }: OverlaySidebarProps) {
@@ -744,6 +746,7 @@ export function OverlaySidebar({
             <MobileOverlayAppBar
                 title={mobileAppBarTitle}
                 showBack={mobileAppBarShowBack}
+                showMenu={mobileAppBarShowMenu}
                 onBack={onMobileAppBarBack}
             />
             <Sidebar

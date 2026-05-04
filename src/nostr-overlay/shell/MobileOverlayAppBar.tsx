@@ -7,10 +7,11 @@ import { cn } from '@/lib/utils';
 interface MobileOverlayAppBarProps {
     title: string;
     showBack: boolean;
+    showMenu?: boolean;
     onBack: () => void;
 }
 
-export function MobileOverlayAppBar({ title, showBack, onBack }: MobileOverlayAppBarProps) {
+export function MobileOverlayAppBar({ title, showBack, showMenu = true, onBack }: MobileOverlayAppBarProps) {
     const { t } = useI18n();
     const { isMobile, setOpenMobile } = useSidebar();
     const isHome = !showBack;
@@ -60,7 +61,7 @@ export function MobileOverlayAppBar({ title, showBack, onBack }: MobileOverlayAp
                         </Button>
                         <h1 className="nostr-mobile-app-bar-title">{title}</h1>
                     </div>
-                    {menuButton}
+                    {showMenu ? menuButton : null}
                 </>
             )}
         </header>

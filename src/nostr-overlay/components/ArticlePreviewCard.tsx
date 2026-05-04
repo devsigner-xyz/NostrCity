@@ -17,6 +17,7 @@ interface ArticlePreviewCardProps {
     authorLabel?: string;
     compact?: boolean;
     onOpenArticle?: (eventId: string) => void;
+    onOpenAuthor?: (pubkey: string) => void;
 }
 
 function formatPublishedDate(createdAt: number, publishedAt: number | undefined): string {
@@ -28,11 +29,25 @@ function formatPublishedDate(createdAt: number, publishedAt: number | undefined)
     return new Date(timestamp * 1000).toLocaleDateString();
 }
 
-export function ArticlePreviewCard({ event, authorLabel, compact = false, onOpenArticle }: ArticlePreviewCardProps) {
+export function ArticlePreviewCard({ event, authorLabel, compact = false, onOpenArticle, onOpenAuthor }: ArticlePreviewCardProps) {
     const { t } = useI18n();
     const metadata = parseArticleMetadata(event);
     const title = metadata.title ?? t('articles.untitled');
     const publishedDate = formatPublishedDate(event.created_at, metadata.publishedAt);
+    const author = authorLabel
+        ? onOpenAuthor
+            ? (
+                <button
+                    type="button"
+                    className="font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    aria-label={t('richContent.openProfile', { label: authorLabel })}
+                    onClick={() => onOpenAuthor(event.pubkey)}
+                >
+                    {authorLabel}
+                </button>
+            )
+            : authorLabel
+        : null;
 
     return (
         <Card size={compact ? 'sm' : 'default'}>
@@ -50,8 +65,10 @@ export function ArticlePreviewCard({ event, authorLabel, compact = false, onOpen
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
                 {authorLabel || publishedDate ? (
-                    <p className="text-sm text-muted-foreground">
-                        {[authorLabel, publishedDate ? t('articles.published', { date: publishedDate }) : ''].filter(Boolean).join(' · ')}
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                        {author}
+                        {author && publishedDate ? <span aria-hidden="true">·</span> : null}
+                        {publishedDate ? <span>{t('articles.published', { date: publishedDate })}</span> : null}
                     </p>
                 ) : null}
                 {metadata.topics.length > 0 ? (

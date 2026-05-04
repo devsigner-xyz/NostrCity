@@ -54,7 +54,7 @@ function service(): SocialFeedService {
     };
 }
 
-async function renderDetail(): Promise<RenderResult> {
+async function renderDetail({ onOpenAuthor = vi.fn() }: { onOpenAuthor?: ReturnType<typeof vi.fn<(pubkey: string) => void>> } = {}): Promise<RenderResult> {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -72,12 +72,13 @@ async function renderDetail(): Promise<RenderResult> {
                         <Route
                             path="/agora/articles/:eventId"
                             element={(
-                                <ArticleDetailRouteContainer
-                                    items={[articleItem()]}
-                                    service={service()}
-                                    enabled
-                                    onBack={vi.fn()}
-                                />
+                                 <ArticleDetailRouteContainer
+                                     items={[articleItem()]}
+                                     profilesByPubkey={{ ['b'.repeat(64)]: { pubkey: 'b'.repeat(64), displayName: 'Alice Writer' } }}
+                                     service={service()}
+                                     enabled
+                                     onOpenAuthor={onOpenAuthor}
+                                 />
                             )}
                         />
                     </Routes>
@@ -107,8 +108,9 @@ afterEach(async () => {
 });
 
 describe('ArticleDetailRouteContainer', () => {
-    test('adds bottom breathing room and a footer action back to the article list', async () => {
-        const rendered = await renderDetail();
+    test('shows a clickable author and omits article-list CTAs', async () => {
+        const onOpenAuthor = vi.fn();
+        const rendered = await renderDetail({ onOpenAuthor });
         mounted.push(rendered);
 
         const detailContent = rendered.container.querySelector('[data-testid="article-detail-content"]');
@@ -116,8 +118,15 @@ describe('ArticleDetailRouteContainer', () => {
 
         const backButtons = Array.from(rendered.container.querySelectorAll('button'))
             .filter((button) => button.textContent === 'Volver a artículos');
-        expect(backButtons).toHaveLength(2);
-        expect(backButtons[1]?.className).toContain('self-center');
-        expect(backButtons[1]?.className).toContain('mt-4');
+        expect(backButtons).toHaveLength(0);
+
+        const authorButton = rendered.container.querySelector('button[aria-label="Abrir perfil de Alice Writer"]') as HTMLButtonElement | null;
+        expect(authorButton).not.toBeNull();
+
+        await act(async () => {
+            authorButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onOpenAuthor).toHaveBeenCalledWith('b'.repeat(64));
     });
 });

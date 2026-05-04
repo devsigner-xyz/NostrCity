@@ -149,6 +149,7 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
         },
         articleDetail: {
             items: [],
+            profilesByPubkey: {},
             service: {
                 loadFollowingFeed: async () => ({ items: [], hasMore: false }),
                 loadArticlesFeed: async () => ({ items: [], hasMore: false }),
@@ -161,7 +162,6 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
                 loadViewerReplies: async () => ({}),
             },
             enabled: false,
-            onBack: noop,
         },
         cityStats: {
             buildingsCount: 0,

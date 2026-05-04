@@ -41,6 +41,10 @@ export function shouldShowMobileBack(pathname: string, search = ''): boolean {
     return hasActiveGroupDetail(pathname, search) || !shouldShowMobileBottomNavigation(pathname, search);
 }
 
+export function shouldShowMobileMenu(pathname: string): boolean {
+    return !pathname.startsWith('/agora/articles/');
+}
+
 export function shouldShowMobileBottomNavigation(pathname: string, search = ''): boolean {
     if (hasActiveGroupDetail(pathname, search)) {
         return false;

@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils';
 
 interface ArticleMarkdownContentProps {
     event: NostrEvent;
+    authorLabel?: string;
+    onOpenAuthor?: (pubkey: string) => void;
 }
 
 function formatPublishedDate(createdAt: number, publishedAt: number | undefined): string {
@@ -61,17 +63,37 @@ function unwrapListParagraphs(children: ReactNode): ReactNode {
     });
 }
 
-export function ArticleMarkdownContent({ event }: ArticleMarkdownContentProps) {
+export function ArticleMarkdownContent({ event, authorLabel, onOpenAuthor }: ArticleMarkdownContentProps) {
     const { t } = useI18n();
     const metadata = parseArticleMetadata(event);
     const title = metadata.title ?? t('articles.untitled');
     const publishedDate = formatPublishedDate(event.created_at, metadata.publishedAt);
+    const author = authorLabel
+        ? onOpenAuthor
+            ? (
+                <button
+                    type="button"
+                    className="font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    aria-label={t('richContent.openProfile', { label: authorLabel })}
+                    onClick={() => onOpenAuthor(event.pubkey)}
+                >
+                    {authorLabel}
+                </button>
+            )
+            : authorLabel
+        : null;
 
     return (
         <article className="mx-auto flex max-w-3xl flex-col gap-6 [font-family:'Noto_Serif',Georgia,Cambria,'Times_New_Roman',serif]">
             <header className="flex flex-col gap-3">
                 <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-                {publishedDate ? <p className="text-sm text-muted-foreground">{t('articles.published', { date: publishedDate })}</p> : null}
+                {author || publishedDate ? (
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                        {author}
+                        {author && publishedDate ? <span aria-hidden="true">·</span> : null}
+                        {publishedDate ? <span>{t('articles.published', { date: publishedDate })}</span> : null}
+                    </p>
+                ) : null}
                 {metadata.summary ? <p className="text-base text-muted-foreground">{metadata.summary}</p> : null}
             </header>
             {metadata.image ? (

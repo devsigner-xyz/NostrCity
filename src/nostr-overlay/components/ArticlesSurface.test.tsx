@@ -143,11 +143,14 @@ describe('ArticlesSurface', () => {
     test('renders articles and calls actions', async () => {
         const onRefresh = vi.fn();
         const onOpenArticle = vi.fn();
+        const onOpenAuthor = vi.fn();
         const rendered = await renderElement(surface({
             items: [articleItem('article-1')],
+            profilesByPubkey: { ['a'.repeat(64)]: { pubkey: 'a'.repeat(64), name: 'Alice' } },
             hasMore: true,
             onRefresh,
             onOpenArticle,
+            onOpenAuthor,
         }));
         mounted.push(rendered);
 
@@ -156,14 +159,17 @@ describe('ArticlesSurface', () => {
         const buttons = Array.from(rendered.container.querySelectorAll('button'));
         const refresh = buttons.find((button) => button.textContent === 'Actualizar');
         const read = buttons.find((button) => button.textContent === 'Leer artículo');
+        const author = buttons.find((button) => button.getAttribute('aria-label') === 'Abrir perfil de Alice');
 
         await act(async () => {
             refresh?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             read?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            author?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
         expect(onRefresh).toHaveBeenCalledTimes(1);
         expect(onOpenArticle).toHaveBeenCalledWith('article-1');
+        expect(onOpenAuthor).toHaveBeenCalledWith('a'.repeat(64));
         expect(buttons.find((button) => button.textContent === 'Cargar mas')).toBeUndefined();
     });
 

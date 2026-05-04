@@ -50,6 +50,7 @@ interface OverlaySidebarLayerProps {
     onOpenMissions: () => void;
     mobileAppBarTitle: string;
     mobileAppBarShowBack: boolean;
+    mobileAppBarShowMenu?: boolean;
     onMobileAppBarBack: () => void;
     follows: string[];
     profiles: Record<string, NostrProfile>;
@@ -111,6 +112,7 @@ export function OverlaySidebarLayer({
     onOpenMissions,
     mobileAppBarTitle,
     mobileAppBarShowBack,
+    mobileAppBarShowMenu,
     onMobileAppBarBack,
     follows,
     profiles,
@@ -175,6 +177,7 @@ export function OverlaySidebarLayer({
             onOpenMissions={onOpenMissions}
             mobileAppBarTitle={mobileAppBarTitle}
             mobileAppBarShowBack={mobileAppBarShowBack}
+            {...(mobileAppBarShowMenu !== undefined ? { mobileAppBarShowMenu } : {})}
             onMobileAppBarBack={onMobileAppBarBack}
         >
             <SocialSidebar

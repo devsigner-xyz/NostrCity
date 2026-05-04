@@ -89,4 +89,19 @@ describe('ArticlePreviewCard', () => {
 
         expect(onOpenArticle).toHaveBeenCalledWith('article-id');
     });
+
+    test('opens the author profile from the author label', async () => {
+        const onOpenAuthor = vi.fn();
+        const rendered = await renderElement(<ArticlePreviewCard event={article()} authorLabel="Alice" onOpenAuthor={onOpenAuthor} />);
+        mounted.push(rendered);
+
+        const author = rendered.container.querySelector('button[aria-label="Abrir perfil de Alice"]') as HTMLButtonElement | null;
+        expect(author).not.toBeNull();
+
+        await act(async () => {
+            author?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onOpenAuthor).toHaveBeenCalledWith('b'.repeat(64));
+    });
 });

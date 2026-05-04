@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
     resolveMobileAppBarTitle,
     resolveMobileBackBehavior,
+    shouldShowMobileMenu,
     shouldShowMobileBottomNavigation,
     shouldShowMobileBack,
 } from './mobile-navigation';
@@ -48,6 +49,12 @@ describe('mobile navigation route metadata', () => {
         expect(resolveMobileAppBarTitle({ pathname: `/agora/notes/${noteEventId}`, language: 'es' })).toBe('Nota');
         expect(resolveMobileAppBarTitle({ pathname: `/agora/articles/${articleId}`, language: 'es' })).toBe('Artículos');
         expect(resolveMobileAppBarTitle({ pathname: '/relays/detail', language: 'es' })).toBe('Relays');
+    });
+
+    test('hides the mobile menu on article detail routes only', () => {
+        expect(shouldShowMobileMenu('/agora/articles')).toBe(true);
+        expect(shouldShowMobileMenu(`/agora/articles/${articleId}`)).toBe(false);
+        expect(shouldShowMobileMenu(`/agora/notes/${noteEventId}`)).toBe(true);
     });
 
     test('uses settings title for settings routes', () => {

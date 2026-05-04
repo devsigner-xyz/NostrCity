@@ -42,6 +42,7 @@ interface ArticlesSurfaceProps {
     onRefresh: () => Promise<void> | void;
     onLoadMore: () => Promise<void> | void;
     onOpenArticle: (eventId: string) => void;
+    onOpenAuthor?: (pubkey: string) => void;
     onSelectedHashtagsChange?: (hashtags: string[]) => void;
     onClearHashtag?: () => void;
 }
@@ -93,6 +94,7 @@ export function ArticlesSurface({
     onRefresh,
     onLoadMore,
     onOpenArticle,
+    onOpenAuthor,
     onSelectedHashtagsChange,
 }: ArticlesSurfaceProps) {
     const { t } = useI18n();
@@ -296,6 +298,7 @@ export function ArticlesSurface({
                                         event={item.rawEvent}
                                         authorLabel={profileLabel(item.pubkey, profilesByPubkey[item.pubkey])}
                                         onOpenArticle={onOpenArticle}
+                                        {...(onOpenAuthor ? { onOpenAuthor } : {})}
                                     />
                                 </div>
                             ))}

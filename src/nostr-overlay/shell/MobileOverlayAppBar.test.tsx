@@ -39,11 +39,13 @@ function setDesktopViewport(): void {
 async function renderAppBar({
     title = 'Nostr City',
     showBack = false,
+    showMenu = true,
     onBack = vi.fn<() => void>(),
     includeSidebar = false,
 }: {
     title?: string;
     showBack?: boolean;
+    showMenu?: boolean;
     onBack?: ReturnType<typeof vi.fn<() => void>>;
     includeSidebar?: boolean;
 } = {}): Promise<RenderResult> {
@@ -55,7 +57,7 @@ async function renderAppBar({
         root.render(
             <I18nProvider initialLocale="es">
                 <SidebarProvider>
-                    <MobileOverlayAppBar title={title} showBack={showBack} onBack={onBack} />
+                    <MobileOverlayAppBar title={title} showBack={showBack} showMenu={showMenu} onBack={onBack} />
                     {includeSidebar ? (
                         <Sidebar mobileTitle="Navegación de Nostr City" mobileDescription="Accesos principales">
                             <SidebarContent>Contenido del sidebar móvil</SidebarContent>
@@ -135,6 +137,16 @@ describe('MobileOverlayAppBar', () => {
         });
 
         expect(onBack).toHaveBeenCalledTimes(1);
+    });
+
+    test('can hide the menu button on internal article detail navigation', async () => {
+        setMobileViewport();
+        const rendered = await renderAppBar({ title: 'Artículos', showBack: true, showMenu: false });
+        mounted.push(rendered);
+
+        expect(rendered.container.querySelector('button[aria-label="Volver"]')).not.toBeNull();
+        expect(rendered.container.querySelector('button[aria-label="Abrir navegación"]')).toBeNull();
+        expect(rendered.container.textContent || '').toContain('Artículos');
     });
 
     test('opens the mobile sidebar from the menu button', async () => {

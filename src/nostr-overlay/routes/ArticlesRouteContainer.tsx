@@ -18,6 +18,7 @@ export interface ArticlesRouteContainerProps {
     onRefresh: () => Promise<void> | void;
     onLoadMore: () => Promise<void> | void;
     onOpenArticle: (eventId: string) => void;
+    onOpenAuthor?: (pubkey: string) => void;
     onSelectedHashtagsChange?: (hashtags: string[]) => void;
     onClearHashtag?: () => void;
 }

@@ -72,6 +72,7 @@ import { normalizeHashtag, useOverlayRouteState } from './shell/use-overlay-rout
 import {
     resolveMobileAppBarTitle,
     resolveMobileBackBehavior,
+    shouldShowMobileMenu,
     shouldShowMobileBack,
 } from './shell/mobile-navigation';
 import { useOverlayNavigationStack } from './shell/use-overlay-navigation-stack';
@@ -173,6 +174,7 @@ export function App({ mapBridge, services }: AppProps) {
     const loginDisabled = overlay.status !== 'idle' && overlay.status !== 'success' && overlay.status !== 'error';
     const mapLoaderText = selectMapLoaderStageLabel(overlay.mapLoaderStage, uiSettings.language);
     const mobileAppBarShowBack = shouldShowMobileBack(location.pathname, location.search);
+    const mobileAppBarShowMenu = shouldShowMobileMenu(location.pathname);
     const agoraReturnFocusEventId = location.pathname === '/agora'
         ? routeReturnStateFromUnknown(location.state).returnFocusEventId
         : undefined;
@@ -1267,6 +1269,7 @@ export function App({ mapBridge, services }: AppProps) {
                     onOpenMissions={() => navigate('/discover')}
                     mobileAppBarTitle={mobileAppBarTitle}
                     mobileAppBarShowBack={mobileAppBarShowBack}
+                    mobileAppBarShowMenu={mobileAppBarShowMenu}
                     onMobileAppBarBack={handleMobileAppBarBack}
                     follows={overlay.follows}
                     profiles={overlay.profiles}
@@ -1410,14 +1413,16 @@ export function App({ mapBridge, services }: AppProps) {
                         onRefresh: articles.refresh,
                         onLoadMore: articles.loadMore,
                         onOpenArticle: (eventId) => navigate(`/agora/articles/${eventId}`),
+                        onOpenAuthor: openMentionedProfile,
                         onSelectedHashtagsChange: selectArticleHashtags,
                         onClearHashtag: clearArticleHashtag,
                     }}
                     articleDetail={{
                         items: articles.items,
+                        profilesByPubkey: richContentProfilesByPubkey,
                         service: overlay.socialFeedService,
                         enabled: Boolean(overlay.ownerPubkey),
-                        onBack: () => navigate('/agora/articles'),
+                        onOpenAuthor: openMentionedProfile,
                     }}
                     cityStats={{
                         buildingsCount: overlay.buildingsCount,
