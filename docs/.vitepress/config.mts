@@ -13,7 +13,6 @@ export default defineConfig({
     ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' }],
     ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' }],
     ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/icon-light-180x180.png' }],
-    ['link', { rel: 'manifest', href: '/site.webmanifest' }],
   ],
   cleanUrls: true,
   lastUpdated: process.env.VITEPRESS_LAST_UPDATED !== 'false',
