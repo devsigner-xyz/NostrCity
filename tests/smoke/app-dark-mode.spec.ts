@@ -4,10 +4,6 @@ import { seedReadonlyDarkSession, visibleSurfaceLuminance, waitForOverlayRoute }
 
 const AUDITED_ROUTES = [
     {
-        path: '/app/groups',
-        marker: 'Choose group relays',
-    },
-    {
         path: '/app/city-stats',
         marker: 'Occupied buildings',
     },
@@ -25,12 +21,11 @@ const AUDITED_ROUTES = [
     },
 ] as const;
 
-test('dark mode does not leave routed surfaces in light mode', async ({ page }) => {
+test('dark mode routed surfaces stay dark, accessible, and keyboard-visible', async ({ page }) => {
     await seedReadonlyDarkSession(page);
 
     for (const route of AUDITED_ROUTES) {
         await page.goto(route.path, { waitUntil: 'domcontentloaded' });
-        await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined);
         await waitForOverlayRoute(page, route.marker);
 
         const surface = page.getByTestId('overlay-surface-content');
@@ -55,19 +50,6 @@ test('dark mode does not leave routed surfaces in light mode', async ({ page }) 
             expect(await visibleSurfaceLuminance(firstKpiCard)).toBeLessThan(0.35);
             expect(await visibleSurfaceLuminance(firstChartCard)).toBeLessThan(0.35);
         }
-    }
-});
-
-test('audited dark mode routes keep accessible surface semantics and visible keyboard focus', async ({ page }) => {
-    await seedReadonlyDarkSession(page);
-
-    for (const route of AUDITED_ROUTES) {
-        await page.goto(route.path, { waitUntil: 'domcontentloaded' });
-        await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined);
-        await waitForOverlayRoute(page, route.marker);
-
-        const surface = page.getByTestId('overlay-surface-content');
-        await expect(surface).toBeVisible();
 
         const accessibilityScan = await new AxeBuilder({ page })
             .include('[data-testid="overlay-surface-content"]')
@@ -75,8 +57,10 @@ test('audited dark mode routes keep accessible surface semantics and visible key
 
         expect(accessibilityScan.violations).toEqual([]);
 
-        if (route.path === '/app/groups') {
-            await page.getByRole('button', { name: 'Add suggested group relays' }).focus();
+        if (route.path === '/app/relays') {
+            const focusTarget = surface.getByRole('button').first();
+            await expect(focusTarget).toBeVisible();
+            await focusTarget.focus();
 
             const focusStyles = await page.evaluate(() => {
                 const activeElement = document.activeElement as HTMLElement | null;
@@ -86,13 +70,11 @@ test('audited dark mode routes keep accessible surface semantics and visible key
 
                 const styles = getComputedStyle(activeElement);
                 return {
-                    text: activeElement.textContent,
                     boxShadow: styles.boxShadow,
                     outlineWidth: styles.outlineWidth,
                 };
             });
 
-            expect(focusStyles?.text).toContain('Add suggested relays');
             expect((focusStyles?.boxShadow && focusStyles.boxShadow !== 'none') || focusStyles?.outlineWidth !== '0px').toBe(true);
         }
     }

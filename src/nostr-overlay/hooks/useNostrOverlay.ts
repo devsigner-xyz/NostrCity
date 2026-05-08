@@ -404,6 +404,7 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
     });
     const [mapLoaderStage, setMapLoaderStage] = useState<MapLoaderStage | null>(null);
     const requestIdRef = useRef(0);
+    const isMountedRef = useRef(true);
     const latestStateRef = useRef(state);
     const occupancyAnimationTokenRef = useRef(0);
     const skipNextMapGeneratedRef = useRef(false);
@@ -613,6 +614,17 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
         occupancyAnimationTokenRef.current += 1;
         return occupancyAnimationTokenRef.current;
     };
+
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        return () => {
+            isMountedRef.current = false;
+            requestIdRef.current += 1;
+            occupancyAnimationTokenRef.current += 1;
+            skipNextMapGeneratedRef.current = false;
+        };
+    }, []);
 
     const clearSocialServerState = async (): Promise<void> => {
         const scopes = [
@@ -1512,7 +1524,12 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
                 ...(occupancy.selectedBuildingIndex !== undefined
                     ? { selectedBuildingIndex: occupancy.selectedBuildingIndex }
                     : {}),
+                shouldStop: () => !isMountedRef.current,
             });
+
+            if (!isMountedRef.current) {
+                return;
+            }
 
             setState((nextState) => {
                 if (!hasLoadedOverlayData(nextState.status) || nextState.data.ownerPubkey !== current.data.ownerPubkey) {
@@ -1531,6 +1548,10 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
                 };
             });
         } catch (error) {
+            if (!isMountedRef.current) {
+                return;
+            }
+
             const message = error instanceof Error ? error.message : 'No se pudo regenerar el mapa';
             setState((nextState) => ({
                 ...nextState,
@@ -1539,7 +1560,9 @@ export function useNostrOverlay({ mapBridge, services, publicDemoMode = false }:
             }));
         } finally {
             skipNextMapGeneratedRef.current = false;
-            setMapLoaderStage(null);
+            if (isMountedRef.current) {
+                setMapLoaderStage(null);
+            }
         }
     };
 

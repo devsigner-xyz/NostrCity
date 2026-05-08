@@ -159,7 +159,7 @@ describe('nostr overlay query standards', () => {
                 pageSize: 10,
             })
         ).toEqual(
-            ['nostr-overlay', 'social', 'articles-feed', { ownerPubkey: 'owner', follows: ['a', 'b'], pageSize: 10 }]
+            ['nostr-overlay', 'social', 'articles-feed', { ownerPubkey: 'owner', follows: ['a', 'b'], hashtags: [], pageSize: 10 }]
         );
 
         expect(

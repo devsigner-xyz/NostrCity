@@ -46,6 +46,30 @@ async function mockOverlayBootstrapApis(page: Page): Promise<void> {
         });
     });
 
+    await page.route('**/v1/graph/followers', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                pubkey: READONLY_OWNER_PUBKEY,
+                followers: [],
+                complete: true,
+            }),
+        });
+    });
+
+    await page.route('**/v1/social/feed/following**', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                items: [],
+                hasMore: false,
+                nextUntil: null,
+            }),
+        });
+    });
+
     await page.route('**/v1/identity/profiles/resolve', async (route) => {
         const postData = route.request().postDataJSON() as { pubkeys?: string[] } | null;
         const pubkeys = postData?.pubkeys ?? [];

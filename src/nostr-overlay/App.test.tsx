@@ -5011,7 +5011,10 @@ describe('Nostr overlay App', () => {
             refreshButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        await waitFor(() => (rendered.container.textContent || '').includes('Reconecta WebLN'));
+        await waitFor(() => {
+            const text = rendered.container.textContent || '';
+            return text.includes('Conectar con WebLN') && !text.includes('Conectada por WebLN');
+        });
         expect(failingEnable).toHaveBeenCalledTimes(1);
     });
 
@@ -5077,11 +5080,12 @@ describe('Nostr overlay App', () => {
         });
         rendered.container.remove();
 
+        const failingEnable = vi.fn(async () => {
+            throw new Error('denied');
+        });
         Object.assign(window, {
             webln: {
-                enable: vi.fn(async () => {
-                    throw new Error('denied');
-                }),
+                enable: failingEnable,
                 sendPayment: vi.fn(async () => ({ preimage: 'abc' })),
                 makeInvoice: vi.fn(async () => ({ paymentRequest: 'lnbc1invoice', expiresAt: 200 })),
             },
@@ -5116,7 +5120,8 @@ describe('Nostr overlay App', () => {
         mounted.push(reloaded);
 
         await waitFor(() => reloaded.container.querySelector('[data-testid="login-gate-screen"]') === null);
-        await waitFor(() => (reloaded.container.textContent || '').includes('Reconecta WebLN'));
+        await waitFor(() => failingEnable.mock.calls.length === 1);
+        expect(reloaded.container.textContent || '').toContain('Conectar con WebLN');
         expect(reloaded.container.textContent || '').not.toContain('Conectada por WebLN');
     });
 
@@ -5211,7 +5216,7 @@ describe('Nostr overlay App', () => {
         mounted.push(reloaded);
 
         await waitFor(() => reloaded.container.querySelector('[data-testid="login-gate-screen"]') === null);
-        await waitFor(() => (reloaded.container.textContent || '').includes('Reconecta WebLN'));
+        await waitFor(() => (reloaded.container.textContent || '').includes('Conectar con WebLN'));
         expect(reloaded.container.textContent || '').not.toContain('Conectada por WebLN');
     });
 
