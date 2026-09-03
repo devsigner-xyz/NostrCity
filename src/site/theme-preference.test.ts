@@ -39,8 +39,19 @@ describe('site theme preference', () => {
     expect(resolveSiteTheme()).toBe('light');
   });
 
-  it('distinguishes an explicit system preference from a missing theme value', () => {
+  it('uses light for a legacy persisted system default', () => {
     window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ theme: 'system' }));
+
+    expect(readStoredSiteThemeValue()).toBe('system');
+    expect(readSiteThemePreference()).toBe('light');
+    expect(resolveSiteTheme()).toBe('light');
+  });
+
+  it('distinguishes an explicit system preference from a missing theme value', () => {
+    window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({
+      theme: 'system',
+      themePreferenceVersion: 2,
+    }));
 
     expect(readStoredSiteThemeValue()).toBe('system');
     expect(readSiteThemePreference()).toBe('system');
@@ -62,7 +73,12 @@ describe('site theme preference', () => {
     saveSiteThemePreference('dark');
 
     const stored = JSON.parse(window.localStorage.getItem(UI_SETTINGS_STORAGE_KEY) || '{}') as Record<string, unknown>;
-    expect(stored).toEqual({ language: 'en', streetLabelsEnabled: false, theme: 'dark' });
+    expect(stored).toEqual({
+      language: 'en',
+      streetLabelsEnabled: false,
+      theme: 'dark',
+      themePreferenceVersion: 2,
+    });
     expect(listener).toHaveBeenCalledTimes(1);
     window.removeEventListener(SITE_THEME_CHANGE_EVENT, listener);
   });

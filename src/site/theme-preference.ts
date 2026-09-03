@@ -1,4 +1,8 @@
-import { UI_SETTINGS_STORAGE_KEY, type UiTheme } from '../nostr/ui-settings';
+import {
+  UI_SETTINGS_STORAGE_KEY,
+  UI_THEME_PREFERENCE_VERSION,
+  type UiTheme,
+} from '../nostr/ui-settings';
 
 export type SiteTheme = 'light' | 'dark';
 
@@ -54,7 +58,14 @@ export function readStoredSiteThemeValue(storage: StorageLike | null = getDefaul
 }
 
 export function readSiteThemePreference(storage: StorageLike | null = getDefaultStorage()): UiTheme {
-  return readStoredSiteThemeValue(storage) ?? 'light';
+  const payload = getStoredPayload(storage);
+  const theme = payload.theme;
+
+  if (theme === 'system' && payload.themePreferenceVersion !== UI_THEME_PREFERENCE_VERSION) {
+    return 'light';
+  }
+
+  return theme === 'light' || theme === 'dark' || theme === 'system' ? theme : 'light';
 }
 
 export function resolveSiteTheme(storage: StorageLike | null = getDefaultStorage()): SiteTheme {
@@ -65,7 +76,11 @@ export function resolveSiteTheme(storage: StorageLike | null = getDefaultStorage
 export function saveSiteThemePreference(theme: SiteTheme, storage: StorageLike | null = getDefaultStorage()): SiteTheme {
   if (storage) {
     const payload = getStoredPayload(storage);
-    storage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ ...payload, theme }));
+    storage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({
+      ...payload,
+      theme,
+      themePreferenceVersion: UI_THEME_PREFERENCE_VERSION,
+    }));
   }
 
   if (typeof window !== 'undefined') {

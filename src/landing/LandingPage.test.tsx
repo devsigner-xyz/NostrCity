@@ -105,7 +105,7 @@ describe('LandingPage theme selector', () => {
     const stored = JSON.parse(window.localStorage.getItem(UI_SETTINGS_STORAGE_KEY) || '{}') as { theme?: string; language?: string };
     const logo = rendered.container.querySelector('.brand-logo') as HTMLImageElement | null;
 
-    expect(stored).toEqual({ language: 'es', theme: 'light' });
+    expect(stored).toEqual({ language: 'es', theme: 'light', themePreferenceVersion: 2 });
     expect(rendered.container.querySelector('.landing-shell')?.getAttribute('data-theme')).toBe('light');
     expect(logo?.getAttribute('src')).toBe('/icon-light-32x32.png');
   });

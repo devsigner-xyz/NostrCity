@@ -2,6 +2,7 @@ import type { AppLocale } from '../i18n/types';
 
 export const UI_SETTINGS_STORAGE_KEY = 'nostr.overlay.ui.v1';
 export const UI_SETTINGS_LANGUAGE_CHANGE_EVENT = 'nostr.overlay.ui-language-change';
+export const UI_THEME_PREFERENCE_VERSION = 2;
 export type AgoraFeedLayout = 'list' | 'masonry';
 export type UiLanguage = AppLocale;
 export type UiTheme = 'light' | 'dark' | 'system';
@@ -20,6 +21,7 @@ interface UiSettingsPayload {
     agoraFeedLayout?: AgoraFeedLayout;
     language?: UiLanguage;
     theme?: UiTheme;
+    themePreferenceVersion?: number;
     occupiedLabelsZoomLevel?: number;
     streetLabelsEnabled?: boolean;
     specialMarkersEnabled?: boolean;
@@ -83,6 +85,10 @@ function normalizeTheme(value: unknown): UiTheme {
     return value === 'light' || value === 'dark' || value === 'system' ? value : DEFAULT_THEME;
 }
 
+function normalizeStoredTheme(value: unknown, preferenceVersion: unknown): UiTheme {
+    const theme = normalizeTheme(value);
+    return theme === 'system' && preferenceVersion !== UI_THEME_PREFERENCE_VERSION ? DEFAULT_THEME : theme;
+}
 function normalizeStreetLabelsZoomLevel(value: number | undefined): number {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
         return DEFAULT_STREET_LABELS_ZOOM_LEVEL;
@@ -162,7 +168,7 @@ export function loadUiSettings(storage: StorageLike | null = getDefaultStorage()
         return {
             agoraFeedLayout: normalizeAgoraFeedLayout(parsed.agoraFeedLayout),
             language: normalizeLanguage(parsed.language),
-            theme: normalizeTheme(parsed.theme),
+            theme: normalizeStoredTheme(parsed.theme, parsed.themePreferenceVersion),
             occupiedLabelsZoomLevel: normalizeOccupiedLabelsZoomLevel(parsed.occupiedLabelsZoomLevel),
             streetLabelsEnabled: normalizeStreetLabelsEnabled(parsed.streetLabelsEnabled),
             specialMarkersEnabled: normalizeSpecialMarkersEnabled(parsed.specialMarkersEnabled),
@@ -199,6 +205,7 @@ export function saveUiSettings(
             agoraFeedLayout: nextState.agoraFeedLayout,
             language: nextState.language,
             theme: nextState.theme,
+            themePreferenceVersion: UI_THEME_PREFERENCE_VERSION,
             occupiedLabelsZoomLevel: nextState.occupiedLabelsZoomLevel,
             streetLabelsEnabled: nextState.streetLabelsEnabled,
             specialMarkersEnabled: nextState.specialMarkersEnabled,

@@ -66,9 +66,30 @@ describe('ui-settings', () => {
         const loaded = loadUiSettings(window.localStorage);
 
         expect(stored.theme).toBe('dark');
+        expect(stored.themePreferenceVersion).toBe(2);
         expect(loaded.theme).toBe('dark');
     });
 
+    test('uses light for a legacy persisted system default', () => {
+        window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({
+            language: 'es',
+            theme: 'system',
+        }));
+
+        expect(loadUiSettings(window.localStorage).theme).toBe('light');
+    });
+
+    test('respects system after it is selected with the current preference version', () => {
+        saveUiSettings(
+            {
+                ...getDefaultUiSettings(),
+                theme: 'system',
+            },
+            window.localStorage
+        );
+
+        expect(loadUiSettings(window.localStorage).theme).toBe('system');
+    });
     test('falls back to defaults when payload is malformed', () => {
         window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, '{bad-json');
         expect(loadUiSettings(window.localStorage)).toEqual(getDefaultUiSettings());
