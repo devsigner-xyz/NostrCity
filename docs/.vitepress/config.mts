@@ -23,13 +23,13 @@ export default defineConfig({
     nav: [
       { text: 'Documentación', link: '/' },
       { text: 'Aplicación', link: appUrl },
-      { text: 'GitHub', link: 'https://github.com/strhodler/NostrCity' },
+      { text: 'GitHub', link: 'https://github.com/devsigner-xyz/NostrCity' },
     ],
     search: {
       provider: 'local',
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/strhodler/NostrCity' },
+      { icon: 'github', link: 'https://github.com/devsigner-xyz/NostrCity' },
     ],
     sidebar: [
       {

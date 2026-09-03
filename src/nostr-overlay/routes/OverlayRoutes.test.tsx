@@ -256,15 +256,6 @@ function buildOverlayRoutesProps(overrides: Partial<OverlayRoutesProps> = {}): O
             onUiSettingsChange: noop,
             onClose: noop,
         },
-        donation: {
-            profile: {
-                pubkey: 'd'.repeat(64),
-                displayName: 'strhodler',
-                lud16: 'strhodler@getalby.com',
-            },
-            canDonateWithWallet: false,
-            onDonate: asyncNoop,
-        },
         ...overrides,
     };
 }
@@ -460,13 +451,6 @@ describe('OverlayRoutes', () => {
 
         expect(rendered.container.querySelector('[data-testid="wallet-route"]')).not.toBeNull();
         expect(lastLocation(rendered.locations)).toBe('/wallet');
-    });
-
-    test('renders donation banner on settings about route', async () => {
-        const rendered = await renderOverlayRoutes('/settings/about');
-        mounted.push(rendered);
-
-        expect(rendered.container.querySelector('[data-testid="lightning-donation-banner"]')).not.toBeNull();
     });
 
     test('redirects readonly direct wallet URLs back to the map', async () => {

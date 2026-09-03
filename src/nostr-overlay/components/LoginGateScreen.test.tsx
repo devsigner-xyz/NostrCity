@@ -218,7 +218,7 @@ describe('LoginGateScreen', () => {
         expect(rendered.container.textContent || '').not.toContain('Crear cuenta');
 
         const link = rendered.container.querySelector('[data-testid="public-demo-login-notice"] a') as HTMLAnchorElement | null;
-        expect(link?.getAttribute('href')).toBe('https://github.com/strhodler/NostrCity');
+        expect(link?.getAttribute('href')).toBe('https://github.com/devsigner-xyz/NostrCity');
         expect(link?.getAttribute('target')).toBe('_blank');
         expect(link?.getAttribute('rel')).toBe('noreferrer');
     });
@@ -481,19 +481,19 @@ describe('LoginGateScreen', () => {
         expect(rendered.container.querySelector('[data-slot="empty-icon"] [aria-label="Loading"]')).not.toBeNull();
     });
 
-    test('shows strhodler attribution link while restoring a session', async () => {
+    test('shows devsigner attribution link while restoring a session', async () => {
         const rendered = await renderScreen({ restoringSession: true });
         mounted.push(rendered);
 
-        const link = rendered.container.querySelector('[data-testid="strhodler-attribution-link"]') as HTMLAnchorElement | null;
+        const link = rendered.container.querySelector('[data-testid="devsigner-attribution-link"]') as HTMLAnchorElement | null;
         const avatar = link?.querySelector('img') as HTMLImageElement | null;
 
         expect(link).not.toBeNull();
-        expect(link?.textContent || '').toContain('Hecho con ❤️ por strhodler');
-        expect(link?.getAttribute('href')).toBe('https://github.com/strhodler');
+        expect(link?.textContent || '').toContain('Hecho con ❤️ por devsigner');
+        expect(link?.getAttribute('href')).toBe('https://github.com/devsigner-xyz');
         expect(link?.getAttribute('target')).toBe('_blank');
         expect(link?.getAttribute('rel')).toBe('noreferrer');
-        expect(avatar?.getAttribute('src')).toBe('/strhodler.jpg');
+        expect(avatar?.getAttribute('src')).toBe('/devsigner.png');
         expect(avatar?.getAttribute('alt')).toBe('');
     });
 

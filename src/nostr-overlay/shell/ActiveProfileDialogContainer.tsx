@@ -44,8 +44,6 @@ interface ActiveProfileDialogContainerProps {
     onRequestZapPayment: (input: ZapIntentInput) => Promise<void>;
     zapAmounts: number[];
     onConfigureZapAmounts: () => void;
-    donationPubkey?: string;
-    canDonateWithWallet?: boolean;
     onResolveProfiles: (pubkeys: string[]) => Promise<void> | void;
     onResolveEventReferences: (
         eventIds: string[],
@@ -90,8 +88,6 @@ export function ActiveProfileDialogContainer({
     onRequestZapPayment,
     zapAmounts,
     onConfigureZapAmounts,
-    donationPubkey,
-    canDonateWithWallet = false,
     onResolveProfiles,
     onResolveEventReferences,
 }: ActiveProfileDialogContainerProps) {
@@ -155,9 +151,6 @@ export function ActiveProfileDialogContainer({
             })}
             zapAmounts={zapAmounts}
             onConfigureZapAmounts={onConfigureZapAmounts}
-            {...(donationPubkey ? { donationPubkey } : {})}
-            canDonateWithWallet={canDonateWithWallet}
-            onDonate={({ pubkey, amount }) => onRequestZapPayment({ targetPubkey: pubkey, amount })}
             onResolveProfiles={onResolveProfiles}
             onResolveEventReferences={onResolveEventReferences}
             eventReferencesById={eventReferencesById}

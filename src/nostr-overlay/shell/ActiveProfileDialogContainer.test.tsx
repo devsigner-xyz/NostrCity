@@ -69,9 +69,6 @@ interface MockedDialogProps {
     onZap?: (input: { eventId: string; eventKind?: number; targetPubkey?: string; amount: number }) => Promise<void> | void;
     zapAmounts?: number[];
     onConfigureZapAmounts?: () => void;
-    donationPubkey?: string;
-    canDonateWithWallet?: boolean;
-    onDonate?: (input: { pubkey: string; amount: number }) => Promise<void> | void;
     onResolveProfiles?: (pubkeys: string[]) => Promise<void> | void;
     onResolveEventReferences?: (eventIds: string[], options?: { relayHintsByEventId?: Record<string, string[]> }) => Promise<Record<string, unknown> | void> | Record<string, unknown> | void;
     eventReferencesById?: Record<string, unknown>;
@@ -257,26 +254,6 @@ describe('ActiveProfileDialogContainer', () => {
             amount: 128,
             eventId: EVENT_ID,
         });
-    });
-
-    test('passes donation target and maps donation payments to zap requests', async () => {
-        const onRequestZapPayment = vi.fn(async () => {});
-        const rendered = await renderContainer(createDefaultProps({
-            donationPubkey: ACTIVE_PUBKEY,
-            canDonateWithWallet: true,
-            onRequestZapPayment,
-        }));
-        mounted.push(rendered);
-
-        const dialogProps = getDialogProps();
-        expect(dialogProps.donationPubkey).toBe(ACTIVE_PUBKEY);
-        expect(dialogProps.canDonateWithWallet).toBe(true);
-
-        await act(async () => {
-            await dialogProps.onDonate?.({ pubkey: ACTIVE_PUBKEY, amount: 210 });
-        });
-
-        expect(onRequestZapPayment).toHaveBeenCalledWith({ targetPubkey: ACTIVE_PUBKEY, amount: 210 });
     });
 
     test('passes dialog callbacks through unchanged', async () => {

@@ -19,13 +19,6 @@ import { SettingsRouteContainer, type SettingsRouteContainerProps } from './Sett
 import { UserSearchRouteContainer, type UserSearchRouteContainerProps } from './UserSearchRouteContainer';
 import { WalletRouteContainer, type WalletRouteContainerProps } from './WalletRouteContainer';
 import { isWriteEnabled } from '../../nostr/auth/session';
-import type { NostrProfile } from '../../nostr/types';
-
-interface DonationRouteProps {
-    profile?: NostrProfile;
-    canDonateWithWallet: boolean;
-    onDonate: (input: { pubkey: string; amount: number }) => Promise<void> | void;
-}
 
 export interface OverlayRoutesProps {
     showLoginGate: boolean;
@@ -45,7 +38,6 @@ export interface OverlayRoutesProps {
     profile: ProfileRouteContainerProps;
     userSearch: UserSearchRouteContainerProps;
     settings: SettingsRouteContainerProps;
-    donation: DonationRouteProps;
 }
 
 export function OverlayRoutes({
@@ -66,7 +58,6 @@ export function OverlayRoutes({
     profile,
     userSearch,
     settings,
-    donation,
 }: OverlayRoutesProps) {
     const groupsRouteElement = !groups
         ? <GroupsRouteContainer />
@@ -104,7 +95,7 @@ export function OverlayRoutes({
                     <Route path="/settings" element={<SettingsRouteContainer {...settings} />}>
                         <Route index element={<Navigate to="shortcuts" replace />} />
                         <Route path="shortcuts" element={<SettingsShortcutsRoute />} />
-                        <Route path="about" element={<SettingsAboutRoute {...donation} />} />
+                        <Route path="about" element={<SettingsAboutRoute />} />
                         <Route path="advanced" element={<SettingsAdvancedRoute />} />
                         <Route path="*" element={<Navigate to="shortcuts" replace />} />
                     </Route>

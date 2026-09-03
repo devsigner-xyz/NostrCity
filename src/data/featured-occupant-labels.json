@@ -1,8 +1,3 @@
 {
-  "accounts": [
-    {
-      "npub": "npub1dd3k7ku95jhpyh9y7pgx9qrh2ykvtfl5lnncqzzt2gyhgw0a04ysm4paad",
-      "comment": "strhodler"
-    }
-  ]
+  "accounts": []
 }

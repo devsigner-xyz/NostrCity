@@ -29,34 +29,11 @@ export const resolveAllowedOrigins = (env: EnvLike = process.env): Set<string> =
 
 const CORS_METHODS = 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
 const CORS_HEADERS = 'Content-Type,Authorization,X-Request-Id';
-const NIP05_WELL_KNOWN_PATH = '/.well-known/nostr.json';
-const NIP05_WELL_KNOWN_CORS_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-
-const isNip05WellKnownRequest = (url: string): boolean => {
-  return url.split('?')[0] === NIP05_WELL_KNOWN_PATH;
-};
-
 export const corsPlugin: FastifyPluginAsync = async (app) => {
   const allowedOrigins = resolveAllowedOrigins();
 
   app.addHook('onRequest', async (request, reply) => {
     const origin = request.headers.origin;
-
-    if (
-      isNip05WellKnownRequest(request.url) &&
-      NIP05_WELL_KNOWN_CORS_METHODS.has(request.method)
-    ) {
-      reply.header('access-control-allow-origin', '*');
-      reply.header('access-control-allow-methods', 'GET,OPTIONS');
-      reply.header('access-control-allow-headers', CORS_HEADERS);
-      reply.header('access-control-max-age', '600');
-
-      if (request.method === 'OPTIONS') {
-        reply.code(204).send();
-      }
-
-      return;
-    }
 
     if (!origin) {
       return;

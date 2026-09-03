@@ -33,7 +33,6 @@ import { validateProductionSecurityConfig } from './production-config';
 import { isPublicDemoMode } from './public-demo-mode';
 import type { ReadinessChecks } from './readiness';
 import { healthRoute } from './routes/health.route';
-import { nip05WellKnownRoute } from './routes/nip05-well-known.route';
 import { createAppServices } from './services/app-services';
 
 export interface BuildAppOptions {
@@ -91,7 +90,6 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
   }
   app.register(errorHandlerPlugin);
 
-  app.register(nip05WellKnownRoute);
   app.register(healthRoute, { prefix: '/v1', readinessChecks });
   app.register(identityRoutes, {
     prefix: '/v1',

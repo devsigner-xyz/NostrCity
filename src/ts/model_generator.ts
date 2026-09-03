@@ -50,7 +50,7 @@ export default class ModelGenerator {
             this.buildingsGeometries = [];
             this.polygonsToProcess = [];
             this.buildingsToProcess = [];
-            this.zip.file("model/README.txt", "For guidance on working with these exported STL files, see https://github.com/strhodler/NostrCity/blob/main/docs/empezar/exportacion-y-stl.md");
+            this.zip.file("model/README.txt", "For guidance on working with these exported STL files, see https://github.com/devsigner-xyz/NostrCity/blob/master/docs/empezar/exportacion-y-stl.md");
             this.setState(ModelGeneratorStates.SUBTRACT_OCEAN);
         });
     }

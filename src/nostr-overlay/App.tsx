@@ -80,7 +80,6 @@ import { OverlayRoutes } from './routes/OverlayRoutes';
 import { buildAgoraNoteDetailPath } from './routes/note-detail-routing';
 import { buildLocationTarget, routeReturnStateFromUnknown } from './shell/route-return-state';
 import type { NoteCardModel } from './components/note-card-model';
-import { decodeNpubToHex } from '../nostr/npub';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Toaster, toast } from 'sonner';
 import { translate } from '@/i18n/translate';
@@ -96,23 +95,6 @@ interface AppProps {
 interface SocialComposeState {
     mode: 'post' | 'quote';
     quoteTarget?: NoteCardModel;
-}
-
-const STRHODLER_DONATION_PUBKEY = decodeNpubToHex('npub1dd3k7ku95jhpyh9y7pgx9qrh2ykvtfl5lnncqzzt2gyhgw0a04ysm4paad');
-
-function isWalletReadyForDonation(settings: ReturnType<typeof useWalletZapController>['walletSettings']): boolean {
-    const connection = settings.activeConnection;
-    return Boolean(connection?.capabilities.payInvoice && connection.restoreState === 'connected');
-}
-
-function canCreateZapRequest(input: { writeGateway: unknown; relaySettingsSnapshot: RelaySettingsState }): boolean {
-    return Boolean(
-        input.writeGateway
-        && (
-            input.relaySettingsSnapshot.byType.nip65Both.length > 0
-            || input.relaySettingsSnapshot.byType.nip65Write.length > 0
-        )
-    );
 }
 
 export function App({ mapBridge, services }: AppProps) {
@@ -1111,23 +1093,6 @@ export function App({ mapBridge, services }: AppProps) {
         refreshWallet,
     } = walletZapController;
     const requestZapPayment: (input: ZapIntentInput) => Promise<void> = walletZapController.handleZapIntent;
-    const strhodlerDonationProfile = useMemo(() => {
-        if (!STRHODLER_DONATION_PUBKEY) {
-            return undefined;
-        }
-
-        if (overlay.activeProfilePubkey === STRHODLER_DONATION_PUBKEY && overlay.activeProfile) {
-            return overlay.activeProfile;
-        }
-
-        return overlay.profiles[STRHODLER_DONATION_PUBKEY]
-            ?? overlay.followerProfiles[STRHODLER_DONATION_PUBKEY]
-            ?? (overlay.ownerPubkey === STRHODLER_DONATION_PUBKEY ? overlay.ownerProfile : undefined);
-    }, [overlay.activeProfile, overlay.activeProfilePubkey, overlay.followerProfiles, overlay.ownerProfile, overlay.ownerPubkey, overlay.profiles]);
-    const canDonateWithWallet = overlay.canWrite && isWalletReadyForDonation(walletSettings) && canCreateZapRequest({
-        writeGateway: overlay.writeGateway,
-        relaySettingsSnapshot,
-    });
     const hasGroupRelaysConfigured = relaySettingsSnapshot.byType.groups.length > 0;
     const addSuggestedGroupRelays = useCallback(() => {
         let nextState = relaySettingsSnapshot;
@@ -1211,10 +1176,6 @@ export function App({ mapBridge, services }: AppProps) {
         onManageGroupRelays: openGroupRelaysSettings,
         errorFallbackMessage: translate(uiSettings.language, 'groups.errorDescription'),
     });
-    const requestDonationPayment = useCallback((input: { pubkey: string; amount: number }) => (
-        requestZapPayment({ targetPubkey: input.pubkey, amount: input.amount })
-    ), [requestZapPayment]);
-
     const handleLogout = async (): Promise<void> => {
         await overlay.logoutSession?.();
         resetEasterEggProgress();
@@ -1575,11 +1536,6 @@ export function App({ mapBridge, services }: AppProps) {
                         ...(overlay.ownerPubkey ? { ownerPubkey: overlay.ownerPubkey } : {}),
                         onClose: () => navigate('/'),
                     }}
-                    donation={{
-                        ...(strhodlerDonationProfile ? { profile: strhodlerDonationProfile } : {}),
-                        canDonateWithWallet,
-                        onDonate: requestDonationPayment,
-                    }}
                 />
             )}
             dialogs={(
@@ -1630,8 +1586,6 @@ export function App({ mapBridge, services }: AppProps) {
                     onRequestZapPayment={requestZapPayment}
                     zapAmounts={zapSettings.amounts}
                     onConfigureZapAmounts={() => navigate('/wallet')}
-                    {...(STRHODLER_DONATION_PUBKEY ? { donationPubkey: STRHODLER_DONATION_PUBKEY } : {})}
-                    canDonateWithWallet={canDonateWithWallet}
                     onResolveProfiles={resolveMentionProfiles}
                     onResolveEventReferences={resolveEventReferences}
                     activeEasterEgg={activeEasterEgg}

@@ -78,7 +78,7 @@ export function LoginGateScreen({
                                 <p className="mt-1 text-muted-foreground">{t('auth.login.publicDemo.body')}</p>
                                 <a
                                     className="mt-2 inline-flex text-primary underline-offset-4 hover:underline"
-                                    href="https://github.com/strhodler/NostrCity"
+                                    href="https://github.com/devsigner-xyz/NostrCity"
                                     target="_blank"
                                     rel="noreferrer"
                                 >
@@ -100,13 +100,13 @@ export function LoginGateScreen({
                                 </Empty>
                                 <Badge variant="outline" asChild className="mx-auto h-auto gap-1.5 py-1 pl-1 pr-2">
                                     <a
-                                        href="https://github.com/strhodler"
+                                        href="https://github.com/devsigner-xyz"
                                         target="_blank"
                                         rel="noreferrer"
-                                        data-testid="strhodler-attribution-link"
+                                        data-testid="devsigner-attribution-link"
                                     >
-                                        <img src="/strhodler.jpg" alt="" className="size-5 rounded-full object-cover" />
-                                        {t('auth.login.strhodlerByline')}
+                                        <img src="/devsigner.png" alt="" className="size-5 rounded-full object-cover" />
+                                        {t('auth.login.devsignerByline')}
                                     </a>
                                 </Badge>
                             </>

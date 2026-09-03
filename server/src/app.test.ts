@@ -8,8 +8,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from './app';
 
-const STRHODLER_PUBKEY = '6b636f5b85a4ae125ca4f050628077512cc5a7f4fce780084b52097439fd7d49';
-
 const expectRouteNotFound = async (
   appInstance: ReturnType<typeof buildApp>,
   method: 'GET' | 'POST',
@@ -46,39 +44,6 @@ describe('buildApp', () => {
     );
     expect(response.headers['cross-origin-opener-policy']).toBe('same-origin');
     expect(response.headers['x-content-type-options']).toBe('nosniff');
-  });
-
-  it('serves the NIP-05 well-known document without redirects', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: '/.well-known/nostr.json?name=strhodler',
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.headers.location).toBeUndefined();
-    expect(response.headers['content-type']).toContain('application/json');
-    expect(response.headers['access-control-allow-origin']).toBe('*');
-    expect(response.json()).toEqual({
-      names: {
-        strhodler: STRHODLER_PUBKEY,
-      },
-      relays: {
-        [STRHODLER_PUBKEY]: [
-          'wss://relay.damus.io',
-          'wss://nos.lol',
-          'wss://relay.primal.net',
-          'wss://relay.snort.social',
-          'wss://nostr.wine',
-          'wss://relay.nostr.band',
-          'wss://relay.current.fyi',
-          'wss://purplepag.es',
-          'wss://relay.nostr.bg',
-          'wss://nostr.mom',
-          'wss://relayable.org',
-          'wss://offchain.pub',
-        ],
-      },
-    });
   });
 
   it('returns readiness status for GET /v1/ready', async () => {

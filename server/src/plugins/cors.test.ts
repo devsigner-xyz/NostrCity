@@ -55,45 +55,6 @@ describe('cors plugin', () => {
     });
   });
 
-  it('allows any origin for the NIP-05 well-known document', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: '/.well-known/nostr.json?name=strhodler',
-      headers: {
-        origin: 'https://not-allowed.example',
-      },
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.headers['access-control-allow-origin']).toBe('*');
-  });
-
-  it('allows NIP-05 well-known preflight from any origin', async () => {
-    const response = await app.inject({
-      method: 'OPTIONS',
-      url: '/.well-known/nostr.json?name=strhodler',
-      headers: {
-        origin: 'https://not-allowed.example',
-      },
-    });
-
-    expect(response.statusCode).toBe(204);
-    expect(response.headers['access-control-allow-origin']).toBe('*');
-    expect(response.headers['access-control-allow-methods']).toBe('GET,OPTIONS');
-  });
-
-  it('does not open CORS for non-NIP-05 methods on the well-known path', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/.well-known/nostr.json?name=strhodler',
-      headers: {
-        origin: 'https://not-allowed.example',
-      },
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(response.headers['access-control-allow-origin']).toBeUndefined();
-  });
 });
 
 describe('cors plugin in production', () => {

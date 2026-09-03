@@ -10,7 +10,6 @@ import { LocalKeyAuthProvider } from '../nostr/auth/providers/local-key-provider
 import { createAuthSession } from '../nostr/auth/session';
 import { AUTH_SESSION_STORAGE_KEY } from '../nostr/auth/secure-storage';
 import { loadRelaySettings, RELAY_SETTINGS_STORAGE_KEY, saveRelaySettings, type RelaySettingsState } from '../nostr/relay-settings';
-import { WALLET_SETTINGS_STORAGE_KEY } from '../nostr/wallet-settings';
 import { UI_SETTINGS_STORAGE_KEY } from '../nostr/ui-settings';
 import { EASTER_EGG_PROGRESS_STORAGE_KEY } from '../nostr/easter-egg-progress';
 import { getBootstrapRelays } from '../nostr/relay-policy';
@@ -1235,10 +1234,18 @@ describe('Nostr overlay App', () => {
                 [SAMPLE_AUTH_PUBKEY]: { pubkey: SAMPLE_AUTH_PUBKEY, displayName: 'Owner' },
                 [peerPubkey]: { pubkey: peerPubkey, displayName: 'Alice' },
             }),
+            fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
+                ownerPubkey: SAMPLE_AUTH_PUBKEY,
+                follows: [peerPubkey],
+                relayHints: [],
+            }),
         });
         mounted.push(rendered);
 
         await waitFor(() => (rendered.container.textContent || '').includes('hola alice'));
+        await waitFor(() => (
+            rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"] .nostr-mobile-app-bar-title')?.textContent === 'Alice'
+        ));
 
         const appBarTitle = rendered.container.querySelector('[data-testid="mobile-overlay-app-bar"] .nostr-mobile-app-bar-title');
         expect(appBarTitle?.textContent).toBe('Alice');
@@ -4863,74 +4870,6 @@ describe('Nostr overlay App', () => {
         await waitFor(() => reloaded.container.querySelector('[data-testid="login-gate-screen"]') === null);
         await waitFor(() => (reloaded.container.textContent || '').includes('Conectada por WebLN'));
         expect(enable).toHaveBeenCalledTimes(2);
-    });
-
-    test('keeps donation payment controls hidden for readonly npub sessions with a remembered WebLN wallet', async () => {
-        const ownerPubkey = 'f'.repeat(64);
-        const strhodlerPubkey = nip19.decode('npub1dd3k7ku95jhpyh9y7pgx9qrh2ykvtfl5lnncqzzt2gyhgw0a04ysm4paad').data as string;
-        const enable = vi.fn(async () => {});
-        window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
-            method: 'npub',
-            pubkey: ownerPubkey,
-            readonly: true,
-            locked: false,
-            createdAt: Date.now(),
-        }));
-        window.localStorage.setItem(`${WALLET_SETTINGS_STORAGE_KEY}:user:${ownerPubkey}`, JSON.stringify({
-            activeConnection: {
-                method: 'webln',
-                capabilities: {
-                    payInvoice: true,
-                    makeInvoice: false,
-                    notifications: false,
-                },
-                restoreState: 'connected',
-            },
-        }));
-        Object.assign(window, {
-            webln: {
-                enable,
-                sendPayment: vi.fn(async () => ({ preimage: 'abc' })),
-                makeInvoice: vi.fn(async () => ({ paymentRequest: 'lnbc1invoice', expiresAt: 200 })),
-            },
-        });
-
-        const { bridge } = createMapBridgeStub();
-        const rendered = await renderApp(
-            <App
-                mapBridge={bridge}
-                services={{
-                    createClient: () => ({
-                        connect: async () => {},
-                        fetchLatestReplaceableEvent: async () => null,
-                        fetchEvents: async () => [],
-                    }),
-                    fetchFollowsByPubkeyFn: vi.fn().mockResolvedValue({
-                        ownerPubkey,
-                        follows: [strhodlerPubkey],
-                        relayHints: [],
-                    }),
-                    fetchProfilesFn: vi.fn().mockResolvedValue({
-                        [ownerPubkey]: { pubkey: ownerPubkey, displayName: 'Owner' },
-                        [strhodlerPubkey]: { pubkey: strhodlerPubkey, displayName: 'strhodler', lud16: 'strhodler@getalby.com' },
-                    }),
-                    fetchFollowersBestEffortFn: vi.fn().mockResolvedValue({
-                        followers: [],
-                        scannedBatches: 1,
-                        complete: true,
-                    }),
-                }}
-            />,
-            { initialEntries: ['/settings/about'] }
-        );
-        mounted.push(rendered);
-
-        await waitFor(() => rendered.container.querySelector('[data-testid="lightning-donation-banner"]') !== null);
-        await waitFor(() => enable.mock.calls.length >= 1);
-
-        expect(rendered.container.querySelector('[data-testid="lightning-donation-qr"]')).not.toBeNull();
-        expect(rendered.container.querySelector('[data-testid="lightning-donation-amount"]')).toBeNull();
-        expect(rendered.container.querySelector('[data-testid="lightning-donation-submit"]')).toBeNull();
     });
 
     test('marks WebLN wallet as reconnect-required when refresh revalidation fails', async () => {

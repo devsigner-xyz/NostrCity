@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { SettingsAboutPage } from './SettingsAboutPage';
 
 interface RenderResult {
@@ -8,13 +8,13 @@ interface RenderResult {
     root: Root;
 }
 
-async function renderPage(props: Partial<Parameters<typeof SettingsAboutPage>[0]> = {}): Promise<RenderResult> {
+async function renderPage(): Promise<RenderResult> {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
 
     await act(async () => {
-        root.render(<SettingsAboutPage {...props} />);
+        root.render(<SettingsAboutPage />);
     });
 
     return { container, root };
@@ -51,21 +51,5 @@ describe('SettingsAboutPage', () => {
         expect(link?.getAttribute('href')).toBe('https://github.com/ProbableTrain/MapGenerator');
         expect(link?.getAttribute('target')).toBe('_blank');
         expect(link?.getAttribute('rel')).toBe('noreferrer');
-    });
-
-    test('includes reusable lightning donation banner when strhodler lightning metadata is available', async () => {
-        const rendered = await renderPage({
-            donationProfile: {
-                pubkey: 'd'.repeat(64),
-                displayName: 'strhodler',
-                lud16: 'strhodler@getalby.com',
-            },
-            canDonateWithWallet: false,
-            onDonate: vi.fn(async () => {}),
-        });
-        mounted.push(rendered);
-
-        expect(rendered.container.querySelector('[data-testid="lightning-donation-banner"]')).not.toBeNull();
-        expect(rendered.container.querySelector('[data-testid="lightning-donation-qr"]')).not.toBeNull();
     });
 });

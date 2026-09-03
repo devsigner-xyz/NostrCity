@@ -158,36 +158,6 @@ describe('OccupantProfileDialog', () => {
         expect(subheadings).not.toContain('Le siguen');
     });
 
-    test('shows lightning donation banner first in strhodler info tab', async () => {
-        const strhodlerPubkey = 'd'.repeat(64);
-        const rendered = await renderElement(
-            <OccupantProfileDialog
-                {...buildProps({
-                    pubkey: strhodlerPubkey,
-                    profile: {
-                        pubkey: strhodlerPubkey,
-                        displayName: 'strhodler',
-                        lud16: 'strhodler@getalby.com',
-                    },
-                    donationPubkey: strhodlerPubkey,
-                    canDonateWithWallet: false,
-                    onDonate: vi.fn(async () => {}),
-                })}
-            />
-        );
-        mounted.push(rendered);
-
-        await selectTab('Información');
-
-        const infoSection = document.body.querySelector('.nostr-profile-info');
-        const rows = Array.from(infoSection?.querySelectorAll('.nostr-profile-info-row') ?? []);
-        const banner = infoSection?.querySelector('[data-testid="lightning-donation-banner"]');
-
-        expect(banner).not.toBeNull();
-        expect(rows.length).toBeGreaterThan(0);
-        expect(infoSection?.firstElementChild).toBe(banner);
-    });
-
     test('renders a horizontal separator between profile header and tabs', async () => {
         const rendered = await renderElement(<OccupantProfileDialog {...buildProps()} />);
         mounted.push(rendered);
