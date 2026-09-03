@@ -7,7 +7,7 @@ export type UiLanguage = AppLocale;
 export type UiTheme = 'light' | 'dark' | 'system';
 
 const DEFAULT_AGORA_FEED_LAYOUT: AgoraFeedLayout = 'list';
-const DEFAULT_THEME: UiTheme = 'system';
+const DEFAULT_THEME: UiTheme = 'light';
 const DEFAULT_OCCUPIED_LABELS_ZOOM_LEVEL = 8;
 const DEFAULT_STREET_LABELS_ENABLED = true;
 const DEFAULT_SPECIAL_MARKERS_ENABLED = true;

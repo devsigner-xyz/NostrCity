@@ -217,6 +217,9 @@ describe('LoginGateScreen', () => {
         expect(rendered.container.textContent || '').toContain('Ver repositorio en GitHub');
         expect(rendered.container.textContent || '').not.toContain('Crear cuenta');
 
+        const npubInput = rendered.container.querySelector('input[name="npub"]') as HTMLInputElement | null;
+        expect(npubInput?.value).toBe('npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m');
+
         const link = rendered.container.querySelector('[data-testid="public-demo-login-notice"] a') as HTMLAnchorElement | null;
         expect(link?.getAttribute('href')).toBe('https://github.com/devsigner-xyz/NostrCity');
         expect(link?.getAttribute('target')).toBe('_blank');

@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 
 interface LoginMethodSelectorProps {
     disabled?: boolean;
+    initialNpub?: string;
     loadingText?: string;
     onStartSession: (method: LoginMethod, input: ProviderResolveInput) => Promise<void> | void;
     initialMethod?: SelectorMethod;
@@ -38,6 +39,7 @@ const NIP46_PAIRING_RELAYS = getBootstrapRelays().slice(0, 2);
 
 export function LoginMethodSelector({
     disabled = false,
+    initialNpub = '',
     loadingText,
     onStartSession,
     initialMethod = 'npub',
@@ -45,7 +47,7 @@ export function LoginMethodSelector({
 }: LoginMethodSelectorProps) {
     const { t } = useI18n();
     const [method, setMethod] = useState<SelectorMethod>(restrictToNpubOnly ? 'npub' : initialMethod);
-    const [npub, setNpub] = useState('');
+    const [npub, setNpub] = useState(initialNpub);
     const [bunkerUri, setBunkerUri] = useState('');
     const [nip46Action, setNip46Action] = useState<Nip46Action>('bunker');
     const [nostrConnectUri, setNostrConnectUri] = useState('');

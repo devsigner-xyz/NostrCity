@@ -69,7 +69,7 @@ afterEach(async () => {
 });
 
 describe('LandingPage theme selector', () => {
-  test('uses system dark mode before an explicit selection is stored', async () => {
+  test('uses light mode before an explicit selection is stored', async () => {
     mockSystemTheme(true);
 
     const rendered = await renderLanding();
@@ -77,13 +77,13 @@ describe('LandingPage theme selector', () => {
 
     const shell = rendered.container.querySelector('.landing-shell');
     const logo = rendered.container.querySelector('.brand-logo') as HTMLImageElement | null;
-    const darkButton = rendered.container.querySelector('button[aria-pressed="true"]');
+    const lightButton = rendered.container.querySelector('button[aria-pressed="true"]');
 
-    expect(shell?.getAttribute('data-theme')).toBe('dark');
-    expect(logo?.getAttribute('src')).toBe('/icon-dark-32x32.png');
+    expect(shell?.getAttribute('data-theme')).toBe('light');
+    expect(logo?.getAttribute('src')).toBe('/icon-light-32x32.png');
     expect(logo?.getAttribute('width')).toBe('32');
     expect(logo?.getAttribute('height')).toBe('32');
-    expect(darkButton?.textContent).toContain('Oscuro');
+    expect(lightButton?.textContent).toContain('Claro');
   });
 
   test('stores explicit light mode for the app when selected from the home', async () => {

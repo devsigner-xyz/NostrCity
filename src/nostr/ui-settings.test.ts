@@ -15,7 +15,7 @@ describe('ui-settings', () => {
         const state = loadUiSettings(window.localStorage);
         expect(state).toEqual(getDefaultUiSettings());
         expect(state.agoraFeedLayout).toBe('list');
-        expect(state.theme).toBe('system');
+        expect(state.theme).toBe('light');
         expect(state.occupiedLabelsZoomLevel).toBe(8);
         expect(state.streetLabelsEnabled).toBe(true);
         expect(state.specialMarkersEnabled).toBe(true);
@@ -181,12 +181,12 @@ describe('ui-settings', () => {
         expect(loaded.specialMarkersEnabled).toBe(true);
     });
 
-    test('falls back to system theme when payload is malformed', () => {
+    test('falls back to light theme when payload is malformed', () => {
         window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({
             theme: 'sepia',
         }));
 
         const loaded = loadUiSettings(window.localStorage);
-        expect(loaded.theme).toBe('system');
+        expect(loaded.theme).toBe('light');
     });
 });

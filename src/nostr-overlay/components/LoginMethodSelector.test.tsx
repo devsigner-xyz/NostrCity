@@ -17,6 +17,7 @@ interface RenderResult {
 interface RenderSelectorInput {
     disabled?: boolean;
     initialMethod?: 'npub' | 'nip07' | 'nip46';
+    initialNpub?: string;
     locale?: AppLocale;
     loadingText?: string;
     onStartSession?: StartSessionHandler;
@@ -34,6 +35,7 @@ async function renderSelector(input: RenderSelectorInput = {}): Promise<RenderRe
         onStartSession,
         ...(input.loadingText === undefined ? {} : { loadingText: input.loadingText }),
         ...(input.initialMethod === undefined ? {} : { initialMethod: input.initialMethod }),
+        ...(input.initialNpub === undefined ? {} : { initialNpub: input.initialNpub }),
         ...(input.restrictToNpubOnly === undefined ? {} : { restrictToNpubOnly: input.restrictToNpubOnly }),
     };
 
@@ -157,6 +159,18 @@ describe('LoginMethodSelector', () => {
         expect(rendered.container.querySelector('[data-testid="login-method-selector"]')).not.toBeNull();
         expect(rendered.container.querySelector('[data-testid="login-method-form-npub"]')).not.toBeNull();
         expect(rendered.container.querySelector('[data-testid="login-method-submit-npub"]')).not.toBeNull();
+    });
+
+    test('uses an optional initial npub without affecting the default empty input', async () => {
+        const defaultSelector = await renderSelector();
+        const prefilledSelector = await renderSelector({ initialNpub: 'npub1prefilled' });
+        mounted.push(defaultSelector, prefilledSelector);
+
+        const defaultInput = defaultSelector.container.querySelector('input[name="npub"]') as HTMLInputElement;
+        const prefilledInput = prefilledSelector.container.querySelector('input[name="npub"]') as HTMLInputElement;
+
+        expect(defaultInput.value).toBe('');
+        expect(prefilledInput.value).toBe('npub1prefilled');
     });
 
     test('temporarily exposes only npub in the disabled login method select', async () => {

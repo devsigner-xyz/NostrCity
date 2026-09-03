@@ -31,12 +31,12 @@ afterEach(() => {
 });
 
 describe('site theme preference', () => {
-  it('resolves to the system theme when no explicit preference is stored', () => {
+  it('resolves to light when no explicit preference is stored', () => {
     mockSystemTheme(true);
 
     expect(readStoredSiteThemeValue()).toBeNull();
-    expect(readSiteThemePreference()).toBe('system');
-    expect(resolveSiteTheme()).toBe('dark');
+    expect(readSiteThemePreference()).toBe('light');
+    expect(resolveSiteTheme()).toBe('light');
   });
 
   it('distinguishes an explicit system preference from a missing theme value', () => {

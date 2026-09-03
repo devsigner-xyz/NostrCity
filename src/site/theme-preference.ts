@@ -54,7 +54,7 @@ export function readStoredSiteThemeValue(storage: StorageLike | null = getDefaul
 }
 
 export function readSiteThemePreference(storage: StorageLike | null = getDefaultStorage()): UiTheme {
-  return readStoredSiteThemeValue(storage) ?? 'system';
+  return readStoredSiteThemeValue(storage) ?? 'light';
 }
 
 export function resolveSiteTheme(storage: StorageLike | null = getDefaultStorage()): SiteTheme {

@@ -25,6 +25,8 @@ interface LoginGateScreenProps {
     onStartSession: (method: LoginMethod, input: ProviderResolveInput) => Promise<void> | void;
 }
 
+const PUBLIC_DEMO_NPUB = 'npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m';
+
 export function LoginGateScreen({
     authSession,
     savedLocalAccount,
@@ -47,7 +49,7 @@ export function LoginGateScreen({
     const loginMethodSelectorProps = {
         disabled,
         ...(mapLoaderText === null || mapLoaderText === undefined ? {} : { loadingText: mapLoaderText }),
-        ...(publicDemoMode ? { restrictToNpubOnly: true } : {}),
+        ...(publicDemoMode ? { initialNpub: PUBLIC_DEMO_NPUB, restrictToNpubOnly: true } : {}),
         onStartSession: async (method: LoginMethod, input: ProviderResolveInput) => {
             await onStartSession(method, input);
         },
