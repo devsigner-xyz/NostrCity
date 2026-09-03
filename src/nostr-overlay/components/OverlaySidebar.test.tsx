@@ -353,7 +353,7 @@ describe('OverlaySidebar', () => {
         const chatButton = rendered.container.querySelector('button[aria-label="Abrir chats"]') as HTMLButtonElement | null;
         const groupsButton = rendered.container.querySelector('button[aria-label="Abrir grupos"]') as HTMLButtonElement | null;
         const notificationsButton = rendered.container.querySelector('button[aria-label="Abrir notificaciones"]') as HTMLButtonElement | null;
-        const walletButton = rendered.container.querySelector('button[aria-label="Abrir Wallet"]') as HTMLButtonElement | null;
+        const walletButton = rendered.container.querySelector('button[aria-label="Abrir wallet"]') as HTMLButtonElement | null;
 
         expect(publishButton).not.toBeNull();
         expect(chatButton).not.toBeNull();
